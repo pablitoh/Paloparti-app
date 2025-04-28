@@ -1,0 +1,53 @@
+{
+  "name": "paloparti-next-capacitor",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "check-db": "node scripts/check-db.js",
+    "dev": "npm run check-db && next dev",
+    "predev": "chmod +x scripts/check-db.js",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "export": "next export",
+    "postexport": "cp out/index.html out/200.html",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@heroicons/react": "^2.2.0",
+    "@mui/material": "^7.0.2",
+    "@tanstack/react-query": "^5.74.4",
+    "@types/bcryptjs": "^3.0.0",
+    "@types/jsonwebtoken": "^9.0.9",
+    "bcryptjs": "^3.0.2",
+    "jsonwebtoken": "^9.0.2",
+    "next-auth": "^4.24.11",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-hot-toast": "^2.5.2",
+    "swr": "^2.3.3"
+  },
+  "devDependencies": {
+    "@prisma/client": "^6.6.0",
+    "@types/jest": "^29.5.14",
+    "@types/react": "19.1.0",
+    "@types/supertest": "^6.0.3",
+    "autoprefixer": "^10.0.0",
+    "jest": "^29.7.0",
+    "next": "^15.2.4",
+    "node-mocks-http": "^1.16.2",
+    "postcss": "^8.0.0",
+    "prisma": "^6.6.0",
+    "supertest": "^7.1.0",
+    "tailwindcss": "^3.0.0",
+    "ts-jest": "^29.3.1",
+    "ts-node": "^10.9.2",
+    "typescript": "5.8.3"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  }
+}

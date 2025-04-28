@@ -2,57 +2,70 @@ import { useRouter } from 'next/router';
 import { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import Layout from '../../components/Layout';
-import SimpleHeaderComponent from '../../components/group/SimpleHeader';
-import ReplaceTbdPlayerModal from '../../components/group/modals/ReplaceTbdPlayerModal';
+import Button from '../../components/Button';
+import { Avatar } from '@mui/material';
+import { Box, Typography, Chip } from '@mui/material';
+import {
+  CheckCircleIcon,
+  XCircleIcon,
+  ArrowPathIcon,
+} from '@heroicons/react/24/outline';
+import {
+  CheckCircleIcon as CheckCircleIconSolid,
+  XCircleIcon as XCircleIconSolid,
+} from '@heroicons/react/24/solid';
+import { showSuccessToast, showErrorToast } from '../../services/toastService';
+
+// Import the tab components
 import MembersTab from '../../components/group/tabs/MembersTab';
 import NextMatchTab from '../../components/group/tabs/NextMatchTab';
 import HistoryTab from '../../components/group/tabs/HistoryTab';
 import GoalsTab from '../../components/group/tabs/GoalsTab';
 import MvpTab from '../../components/group/tabs/MvpTab';
-import { Avatar } from '@mui/material';
-import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
-import { showSuccessToast, showErrorToast } from '../../services/toastService';
+import SimpleHeaderComponent from '../../components/group/SimpleHeader';
+
+// Importar los nuevos hooks
 import {
   useGroupBasicInfo,
   useGroupNextMatch,
   useGroupMembers,
   useGroupStats,
   useGroupHistory,
+  useUserAttendanceMutation,
+  useAdminAttendanceMutation,
+  useMembershipRequestMutation,
 } from '../../services/groupHooks';
-import { useGroupActions } from '../../hooks/useGroupActions';
+
 import {
-  formatMatchDate,
-  getScoreForTeam,
-  getPlayerGoals,
-  renderGoalBalls,
-  getRecurrenceText,
-} from '../../utils/groupUtils';
-import type {
-  Group,
-  MatchInterface,
-  ParticipantStatus,
-} from '../../types/group';
+  useLeaveGroupMutation,
+  useRandomizeTeamsMutation,
+  useDeleteMatchMutation,
+  useReplaceTbdPlayerMutation,
+  useResetAttendanceMutation,
+} from '../../services/reactQueryHooks';
 
-// Add AuthUser interface
-interface AuthUser {
-  id: string;
-  name?: string | null;
-  email?: string | null;
-  image?: string | null;
-  birthdate?: Date | null;
-}
+// Tipos
+type ParticipantStatus =
+  | 'CONFIRMED'
+  | 'PENDING'
+  | 'DECLINED'
+  | 'confirmed'
+  | 'pending'
+  | 'declined';
 
-export default function GroupDetails() {
+export default function ModularGroupDetails() {
   const router = useRouter();
   const { id } = router.query;
   const { data: session } = useSession();
-  const user = session?.user as AuthUser | null;
+  const user = session?.user;
 
   // Estados para la UI
   const [selectedTab, setSelectedTab] = useState(0);
   const [showReplaceTbdModal, setShowReplaceTbdModal] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
   const [inviteUrl, setInviteUrl] = useState('');
+  const [showTeams, setShowTeams] = useState(false);
   const [allowFillIn, setAllowFillIn] = useState(true);
 
   // Consultas React Query
@@ -61,107 +74,57 @@ export default function GroupDetails() {
     isLoading: isGroupBasicLoading,
     error: groupBasicError,
     refetch: refetchBasicInfo,
-  } = useGroupBasicInfo(Array.isArray(id) ? id[0] : id);
+  } = useGroupBasicInfo(id as string);
 
   const {
     data: nextMatchData,
     isLoading: isNextMatchLoading,
     error: nextMatchError,
     refetch: refetchNextMatch,
-  } = useGroupNextMatch(Array.isArray(id) ? id[0] : id);
+  } = useGroupNextMatch(id as string);
 
   const {
     data: membersData,
     isLoading: isMembersLoading,
     error: membersError,
     refetch: refetchMembers,
-  } = useGroupMembers(Array.isArray(id) ? id[0] : id, {
-    enabled: selectedTab === 4 || selectedTab === 5,
-  });
+  } = useGroupMembers(id as string);
 
   const {
     data: statsData,
     isLoading: isStatsLoading,
     error: statsError,
-  } = useGroupStats(Array.isArray(id) ? id[0] : id, {
-    enabled: selectedTab === 2 || selectedTab === 3,
-  });
+  } = useGroupStats(id as string);
 
   const {
     data: historyData,
     isLoading: isHistoryLoading,
     error: historyError,
-  } = useGroupHistory(Array.isArray(id) ? id[0] : id, 1, 10, {
-    enabled: selectedTab === 1,
-  });
+  } = useGroupHistory(id as string, 1, 10);
+
+  // Mutaciones
+  const userAttendanceMutation = useUserAttendanceMutation();
+  const adminAttendanceMutation = useAdminAttendanceMutation();
+  const membershipRequestMutation = useMembershipRequestMutation();
+  const leaveGroupMutation = useLeaveGroupMutation();
+  const randomizeTeamsMutation = useRandomizeTeamsMutation();
+  const deleteMatchMutation = useDeleteMatchMutation();
+  const replaceTbdPlayerMutation = useReplaceTbdPlayerMutation();
+  const resetAttendanceMutation = useResetAttendanceMutation();
 
   // Datos procesados del grupo
   const group = useMemo(() => {
     if (!groupBasicData) return null;
 
-    const isAdmin =
-      membersData?.isAdmin === true || groupBasicData.isAdmin === true || false;
-
-    const members =
-      selectedTab === 4 || selectedTab === 5 ? membersData?.members || [] : [];
-    const pendingRequests =
-      selectedTab === 4 || selectedTab === 5
-        ? membersData?.pendingRequests || []
-        : [];
-
     return {
       ...groupBasicData,
       nextMatchDetails: nextMatchData?.nextMatchDetails || null,
       userAttendanceStatus: nextMatchData?.userAttendance || null,
-      members,
-      pendingRequests,
-      isAdmin,
+      members: membersData?.members || [],
+      pendingRequests: membersData?.pendingRequests || [],
+      isAdmin: membersData?.isAdmin || groupBasicData.isAdmin || false,
     };
-  }, [groupBasicData, nextMatchData, membersData, selectedTab]);
-
-  // Hook de acciones del grupo
-  const {
-    handleAttendance,
-    handleAdminAttendanceUpdate,
-    handleMembershipRequest,
-    handleLeaveGroup,
-    handleRandomTeams,
-    handleDeleteMatch,
-    handleReplaceTbdPlayer,
-    handleResetAttendance,
-  } = useGroupActions({
-    groupId: Array.isArray(id) ? id[0] : id || '',
-    nextMatchId: groupBasicData?.nextMatchId,
-    onSuccess: () => {
-      // Force full refetch of all data with no-cache
-      refetchBasicInfo({ cancelRefetch: true });
-      refetchNextMatch({ cancelRefetch: true });
-      refetchMembers({ cancelRefetch: true });
-
-      // No page reload needed as React Query will handle refreshing the UI
-    },
-    group: group,
-    allowFillIn: allowFillIn,
-  });
-
-  // Custom handler for attendance that ensures complete refresh
-  const handleGroupAttendanceWithRefresh = async (
-    status: ParticipantStatus
-  ) => {
-    try {
-      await handleAttendance(status);
-
-      // Force immediate refetches without page reload
-      await refetchBasicInfo({ cancelRefetch: true });
-      await refetchNextMatch({ cancelRefetch: true });
-      await refetchMembers({ cancelRefetch: true });
-
-      // No need to reload the page - React Query will update the UI
-    } catch (error) {
-      console.error('Error updating attendance:', error);
-      showErrorToast('Error al actualizar asistencia');
-    }
-  };
+  }, [groupBasicData, nextMatchData, membersData]);
 
   // Datos procesados de estadísticas
   const { goleadores, mvps } = useMemo(() => {
@@ -173,129 +136,169 @@ export default function GroupDetails() {
 
   // Datos procesados de historial
   const completedMatches = useMemo(() => {
-    const matches = historyData?.matches || [];
-    return [...matches].sort((a, b) => {
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateB - dateA;
-    });
+    return historyData?.matches || [];
   }, [historyData]);
 
   // Estados calculados
   const isUserInGroup = useMemo(() => {
     if (!user || !groupBasicData) return false;
-    if (membersData?.members) {
-      return membersData.members.some(
-        (member: any) =>
-          member.userId === user.id &&
-          (member.status === 'ACTIVE' || member.status === 'CONFIRMED')
-      );
-    }
-    return (
-      groupBasicData.userStatus === 'ACTIVE' ||
-      groupBasicData.userStatus === 'CONFIRMED'
-    );
-  }, [groupBasicData, user, membersData]);
+    return groupBasicData.userStatus === 'ACTIVE';
+  }, [groupBasicData, user]);
 
   const isUserPendingInGroup = useMemo(() => {
     if (!user || !groupBasicData) return false;
-    if (membersData?.members) {
-      return membersData.members.some(
-        (member: any) =>
-          member.userId === user.id && member.status === 'PENDING'
-      );
-    }
     return groupBasicData.userStatus === 'PENDING';
-  }, [groupBasicData, user, membersData]);
+  }, [groupBasicData, user]);
 
   const currentUserIsAdmin = useMemo(() => {
-    if (!user || !groupBasicData) return false;
-    if (membersData?.isAdmin === true || groupBasicData.isAdmin === true) {
-      return true;
-    }
-    if (membersData?.members) {
-      const isAdminInMembers = membersData.members.some(
-        (member: any) =>
-          member.userId === user.id &&
-          member.role === 'ADMIN' &&
-          member.status === 'ACTIVE'
-      );
-      if (isAdminInMembers) return true;
-    }
-    return groupBasicData.createdBy === user.id;
-  }, [groupBasicData, user, membersData]);
+    if (!groupBasicData) return false;
+    return groupBasicData.isAdmin;
+  }, [groupBasicData]);
 
   // Combinar todos los estados de carga para la UI
-  const isLoading = useMemo(() => {
-    const baseLoading =
-      isGroupBasicLoading || isNextMatchLoading || isMembersLoading;
-
-    if (selectedTab === 1) {
-      return baseLoading || isHistoryLoading;
-    } else if (selectedTab === 2 || selectedTab === 3) {
-      return baseLoading || isStatsLoading;
-    }
-    return baseLoading;
-  }, [
-    isGroupBasicLoading,
-    isNextMatchLoading,
-    isMembersLoading,
-    isStatsLoading,
-    isHistoryLoading,
-    selectedTab,
-  ]);
+  const isLoading =
+    isGroupBasicLoading ||
+    isNextMatchLoading ||
+    isMembersLoading ||
+    isStatsLoading ||
+    isHistoryLoading ||
+    isSubmitting;
 
   // Combinar todos los errores para mostrar
-  const error = useMemo(() => {
-    const baseError = groupBasicError || nextMatchError || membersError;
-    if (selectedTab === 1) {
-      return baseError || historyError;
-    } else if (selectedTab === 2 || selectedTab === 3) {
-      return baseError || statsError;
-    }
-    return baseError;
-  }, [
-    groupBasicError,
-    nextMatchError,
-    membersError,
-    statsError,
-    historyError,
-    selectedTab,
-  ]);
+  const error =
+    groupBasicError ||
+    nextMatchError ||
+    membersError ||
+    statsError ||
+    historyError;
 
-  // Efecto para cargar pestaña desde URL
+  // Refrescar todos los datos
+  const refreshAllData = () => {
+    refetchBasicInfo();
+    refetchNextMatch();
+    refetchMembers();
+  };
+
+  // Montar URL de invitación
   useEffect(() => {
-    const tabParam = router.query.tab;
-    if (tabParam && !isNaN(Number(tabParam))) {
-      const tabIndex = Number(tabParam);
-      if (tabComponents && tabIndex >= 0 && tabIndex < tabComponents.length) {
-        setSelectedTab(tabIndex);
-      }
+    if (group?.inviteToken) {
+      const baseUrl = window.location.origin;
+      setInviteUrl(`${baseUrl}/invite/${group.inviteToken}`);
+    } else if (id) {
+      const baseUrl = window.location.origin;
+      setInviteUrl(`${baseUrl}/invite/${id}`);
     }
-  }, [router.query]);
-
-  // Efecto para procesar datos del grupo
-  useEffect(() => {
-    if (!group) return;
-
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    setInviteUrl(`${baseUrl}/invite/${id}`);
   }, [group, id]);
 
-  // Función para copiar enlace de invitación
+  // Actualizar el estado de showTeams basado en nextMatchData
+  useEffect(() => {
+    if (nextMatchData?.nextMatchDetails) {
+      const match = nextMatchData.nextMatchDetails;
+      const hasTeams =
+        (match.playersA && match.playersA.length > 0) ||
+        (match.playersB && match.playersB.length > 0);
+
+      setShowTeams(hasTeams);
+    } else {
+      setShowTeams(false);
+    }
+  }, [nextMatchData]);
+
+  // Función reutilizable para ejecutar acciones
+  const executeAction = async (
+    actionFn: () => Promise<any>,
+    successMessage?: string
+  ): Promise<void> => {
+    setIsSubmitting(true);
+    try {
+      await actionFn();
+      if (successMessage) {
+        showSuccessToast(successMessage);
+      }
+    } catch (error: any) {
+      console.error('Error executing action:', error);
+      showErrorToast(error.message || 'Ocurrió un error inesperado');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Manejador de asistencia para administrador
+  const handleAdminAttendanceUpdate = async (
+    userId: string,
+    status: ParticipantStatus
+  ) => {
+    if (!group?.nextMatchDetails?.id) {
+      showErrorToast('No hay próximo partido configurado');
+      return;
+    }
+
+    await executeAction(async () => {
+      await adminAttendanceMutation.mutateAsync({
+        userId,
+        matchId: group.nextMatchDetails.id,
+        status,
+      });
+    });
+  };
+
+  // Manejador de asistencia para usuario
+  const handleAttendance = async (status: ParticipantStatus): Promise<void> => {
+    if (!group?.nextMatchDetails?.id) {
+      showErrorToast('No hay próximo partido configurado');
+      return;
+    }
+
+    await executeAction(async () => {
+      await userAttendanceMutation.mutateAsync({
+        matchId: group.nextMatchDetails.id,
+        status,
+      });
+    });
+  };
+
+  // Manejar solicitudes de membresía
+  const handleMembershipRequest = async (
+    userId: string,
+    action: 'APPROVE' | 'REJECT'
+  ) => {
+    if (!id || Array.isArray(id)) {
+      showErrorToast('ID de grupo inválido');
+      return;
+    }
+
+    await executeAction(async () => {
+      await membershipRequestMutation.mutateAsync({
+        groupId: id,
+        userId,
+        action,
+      });
+    });
+  };
+
+  // Abandonar el grupo
+  const handleLeaveGroup = async () => {
+    if (!id || Array.isArray(id)) {
+      showErrorToast('ID de grupo inválido');
+      return;
+    }
+
+    await executeAction(async () => {
+      await leaveGroupMutation.mutateAsync(id);
+      router.push('/groups');
+    }, 'Has abandonado el grupo correctamente');
+  };
+
+  // Copiar invitación
   const copyInviteLink = () => {
-    if (!group?.inviteToken && !id) return;
+    if (!inviteUrl) return;
 
     setIsCopying(true);
-    const baseUrl = window.location.origin;
-    const urlToCopy = group?.inviteToken
-      ? `${baseUrl}/invite/${group.inviteToken}`
-      : `${baseUrl}/invite/${id}`;
-
     navigator.clipboard
-      .writeText(urlToCopy)
+      .writeText(inviteUrl)
       .then(() => {
         showSuccessToast('Enlace copiado al portapapeles');
+        // Reset copying state after 2 seconds
         setTimeout(() => {
           setIsCopying(false);
         }, 2000);
@@ -311,24 +314,22 @@ export default function GroupDetails() {
   const tabComponents = useMemo(() => {
     const isAdmin = currentUserIsAdmin;
 
-    const baseTabComponents = [
+    const tabs = [
       {
         label: 'Próximo Partido',
         component: (
           <NextMatchTab
             group={group}
             user={user}
-            id={Array.isArray(id) ? id[0] : id || ''}
+            id={id as string}
             currentUserIsAdmin={currentUserIsAdmin}
             isUserInGroup={isUserInGroup}
             setShowReplaceTbdModal={setShowReplaceTbdModal}
-            handleGroupAttendance={handleGroupAttendanceWithRefresh}
-            handleSortTeams={handleRandomTeams}
-            handleAddResults={() =>
-              router.push(`/matches/${group?.nextMatchId}/results?edit=true`)
-            }
-            handleDeleteMatch={handleDeleteMatch}
-            userAttendanceStatus={nextMatchData?.userAttendance || undefined}
+            handleGroupAttendance={handleAttendance}
+            handleSortTeams={() => {}}
+            handleAddResults={() => {}}
+            handleDeleteMatch={() => {}}
+            userAttendanceStatus={nextMatchData?.userAttendance}
             allowFillIn={allowFillIn}
             setAllowFillIn={setAllowFillIn}
           />
@@ -339,11 +340,13 @@ export default function GroupDetails() {
         component: (
           <HistoryTab
             completedMatches={completedMatches}
-            id={id?.toString() || ''}
-            formatMatchDate={formatMatchDate}
-            getScoreForTeam={getScoreForTeam}
-            getPlayerGoals={getPlayerGoals}
-            renderGoalBalls={renderGoalBalls}
+            id={id as string}
+            formatMatchDate={(date) => new Date(date).toLocaleDateString()}
+            getScoreForTeam={(match, isTeamA) =>
+              isTeamA ? match.scoreA : match.scoreB
+            }
+            getPlayerGoals={() => 0}
+            renderGoalBalls={() => null}
           />
         ),
       },
@@ -363,22 +366,16 @@ export default function GroupDetails() {
             user={user}
             currentUserIsAdmin={currentUserIsAdmin}
             isLoading={isLoading}
-            handleConfirmAttendance={async (
-              memberId: string,
-              userId: string
-            ) => {
-              await handleAdminAttendanceUpdate(userId, 'CONFIRMED');
-            }}
-            handleDeclineAttendance={async (
-              memberId: string,
-              userId: string
-            ) => {
-              await handleAdminAttendanceUpdate(userId, 'DECLINED');
-            }}
+            handleConfirmAttendance={async () => {}}
+            handleDeclineAttendance={async () => {}}
           />
         ),
       },
-      {
+    ];
+
+    // Añadir pestaña de solicitudes solo para administradores
+    if (isAdmin) {
+      tabs.push({
         label: 'Solicitudes',
         component: (
           <div className='space-y-6'>
@@ -394,7 +391,7 @@ export default function GroupDetails() {
             {group?.pendingRequests && group.pendingRequests.length > 0 ? (
               <div className='bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden'>
                 <ul className='divide-y divide-gray-200'>
-                  {group.pendingRequests.map((request: any) => (
+                  {group.pendingRequests.map((request) => (
                     <li
                       key={request.id}
                       className='hover:bg-gray-50 transition-colors'
@@ -431,7 +428,7 @@ export default function GroupDetails() {
                               handleMembershipRequest(request.userId, 'APPROVE')
                             }
                             className='inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 transition-colors'
-                            disabled={isLoading}
+                            disabled={isSubmitting}
                           >
                             <CheckCircleIcon className='h-4 w-4 mr-1' />
                             Aprobar
@@ -441,7 +438,7 @@ export default function GroupDetails() {
                               handleMembershipRequest(request.userId, 'REJECT')
                             }
                             className='inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 transition-colors'
-                            disabled={isLoading}
+                            disabled={isSubmitting}
                           >
                             <XCircleIcon className='h-4 w-4 mr-1' />
                             Rechazar
@@ -479,33 +476,68 @@ export default function GroupDetails() {
             )}
           </div>
         ),
-        adminOnly: true,
-      },
-    ];
+      });
+    }
 
-    return baseTabComponents.filter((tab) => !tab.adminOnly || isAdmin);
+    return tabs;
   }, [
-    currentUserIsAdmin,
     group,
     user,
     id,
+    currentUserIsAdmin,
     isUserInGroup,
-    handleGroupAttendanceWithRefresh,
-    handleRandomTeams,
-    handleDeleteMatch,
+    nextMatchData,
     completedMatches,
-    formatMatchDate,
-    getScoreForTeam,
-    getPlayerGoals,
-    renderGoalBalls,
     goleadores,
     mvps,
     isLoading,
-    handleMembershipRequest,
-    handleAdminAttendanceUpdate,
     allowFillIn,
-    setAllowFillIn,
+    handleAttendance,
+    handleMembershipRequest,
   ]);
+
+  // Función para obtener el texto de recurrencia de forma simplificada
+  const getRecurrenceText = () => {
+    if (!group) return '';
+
+    const dayNames = [
+      'domingo',
+      'lunes',
+      'martes',
+      'miércoles',
+      'jueves',
+      'viernes',
+      'sábado',
+    ];
+
+    if (!group.recurrenceType || group.recurrenceType === 'NONE') {
+      return '';
+    }
+
+    let frequencyText = '';
+    if (group.recurrenceType === 'WEEKLY') {
+      frequencyText = 'Semanal';
+    } else if (group.recurrenceType === 'BIWEEKLY') {
+      frequencyText = 'Quincenal';
+    } else if (group.recurrenceType === 'MONTHLY') {
+      frequencyText = 'Mensual';
+    }
+
+    let daysText = '';
+    if (group.recurrenceDays && group.recurrenceDays.length > 0) {
+      daysText = group.recurrenceDays
+        .map((day: number) => dayNames[day])
+        .map((day: string) => day.charAt(0).toUpperCase() + day.slice(1))
+        .join(', ');
+    }
+
+    let timeText = '';
+    if (group.recurrenceTime) {
+      timeText = `${group.recurrenceTime}hs`;
+    }
+
+    return `${frequencyText} - ${daysText} ${timeText}`;
+  };
 
   return (
     <Layout>
@@ -516,16 +548,17 @@ export default function GroupDetails() {
           </div>
         ) : error ? (
           <div className='text-center text-red-600'>
-            {error instanceof Error ? error.message : String(error)}
+            {error instanceof Error ? error.message : 'Error desconocido'}
           </div>
         ) : group ? (
           <div className='space-y-6'>
+            {/* Simplified Header */}
             <SimpleHeaderComponent
               group={group}
               currentUserIsAdmin={currentUserIsAdmin}
               isUserInGroup={isUserInGroup}
               handleLeaveGroup={handleLeaveGroup}
-              recurrenceText={getRecurrenceText(group)}
+              recurrenceText={getRecurrenceText()}
               shortInviteUrl={inviteUrl}
               inviteUrl={inviteUrl}
               copyInviteLink={copyInviteLink}
@@ -533,6 +566,7 @@ export default function GroupDetails() {
               router={router}
             />
 
+            {/* Navigation tabs - Improved design */}
             <div className='bg-white rounded-xl shadow-sm mb-0'>
               <nav
                 className='flex overflow-x-auto rounded-t-xl'
@@ -566,8 +600,9 @@ export default function GroupDetails() {
               </nav>
             </div>
 
+            {/* Contenido de las pestañas */}
             <div className='bg-white rounded-xl shadow-sm p-6'>
-              {tabComponents[selectedTab]?.component}
+              {tabComponents[selectedTab].component}
             </div>
           </div>
         ) : (
@@ -575,18 +610,23 @@ export default function GroupDetails() {
         )}
       </div>
 
-      {showReplaceTbdModal && group && (
-        <ReplaceTbdPlayerModal
-          showReplaceTbdModal={showReplaceTbdModal}
-          setShowReplaceTbdModal={setShowReplaceTbdModal}
-          group={group}
-          handleReplaceTbdPlayer={handleReplaceTbdPlayer}
-          onSuccessfulReplace={() => {
-            refetchBasicInfo();
-            refetchNextMatch();
-            refetchMembers();
-          }}
-        />
+      {/* Modal para reemplazar jugador TBD */}
+      {showReplaceTbdModal && (
+        <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
+          <div className='bg-white rounded-lg p-6 max-w-md w-full'>
+            <h3 className='text-lg font-medium text-gray-900 mb-2'>
+              Reemplazar Jugador TBD
+            </h3>
+            <div className='py-4'>
+              <p className='text-gray-500 mb-4'>
+                Selecciona un jugador para reemplazar a este TBD.
+              </p>
+              <Button onClick={() => setShowReplaceTbdModal('')}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </Layout>
   );

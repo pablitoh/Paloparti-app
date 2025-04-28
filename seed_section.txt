@@ -1,0 +1,61 @@
+        `Created next match for group "${sport} Club": ${nextMatch.id}`
+      );
+
+      // Update the group to reference the next match
+      await prisma.group.update({
+        where: { id: resultGroupId },
+        data: { nextMatchId: nextMatch.id },
+      });
+
+      // Create attendance records for all members (with the creator confirmed)
+      await prisma.matchAttendance.create({
+        data: {
+          userId: creator.id,
+          groupId: resultGroupId,
+          matchId: nextMatch.id,
+          matchDate: nextMatchDate,
+          status: 'CONFIRMED', // Creator is automatically confirmed
+        },
+      });
+
+      // Create other members with pending status
+      for (const user of selectedUsers) {
+        await prisma.matchAttendance.create({
+          data: {
+            userId: user.id,
+            groupId: resultGroupId,
+            matchId: nextMatch.id,
+            matchDate: nextMatchDate,
+            status: 'PENDING',
+          },
+        });
+      }
+
+      // Create attendance records for all members with PENDING status (incluyendo al creador)
+      await prisma.matchAttendance.create({
+        data: {
+          userId: creator.id,
+          groupId: resultGroupId,
+          matchId: nextMatch.id,
+          matchDate: nextMatchDate,
+          status: 'PENDING', // Creador también con status PENDING para que no haya confirmados
+        },
+      });
+
+      // Create attendance records for other members (todos PENDING)
+      for (const user of selectedUsers) {
+        await prisma.matchAttendance.create({
+          data: {
+            userId: user.id,
+            groupId: resultGroupId,
+            matchId: nextMatch.id,
+            matchDate: nextMatchDate,
+            status: 'PENDING',
+          },
+        });
+      }
+
+      // Create short URL for the group's invite link
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const inviteUrl = `${baseUrl}/invite/${inviteToken}`;
