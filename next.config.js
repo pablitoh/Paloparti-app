@@ -10,7 +10,7 @@ const nextConfig = {
     return config;
   },
   experimental: {
-    appDir: true,
+    // Remove appDir as it's deprecated in Next.js 15
   },
   compiler: {
     styledComponents: true,
@@ -26,6 +26,13 @@ const nextConfig = {
       },
     ];
   },
+  // Exclude backup and other non-production directories
+  pageExtensions: ['tsx', 'ts', 'jsx', 'js'].filter(
+    (ext) =>
+      !ext.includes('backup') &&
+      !ext.includes('.bak') &&
+      !ext.includes('.broken')
+  ),
 };
 
 module.exports = nextConfig;
