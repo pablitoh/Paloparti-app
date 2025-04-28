@@ -6,6 +6,7 @@
     "check-db": "node scripts/check-db.js",
     "dev": "npm run check-db && next dev",
     "predev": "chmod +x scripts/check-db.js",
+    "prebuild": "find . -name \"*.bak\" -o -name \"*.backup\" -o -name \"*.broken\" -o -name \"*.new\" | xargs rm -f || true",
     "build": "prisma generate && next build",
     "start": "next start",
     "export": "next export",

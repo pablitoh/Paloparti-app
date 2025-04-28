@@ -1,7 +1,18 @@
 # Ignore backup files and directories
 backup/
-**/*.backup
-**/*.bak
-**/*.broken
-**/*.new
-tmp/ 
+backup_donotbuild/
+excluded_files/
+**/**.backup
+**/**.bak
+**/**.broken
+**/**.new
+tmp/
+**/*.tsx.backup
+**/*.tsx.bak
+**/*.tsx.broken
+**/*.tsx.new
+**/*.[id].tsx
+pages/**/*.backup
+pages/**/*.bak
+pages/**/*.broken
+pages/**/*.new 

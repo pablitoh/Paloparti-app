@@ -37,3 +37,12 @@ next-env.d.ts
 # IDE
 .idea/
 .vscode/
+
+# Backup files
+backup/
+backup_donotbuild/
+**/**.backup
+**/**.bak
+**/**.broken
+**/**.new
+excluded_files/
