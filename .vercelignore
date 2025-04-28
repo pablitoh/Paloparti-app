@@ -1,0 +1,7 @@
+# Ignore backup files and directories
+backup/
+**/*.backup
+**/*.bak
+**/*.broken
+**/*.new
+tmp/ 

@@ -26,13 +26,6 @@ const nextConfig = {
       },
     ];
   },
-  // Exclude backup and other non-production directories
-  pageExtensions: ['tsx', 'ts', 'jsx', 'js'].filter(
-    (ext) =>
-      !ext.includes('backup') &&
-      !ext.includes('.bak') &&
-      !ext.includes('.broken')
-  ),
 };
 
 module.exports = nextConfig;
