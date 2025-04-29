@@ -20,5 +20,5 @@
     }
   },
   "include": ["prisma/**/*.ts", "**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "excluded_pages/**/*"]
 }

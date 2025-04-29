@@ -172,56 +172,148 @@ export default async function handler(
     return res.status(400).json({ message: 'ID de grupo inválido' });
   }
 
-  try {
-    // Obtener solo la información básica del grupo
-    const group = await prisma.group.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        sport: true,
-        location: true,
-        teamAName: true,
-        teamBName: true,
-        recurrenceType: true,
-        recurrenceDays: true,
-        recurrenceTime: true,
-        requiredPlayers: true,
-        inviteToken: true,
-        createdAt: true,
-        createdBy: true,
-        nextMatchId: true,
-        totalMatches: true,
-      },
-    });
+  // GET: Obtener información del grupo
+  if (req.method === 'GET') {
+    try {
+      // Obtener solo la información básica del grupo
+      const group = await prisma.group.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          sport: true,
+          location: true,
+          teamAName: true,
+          teamBName: true,
+          recurrenceType: true,
+          recurrenceDays: true,
+          recurrenceTime: true,
+          requiredPlayers: true,
+          inviteToken: true,
+          createdAt: true,
+          createdBy: true,
+          nextMatchId: true,
+          totalMatches: true,
+        },
+      });
 
-    if (!group) {
-      return res.status(404).json({ message: 'Grupo no encontrado' });
+      if (!group) {
+        return res.status(404).json({ message: 'Grupo no encontrado' });
+      }
+
+      // Verificar si el usuario es miembro y su rol
+      const userMembership = await prisma.groupMember.findFirst({
+        where: {
+          groupId: id,
+          userId: user.id,
+        },
+      });
+
+      // Determinar si el usuario es administrador
+      const isAdmin =
+        userMembership?.role === 'ADMIN' || group.createdBy === user.id;
+
+      // Formatear la respuesta
+      const formattedGroup = {
+        ...group,
+        isAdmin,
+        userStatus: userMembership?.status || null,
+      };
+
+      return res.status(200).json(formattedGroup);
+    } catch (error) {
+      console.error('Error al obtener detalles del grupo:', error);
+      return res.status(500).json({ message: 'Error interno del servidor' });
     }
+  }
+  // PUT: Actualizar información del grupo
+  else if (req.method === 'PUT') {
+    try {
+      // Verificar que el usuario es administrador
+      const userMembership = await prisma.groupMember.findFirst({
+        where: {
+          groupId: id,
+          userId: user.id,
+        },
+      });
 
-    // Verificar si el usuario es miembro y su rol
-    const userMembership = await prisma.groupMember.findFirst({
-      where: {
-        groupId: id,
-        userId: user.id,
-      },
-    });
+      const group = await prisma.group.findUnique({
+        where: { id },
+        select: {
+          createdBy: true,
+        },
+      });
 
-    // Determinar si el usuario es administrador
-    const isAdmin =
-      userMembership?.role === 'ADMIN' || group.createdBy === user.id;
+      if (!group) {
+        return res.status(404).json({ message: 'Grupo no encontrado' });
+      }
 
-    // Formatear la respuesta
-    const formattedGroup = {
-      ...group,
-      isAdmin,
-      userStatus: userMembership?.status || null,
-    };
+      // Determinar si el usuario es administrador
+      const isAdmin =
+        userMembership?.role === 'ADMIN' || group.createdBy === user.id;
 
-    return res.status(200).json(formattedGroup);
-  } catch (error) {
-    console.error('Error al obtener detalles del grupo:', error);
-    return res.status(500).json({ message: 'Error interno del servidor' });
+      if (!isAdmin) {
+        return res
+          .status(403)
+          .json({ message: 'No tienes permisos para editar este grupo' });
+      }
+
+      // Extraer datos del cuerpo de la solicitud
+      const {
+        name,
+        sport,
+        description,
+        location,
+        teamAName,
+        teamBName,
+        recurrenceType,
+        recurrenceDays,
+        recurrenceTime,
+        requiredPlayers,
+        nextMatch,
+      } = req.body;
+
+      // Validar campos obligatorios
+      if (!name || !sport || !location) {
+        return res.status(400).json({ message: 'Faltan campos obligatorios' });
+      }
+
+      // Validar que requiredPlayers sea un número par
+      if (requiredPlayers % 2 !== 0) {
+        return res
+          .status(400)
+          .json({ message: 'El número de jugadores requeridos debe ser par' });
+      }
+
+      // Actualizar el grupo
+      const updatedGroup = await prisma.group.update({
+        where: { id },
+        data: {
+          name,
+          sport,
+          description,
+          location,
+          teamAName,
+          teamBName,
+          recurrenceType,
+          recurrenceDays,
+          recurrenceTime,
+          requiredPlayers,
+          // Actualizar nextMatch si se proporciona
+          ...(nextMatch && { nextMatch: new Date(nextMatch) }),
+        },
+      });
+
+      return res.status(200).json({
+        message: 'Grupo actualizado correctamente',
+        group: updatedGroup,
+      });
+    } catch (error) {
+      console.error('Error al actualizar el grupo:', error);
+      return res.status(500).json({ message: 'Error interno del servidor' });
+    }
+  } else {
+    return res.status(405).json({ message: 'Método no permitido' });
   }
 }

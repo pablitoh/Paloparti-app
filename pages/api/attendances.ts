@@ -161,7 +161,10 @@ export default async function handler(
       where: {
         groupId: targetGroupId,
         userId: targetUserId,
-        matchId: nextMatchId,
+        OR: [
+          { matchId: nextMatchId },
+          { matchId: null, groupId: targetGroupId, userId: targetUserId },
+        ],
       },
     });
 
@@ -172,7 +175,10 @@ export default async function handler(
       try {
         const updatedRecord = await prisma.matchAttendance.update({
           where: { id: attendanceRecord.id },
-          data: { status },
+          data: {
+            status,
+            matchId: nextMatchId,
+          },
         });
         console.log(
           `Updated existing attendance record for match ${nextMatchId}:`,
@@ -186,27 +192,62 @@ export default async function handler(
         });
       }
     } else {
-      // Create a new attendance record
-      try {
-        const newRecord = await prisma.matchAttendance.create({
-          data: {
-            groupId: targetGroupId,
-            userId: targetUserId,
-            matchId: nextMatchId,
-            matchDate: matchDetails?.date || new Date(),
-            status,
-          },
-        });
-        console.log(
-          `Created new attendance record for match ${nextMatchId}:`,
-          newRecord
-        );
-      } catch (error) {
-        console.error('Error creating attendance record:', error);
-        return res.status(500).json({
-          message: 'Error creating attendance record',
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
+      // Verificar si hay registros duplicados que podrían causar conflictos
+      const potentialDuplicates = await prisma.matchAttendance.findMany({
+        where: {
+          userId: targetUserId,
+          OR: [
+            { matchId: nextMatchId },
+            { matchId: null, groupId: targetGroupId },
+          ],
+        },
+      });
+
+      if (potentialDuplicates.length > 0) {
+        // Si hay registros que podrían causar un conflicto, actualiza el primero
+        try {
+          const updatedRecord = await prisma.matchAttendance.update({
+            where: { id: potentialDuplicates[0].id },
+            data: {
+              status,
+              matchId: nextMatchId,
+              matchDate: matchDetails?.date || new Date(),
+            },
+          });
+          console.log(
+            `Updated potential duplicate record for match ${nextMatchId}:`,
+            updatedRecord
+          );
+        } catch (error) {
+          console.error('Error updating potential duplicate record:', error);
+          return res.status(500).json({
+            message: 'Error updating attendance record',
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+      } else {
+        // Create a new attendance record
+        try {
+          const newRecord = await prisma.matchAttendance.create({
+            data: {
+              groupId: targetGroupId,
+              userId: targetUserId,
+              matchId: nextMatchId,
+              matchDate: matchDetails?.date || new Date(),
+              status,
+            },
+          });
+          console.log(
+            `Created new attendance record for match ${nextMatchId}:`,
+            newRecord
+          );
+        } catch (error) {
+          console.error('Error creating attendance record:', error);
+          return res.status(500).json({
+            message: 'Error creating attendance record',
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
       }
     }
 

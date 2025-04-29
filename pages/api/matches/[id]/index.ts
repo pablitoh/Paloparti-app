@@ -87,7 +87,7 @@ export default async function handler(
 
       console.log('Match found:', {
         match: !!match,
-        hasMembers: match?.group?.members && match.group.members.length > 0,
+        hasMembers: (match?.group?.members?.length ?? 0) > 0,
         groupId: match?.groupId,
       });
 
@@ -99,7 +99,7 @@ export default async function handler(
       }
 
       // Verificar que el usuario es administrador del grupo
-      if (!match.group?.members || match.group.members.length === 0) {
+      if (!match.group?.members || (match.group.members.length ?? 0) === 0) {
         console.log('User is not an admin of this group');
         return res.status(403).json({
           success: false,

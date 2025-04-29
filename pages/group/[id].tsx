@@ -177,7 +177,7 @@ export default function GroupDetails() {
     return [...matches].sort((a, b) => {
       const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateB - dateA;
+      return dateA - dateB;
     });
   }, [historyData]);
 

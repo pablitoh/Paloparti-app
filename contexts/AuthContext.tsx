@@ -96,7 +96,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Mutación para cerrar sesión
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      return signOut({ callbackUrl: '/' });
+      return signOut({ redirect: false });
+    },
+    onSuccess: () => {
+      router.push('/auth/signin');
     },
   });
 

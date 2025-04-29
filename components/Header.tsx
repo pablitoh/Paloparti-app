@@ -11,7 +11,6 @@ const Header = () => {
       await logout();
     } catch (error) {
       console.error('Error logging out:', error);
-      router.push('/auth/signin');
     }
   };
 

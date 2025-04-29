@@ -53,10 +53,10 @@ export default function HistoryTab({
   const sortedMatches = [...completedMatches].sort((a, b) => {
     // First try to sort by createdAt
     if (a.createdAt && b.createdAt) {
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     }
     // Fall back to date field
-    return new Date(b.date).getTime() - new Date(a.date).getTime();
+    return new Date(a.date).getTime() - new Date(b.date).getTime();
   });
 
   const redirectToGroup = (tabIndex = 1) => {
@@ -160,12 +160,9 @@ export default function HistoryTab({
                 <div className='flex items-center justify-center'>
                   {/* Team A */}
                   <div className='flex items-center justify-end flex-1'>
-                    <span className='font-medium text-blue-800'>
+                    <span className='font-medium text-blue-800 text-center'>
                       {match.teamA}
                     </span>
-                    <div className='w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center ml-2 text-white font-bold'>
-                      A
-                    </div>
                   </div>
 
                   {/* Score */}
@@ -182,10 +179,7 @@ export default function HistoryTab({
 
                   {/* Team B */}
                   <div className='flex items-center justify-start flex-1'>
-                    <div className='w-10 h-10 bg-red-600 rounded-full flex items-center justify-center mr-2 text-white font-bold'>
-                      B
-                    </div>
-                    <span className='font-medium text-red-800'>
+                    <span className='font-medium text-red-800 text-center'>
                       {match.teamB}
                     </span>
                   </div>
@@ -196,10 +190,7 @@ export default function HistoryTab({
                 <div className='grid grid-cols-2 gap-4'>
                   {/* Equipo A */}
                   <div className='bg-blue-50 rounded-lg p-3'>
-                    <h4 className='text-sm font-medium text-blue-800 mb-3 pb-2 border-b border-blue-100 flex items-center'>
-                      <span className='w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs mr-2'>
-                        A
-                      </span>
+                    <h4 className='text-sm font-medium text-blue-800 mb-3 pb-2 border-b border-blue-100 text-center'>
                       {match.teamA}
                     </h4>
                     <ul className='space-y-2'>
@@ -208,16 +199,18 @@ export default function HistoryTab({
                         return (
                           <li
                             key={player.id}
-                            className={`flex items-center justify-between py-1.5 px-2 rounded ${
+                            className={`flex items-center justify-center py-1.5 px-2 rounded ${
                               goals > 0
                                 ? 'bg-blue-100 shadow-sm font-semibold'
                                 : 'hover:bg-blue-100/50'
                             }`}
                           >
-                            <span className='text-sm text-gray-800 truncate max-w-[120px]'>
-                              {player.name}
-                            </span>
-                            {goals > 0 && renderGoalBalls(goals)}
+                            <div className='flex items-center'>
+                              <span className='text-sm text-gray-800 text-center'>
+                                {player.name}
+                              </span>
+                              {goals > 0 && renderGoalBalls(goals)}
+                            </div>
                           </li>
                         );
                       })}
@@ -226,10 +219,7 @@ export default function HistoryTab({
 
                   {/* Equipo B */}
                   <div className='bg-red-50 rounded-lg p-3'>
-                    <h4 className='text-sm font-medium text-red-800 mb-3 pb-2 border-b border-red-100 flex items-center'>
-                      <span className='w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-xs mr-2'>
-                        B
-                      </span>
+                    <h4 className='text-sm font-medium text-red-800 mb-3 pb-2 border-b border-red-100 text-center'>
                       {match.teamB}
                     </h4>
                     <ul className='space-y-2'>
@@ -238,16 +228,18 @@ export default function HistoryTab({
                         return (
                           <li
                             key={player.id}
-                            className={`flex items-center justify-between py-1.5 px-2 rounded ${
+                            className={`flex items-center justify-center py-1.5 px-2 rounded ${
                               goals > 0
                                 ? 'bg-red-100 shadow-sm font-semibold'
                                 : 'hover:bg-red-100/50'
                             }`}
                           >
-                            <span className='text-sm text-gray-800 truncate max-w-[120px]'>
-                              {player.name}
-                            </span>
-                            {goals > 0 && renderGoalBalls(goals)}
+                            <div className='flex items-center'>
+                              <span className='text-sm text-gray-800 text-center'>
+                                {player.name}
+                              </span>
+                              {goals > 0 && renderGoalBalls(goals)}
+                            </div>
                           </li>
                         );
                       })}

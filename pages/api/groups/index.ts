@@ -161,6 +161,7 @@ export default async function handler(
         recurrenceDays,
         recurrenceTime,
         nextMatch,
+        requiredPlayers,
       } = req.body;
 
       // Validar campos obligatorios
@@ -173,6 +174,13 @@ export default async function handler(
         return res
           .status(400)
           .json({ message: 'recurrenceDays debe ser un array' });
+      }
+
+      // Validar que requiredPlayers sea un número par
+      if (requiredPlayers && requiredPlayers % 2 !== 0) {
+        return res
+          .status(400)
+          .json({ message: 'El número de jugadores requeridos debe ser par' });
       }
 
       // Generar token de invitación permanente

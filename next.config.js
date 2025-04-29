@@ -18,6 +18,7 @@ const nextConfig = {
   images: {
     domains: ['ui-avatars.com'],
   },
+  pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
   async rewrites() {
     return [
       {
@@ -26,18 +27,8 @@ const nextConfig = {
       },
     ];
   },
-  // Exclude non-production directories from build
+  // Ignorar archivos específicos durante la compilación
   eslint: {
-    dirs: [
-      'pages',
-      'components',
-      'lib',
-      'utils',
-      'hooks',
-      'contexts',
-      'services',
-      'types',
-    ],
     ignoreDuringBuilds: true,
   },
   typescript: {

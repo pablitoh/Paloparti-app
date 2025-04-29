@@ -13,7 +13,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   if (session) {
     return {
       redirect: {
-        destination: '/',
+        destination: '/groups',
         permanent: false,
       },
     };
@@ -21,7 +21,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 
   return {
     props: {
-      callbackUrl: context.query.callbackUrl || '/',
+      callbackUrl: context.query.callbackUrl || '/groups',
     },
   };
 };
@@ -118,7 +118,7 @@ export default function SignIn({ callbackUrl }: { callbackUrl: string }) {
               ¿No tienes una cuenta?{' '}
               <Link
                 href={
-                  callbackUrl !== '/'
+                  callbackUrl !== '/groups'
                     ? `/register?redirect=${encodeURIComponent(callbackUrl)}`
                     : '/register'
                 }

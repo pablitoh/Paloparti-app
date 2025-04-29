@@ -151,6 +151,13 @@ export default function EditGroup() {
       setError(null);
       setSuccess(null);
 
+      // Validar que requiredPlayers sea un número par
+      if (formData.requiredPlayers % 2 !== 0) {
+        setError('El número de jugadores requeridos debe ser par');
+        setIsSubmitting(false);
+        return;
+      }
+
       // Calcular próxima fecha de partido si corresponde
       const nextMatch = calculateNextMatch();
 
@@ -172,6 +179,7 @@ export default function EditGroup() {
         teamAName: validatedTeamAName,
         teamBName: validatedTeamBName,
         nextMatch: nextMatch ? nextMatch.toISOString() : null,
+        requiredPlayers: Number(formData.requiredPlayers),
       };
 
       console.log(
@@ -225,7 +233,7 @@ export default function EditGroup() {
     setFormData((prev) => {
       const newData = {
         ...prev,
-        [name]: value,
+        [name]: name === 'requiredPlayers' ? Number(value) : value,
       };
 
       // If sport changes, update requiredPlayers
@@ -584,13 +592,12 @@ export default function EditGroup() {
                   value={formData.requiredPlayers}
                   onChange={handleChange}
                   min={2}
-                  max={50}
                   required
                   className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                 />
                 <p className='mt-1 text-sm text-gray-500'>
                   Número mínimo de jugadores confirmados necesarios para sortear
-                  los equipos
+                  los equipos (debe ser par)
                 </p>
               </div>
 

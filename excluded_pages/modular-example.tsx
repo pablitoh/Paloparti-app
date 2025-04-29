@@ -1,8 +1,8 @@
 import { useRouter } from 'next/router';
 import { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
-import Layout from '../../components/Layout';
-import Button from '../../components/Button';
+import Layout from '../components/Layout';
+import Button from '../components/Button';
 import { Avatar } from '@mui/material';
 import { Box, Typography, Chip } from '@mui/material';
 import {
@@ -14,15 +14,15 @@ import {
   CheckCircleIcon as CheckCircleIconSolid,
   XCircleIcon as XCircleIconSolid,
 } from '@heroicons/react/24/solid';
-import { showSuccessToast, showErrorToast } from '../../services/toastService';
+import { showSuccessToast, showErrorToast } from '../services/toastService';
 
 // Import the tab components
-import MembersTab from '../../components/group/tabs/MembersTab';
-import NextMatchTab from '../../components/group/tabs/NextMatchTab';
-import HistoryTab from '../../components/group/tabs/HistoryTab';
-import GoalsTab from '../../components/group/tabs/GoalsTab';
-import MvpTab from '../../components/group/tabs/MvpTab';
-import SimpleHeaderComponent from '../../components/group/SimpleHeader';
+import MembersTab from '../components/group/tabs/MembersTab';
+import NextMatchTab from '../components/group/tabs/NextMatchTab';
+import HistoryTab from '../components/group/tabs/HistoryTab';
+import GoalsTab from '../components/group/tabs/GoalsTab';
+import MvpTab from '../components/group/tabs/MvpTab';
+import SimpleHeaderComponent from '../components/group/SimpleHeader';
 
 // Importar los nuevos hooks
 import {
@@ -34,7 +34,7 @@ import {
   useUserAttendanceMutation,
   useAdminAttendanceMutation,
   useMembershipRequestMutation,
-} from '../../services/groupHooks';
+} from '../services/groupHooks';
 
 import {
   useLeaveGroupMutation,
@@ -42,7 +42,7 @@ import {
   useDeleteMatchMutation,
   useReplaceTbdPlayerMutation,
   useResetAttendanceMutation,
-} from '../../services/reactQueryHooks';
+} from '../services/reactQueryHooks';
 
 // Tipos
 type ParticipantStatus =

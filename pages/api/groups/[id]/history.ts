@@ -56,8 +56,8 @@ export default async function handler(
         status: 'COMPLETED',
       },
       orderBy: [
-        { createdAt: 'desc' }, // Primary sort by creation date
-        { date: 'desc' }, // Secondary sort by match date
+        { createdAt: 'asc' }, // Primary sort by creation date
+        { date: 'asc' }, // Secondary sort by match date
       ],
       skip,
       take: limit,
@@ -89,9 +89,15 @@ export default async function handler(
 
     // Procesar los datos para el formato requerido por el frontend
     const formattedMatches = matches.map((match) => {
-      // Separar goles por equipo
-      const goalsA = match.goals?.filter((goal) => goal.isTeamA) || [];
-      const goalsB = match.goals?.filter((goal) => !goal.isTeamA) || [];
+      // Procesar los goles para incluir información del jugador
+      const processedGoals = match.goals.map((goal) => ({
+        id: goal.id,
+        isTeamA: goal.isTeamA,
+        scorerId: goal.scorer.id,
+        scorerName: goal.scorer.name,
+        scorerAvatar: goal.scorer.image,
+        minute: goal.minute || undefined,
+      }));
 
       // Separar jugadores en equipos A y B basados en isTeamA
       const teamAPlayers = match.playersA
@@ -121,8 +127,7 @@ export default async function handler(
         status: match.status,
         playersA: teamAPlayers,
         playersB: teamBPlayers,
-        goalsA,
-        goalsB,
+        goals: processedGoals,
         createdAt: match.createdAt,
       };
     });
