@@ -2,6 +2,7 @@
 backup/
 backup_donotbuild/
 excluded_files/
+excluded_pages/
 **/**.backup
 **/**.bak
 **/**.broken
