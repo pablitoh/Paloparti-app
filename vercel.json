@@ -1,31 +1,3 @@
 {
-  "version": 2,
-  "buildCommand": "npm run build",
-  "devCommand": "npm run dev",
-  "installCommand": "npm install",
-  "regions": ["cdg1"],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "x-frame-options",
-          "value": "DENY"
-        },
-        {
-          "key": "x-content-type-options",
-          "value": "nosniff"
-        },
-        {
-          "key": "x-xss-protection",
-          "value": "1; mode=block"
-        }
-      ]
-    }
-  ],
-  "build": {
-    "env": {
-      "NEXT_TELEMETRY_DISABLED": "1"
-    }
-  }
+  "version": 2
 }
