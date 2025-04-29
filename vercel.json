@@ -10,12 +10,6 @@
       "maxDuration": 10
     }
   },
-  "crons": [
-    {
-      "path": "/api/db-check",
-      "schedule": "0 0 * * *"
-    }
-  ],
   "headers": [
     {
       "source": "/(.*)",
