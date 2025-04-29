@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  output: 'export',
+  distDir: 'build',
   webpack: (config) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,
@@ -18,6 +19,7 @@ const nextConfig = {
   },
   images: {
     domains: ['ui-avatars.com'],
+    unoptimized: true,
   },
   pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
   async rewrites() {
