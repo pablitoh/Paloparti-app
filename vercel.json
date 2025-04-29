@@ -10,23 +10,41 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "regions": ["cdg1"],
+  "functions": {
+    "pages/api/**": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/db-check",
+      "schedule": "0 */3 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
         {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
+          "key": "x-frame-options",
           "value": "DENY"
         },
         {
-          "key": "X-XSS-Protection",
+          "key": "x-content-type-options",
+          "value": "nosniff"
+        },
+        {
+          "key": "x-xss-protection",
           "value": "1; mode=block"
         }
       ]
     }
-  ]
+  ],
+  "build": {
+    "env": {
+      "NEXT_PUBLIC_API_URL": "@next_public_api_url",
+      "DATABASE_URL": "@database_url"
+    }
+  }
 }
