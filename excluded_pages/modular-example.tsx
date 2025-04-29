@@ -1,8 +1,8 @@
 import { useRouter } from 'next/router';
 import { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
-import Layout from '../components/Layout';
-import Button from '../components/Button';
+import Layout from '../../components/Layout';
+import Button from '../../components/Button';
 import { Avatar } from '@mui/material';
 import { Box, Typography, Chip } from '@mui/material';
 import {
