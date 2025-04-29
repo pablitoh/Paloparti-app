@@ -87,7 +87,7 @@ export default async function handler(
 
       console.log('Match found:', {
         match: !!match,
-        hasMembers: match?.group?.members?.length > 0,
+        hasMembers: match?.group?.members && match.group.members.length > 0,
         groupId: match?.groupId,
       });
 
