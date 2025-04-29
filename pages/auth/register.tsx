@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { useAuth } from '../../hooks/useAuth';
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -11,7 +10,6 @@ export default function Register() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { register } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,7 +17,28 @@ export default function Register() {
     setLoading(true);
 
     try {
-      await register(name, email, password, birthdate);
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, birthdate }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Error registering user');
+      }
+
+      // Auto login
+      const loginRes = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!loginRes.ok) {
+        throw new Error('Registration successful, but failed to log in');
+      }
+
       router.push('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error registering user');
