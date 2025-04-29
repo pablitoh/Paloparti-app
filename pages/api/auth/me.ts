@@ -33,7 +33,7 @@ export default async function handler(
         name: true,
         email: true,
         image: true,
-        age: true,
+        birthdate: true,
       },
     });
 
