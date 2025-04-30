@@ -1,3 +1,4 @@
+import { withAuth } from 'next-auth/middleware';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
@@ -8,8 +9,23 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// Configurar las rutas que requieren el middleware
-// Temporalmente lo desactivamos para todas las rutas
+// Configurar las rutas que requieren autenticación
 export const config = {
-  matcher: [],
+  matcher: [
+    '/groups/:path*',
+    '/group/:path*',
+    '/matches/:path*',
+    '/match/:path*',
+    '/profile/:path*',
+    '/api/groups/:path*',
+    '/api/matches/:path*',
+    '/api/profile/:path*',
+  ],
 };
+
+// Aplicar middleware de autenticación
+export default withAuth({
+  pages: {
+    signIn: '/auth/signin',
+  },
+});
