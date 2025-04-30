@@ -5,6 +5,11 @@ import type { NextRequest } from 'next/server';
 // Define una función más simple que solo verifica rutas específicas
 // en lugar de bloquear todo por defecto
 export function middleware(request: NextRequest) {
+  // Specifically exclude the register endpoint
+  if (request.nextUrl.pathname === '/api/auth/register') {
+    return NextResponse.next();
+  }
+
   // Permitir todas las rutas por defecto
   return NextResponse.next();
 }

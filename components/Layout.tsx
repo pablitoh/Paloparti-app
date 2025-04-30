@@ -90,7 +90,10 @@ export default function Layout({ children }: LayoutProps) {
                       </Link>
                       <button
                         onClick={() => {
-                          signOut();
+                          signOut({
+                            redirect: true,
+                            callbackUrl: '/auth/signin',
+                          });
                           setDropdownOpen(false);
                         }}
                         className='block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100'

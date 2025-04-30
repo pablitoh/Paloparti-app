@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Link from 'next/link';
 
 export default function TestLogin() {
   const [email, setEmail] = useState('test@example.com');
@@ -65,6 +66,16 @@ export default function TestLogin() {
   return (
     <div className='p-8 max-w-lg mx-auto'>
       <h1 className='text-2xl font-bold mb-6'>Test Authentication</h1>
+
+      <div className='mb-4 p-4 bg-yellow-100 text-yellow-800 rounded'>
+        <p>
+          This is a test page. Please use the{' '}
+          <Link href='/auth/signin' className='underline font-bold'>
+            official login page
+          </Link>{' '}
+          to sign in.
+        </p>
+      </div>
 
       <div className='mb-8'>
         <h2 className='text-xl font-semibold mb-4'>Test Auth Endpoint</h2>
