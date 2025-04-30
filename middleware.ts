@@ -3,29 +3,36 @@ import { NextResponse } from 'next/server';
 
 // Rutas públicas que no requieren autenticación
 const publicRoutes = [
+  '/',
+  '/login',
+  '/register',
+  '/auth/signin',
   '/api/auth/register',
   '/api/test-auth',
   '/api/debug',
   '/api/invitations/',
   '/api/url-shortener',
   '/api/s/',
+  '/api/healthcheck',
+  '/api/auth/[...nextauth]',
+  '/api/auth/login',
 ];
 
-// Temporarily disable middleware to debug 404 issues
+// Configurar las rutas que requieren autenticación
 export const config = {
-  matcher: [], // Empty matcher = no routes will use this middleware
+  matcher: [
+    '/groups/:path*',
+    '/matches/:path*',
+    '/profile/:path*',
+    '/api/groups/:path*',
+    '/api/matches/:path*',
+    '/api/profile/:path*',
+  ],
 };
 
-// Export a simple middleware that does nothing but allow all requests
-export default function middleware() {
-  return NextResponse.next();
-}
-
-/*
-// Original auth middleware
+// Aplicar middleware de autenticación
 export default withAuth({
   pages: {
     signIn: '/auth/signin',
   },
 });
-*/
