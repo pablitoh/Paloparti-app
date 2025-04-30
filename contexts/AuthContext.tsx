@@ -122,6 +122,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Usamos el endpoint simplificado en la raíz de la API
         const registerUrl = '/api/register';
 
+        console.log(`Sending registration request to ${registerUrl}`);
+
+        // First attempt a preflight OPTIONS request to check if the endpoint is accessible
+        try {
+          const preflightResponse = await fetch(registerUrl, {
+            method: 'OPTIONS',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+          });
+          console.log(`Preflight response status: ${preflightResponse.status}`);
+        } catch (preflightError) {
+          console.error('Preflight request failed:', preflightError);
+        }
+
         const response = await fetch(registerUrl, {
           method: 'POST',
           headers: {
@@ -132,8 +148,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           credentials: 'include',
         });
 
+        console.log(
+          `Registration response status: ${response.status}, statusText: ${response.statusText}`
+        );
+
         // Leer el cuerpo de la respuesta como texto primero
         const responseText = await response.text();
+        console.log(
+          `Response text: ${responseText.substring(0, 200)}${
+            responseText.length > 200 ? '...' : ''
+          }`
+        );
 
         // Intentar parsearlo como JSON
         let data;
@@ -153,6 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             success: false,
             message: data.message || 'Error al crear la cuenta',
             status: response.status,
+            statusText: response.statusText,
           };
         }
 
