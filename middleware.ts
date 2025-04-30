@@ -2,21 +2,37 @@ import { withAuth } from 'next-auth/middleware';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// This function runs before any authentication checks
+// Esta función se ejecuta antes de cualquier verificación de autenticación
 export function middleware(request: NextRequest) {
-  // Specifically exclude the register endpoint to ensure it's accessible without authentication
+  // Gestión especial para el endpoint de registro
   if (request.nextUrl.pathname === '/api/auth/register') {
+    // Para solicitudes OPTIONS (preflight), respondemos inmediatamente con OK
+    if (request.method === 'OPTIONS') {
+      return new NextResponse(null, {
+        status: 200,
+        headers: {
+          'Access-Control-Allow-Credentials': 'true',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET,OPTIONS,PATCH,DELETE,POST,PUT',
+          'Access-Control-Allow-Headers':
+            'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version',
+        },
+      });
+    }
+
+    // Para otras solicitudes al endpoint de registro, permitimos el paso sin restricciones
     return NextResponse.next();
   }
 
-  // Allow all other routes by default
+  // Permitir todas las demás rutas por defecto
   return NextResponse.next();
 }
 
-// Configure which routes require authentication
+// Configurar qué rutas requieren autenticación
+// Importante: excluir explícitamente /api/auth/register del matcher
 export const config = {
   matcher: [
-    '/api/groups/:path*',
+    '/((?!api/auth/register)api/groups)/:path*',
     '/api/groups/:id*/invite',
     '/api/groups/:id*/leave',
     '/api/groups/:id*/members',
@@ -33,7 +49,7 @@ export const config = {
   ],
 };
 
-// Apply authentication middleware
+// Aplicar middleware de autenticación
 export default withAuth({
   pages: {
     signIn: '/auth/signin',

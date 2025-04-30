@@ -119,24 +119,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       birthdate: string;
     }) => {
       try {
-        const response = await fetch('/api/auth/register', {
+        // Usamos simplemente la ruta relativa para todos los ambientes
+        // Esto funciona tanto en desarrollo local como en producción
+        const registerUrl = '/api/auth/register';
+
+        const response = await fetch(registerUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
           body: JSON.stringify({ name, email, password, birthdate }),
+          credentials: 'include',
         });
 
+        // Leer el cuerpo de la respuesta como texto primero
+        const responseText = await response.text();
+
+        // Intentar parsearlo como JSON
+        let data;
+        try {
+          data = responseText ? JSON.parse(responseText) : {};
+        } catch (e) {
+          console.error('Error parsing response:', responseText);
+          return {
+            success: false,
+            message: 'Error al procesar la respuesta del servidor',
+          };
+        }
+
         if (!response.ok) {
-          const data = await response.json();
           // En lugar de lanzar el error, lo retornamos como parte de la respuesta
           return {
             success: false,
             message: data.message || 'Error al crear la cuenta',
+            status: response.status,
           };
         }
 
-        const data = await response.json();
         return { success: true, data };
       } catch (error) {
+        console.error('Network error during registration:', error);
         return {
           success: false,
           message:
