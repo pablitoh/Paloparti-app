@@ -4,8 +4,12 @@ import type { NextRequest } from 'next/server';
 
 // Esta función se ejecuta antes de cualquier verificación de autenticación
 export function middleware(request: NextRequest) {
-  // Gestión especial para el endpoint de registro
-  if (request.nextUrl.pathname === '/api/auth/register') {
+  // Gestión especial para los endpoints de registro
+  if (
+    request.nextUrl.pathname === '/api/auth/register' ||
+    request.nextUrl.pathname === '/api/auth/register/index' ||
+    request.nextUrl.pathname === '/api/auth/register/'
+  ) {
     // Para solicitudes OPTIONS (preflight), respondemos inmediatamente con OK
     if (request.method === 'OPTIONS') {
       return new NextResponse(null, {
@@ -29,7 +33,7 @@ export function middleware(request: NextRequest) {
 }
 
 // Configurar qué rutas requieren autenticación
-// Importante: excluir explícitamente /api/auth/register del matcher
+// Importante: excluir explícitamente todos los endpoints de registro del matcher
 export const config = {
   matcher: [
     '/((?!api/auth/register)api/groups)/:path*',

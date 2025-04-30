@@ -119,9 +119,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       birthdate: string;
     }) => {
       try {
-        // Usamos simplemente la ruta relativa para todos los ambientes
-        // Esto funciona tanto en desarrollo local como en producción
-        const registerUrl = '/api/auth/register';
+        // Usamos el nuevo endpoint para registro que funciona en ambientes desplegados
+        const registerUrl = '/api/auth/register/';
 
         const response = await fetch(registerUrl, {
           method: 'POST',
