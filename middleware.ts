@@ -2,19 +2,18 @@ import { withAuth } from 'next-auth/middleware';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// Define una función más simple que solo verifica rutas específicas
-// en lugar de bloquear todo por defecto
+// This function runs before any authentication checks
 export function middleware(request: NextRequest) {
-  // Specifically exclude the register endpoint
+  // Specifically exclude the register endpoint to ensure it's accessible without authentication
   if (request.nextUrl.pathname === '/api/auth/register') {
     return NextResponse.next();
   }
 
-  // Permitir todas las rutas por defecto
+  // Allow all other routes by default
   return NextResponse.next();
 }
 
-// Configurar las rutas que requieren autenticación
+// Configure which routes require authentication
 export const config = {
   matcher: [
     '/api/groups/:path*',
@@ -34,7 +33,7 @@ export const config = {
   ],
 };
 
-// Aplicar middleware de autenticación
+// Apply authentication middleware
 export default withAuth({
   pages: {
     signIn: '/auth/signin',

@@ -21,9 +21,11 @@ export default async function handler(
 
   // Handle OPTIONS request
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    res.status(200).end();
+    return;
   }
 
+  // Ensure only POST method is allowed
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -42,7 +44,12 @@ export default async function handler(
     });
 
     if (existingUser) {
-      return res.status(400).json({ message: 'User already exists' });
+      return res
+        .status(400)
+        .json({
+          message:
+            'El correo electrónico ya está registrado. Por favor, utiliza otro o inicia sesión.',
+        });
     }
 
     // Hash password

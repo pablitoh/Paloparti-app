@@ -65,19 +65,29 @@ export default function Register() {
         formData.birthdate
       );
 
-      // Redireccionar según parámetro o a la página por defecto
+      // Solo ejecutamos esta parte si el registro fue exitoso
       if (typeof redirect === 'string' && redirect) {
         router.push(redirect);
       } else {
         router.push('/groups');
       }
     } catch (err) {
-      console.error('Register error:', err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Error al crear la cuenta. Por favor, intenta de nuevo.'
-      );
+      // Evitamos loggear el error en producción, solo para desarrollo
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Register error:', err);
+      }
+
+      // Extraemos el mensaje de error de forma segura
+      let errorMessage =
+        'Error al crear la cuenta. Por favor, intenta de nuevo.';
+
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (err && typeof err === 'object' && 'message' in err) {
+        errorMessage = String(err.message);
+      }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -110,7 +120,17 @@ export default function Register() {
           <form onSubmit={handleSubmit} className='space-y-4'>
             {error && (
               <div className='p-3 bg-red-50 border border-red-200 text-red-600 rounded'>
-                {error}
+                <p className='font-medium'>{error}</p>
+                {error.includes('El correo electrónico ya está registrado') && (
+                  <p className='mt-1 text-sm'>
+                    <Link
+                      href='/auth/signin'
+                      className='text-blue-600 hover:underline'
+                    >
+                      Inicia sesión aquí
+                    </Link>
+                  </p>
+                )}
               </div>
             )}
 
