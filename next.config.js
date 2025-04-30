@@ -9,9 +9,6 @@ const nextConfig = {
     };
     return config;
   },
-  experimental: {
-    // Remove appDir as it's deprecated in Next.js 15
-  },
   compiler: {
     styledComponents: true,
   },
@@ -19,7 +16,7 @@ const nextConfig = {
     domains: ['ui-avatars.com'],
     unoptimized: true,
   },
-  pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
+  // Reescrituras básicas
   async rewrites() {
     return [
       {
@@ -28,13 +25,15 @@ const nextConfig = {
       },
     ];
   },
-  // Ignorar archivos específicos durante la compilación
+  // Ignorar errores para facilitar el despliegue
   eslint: {
     ignoreDuringBuilds: true,
   },
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Asegurar que la producción funcione correctamente
+  output: 'standalone',
 };
 
 module.exports = nextConfig;
