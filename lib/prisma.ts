@@ -12,17 +12,13 @@ const globalForPrisma = global as unknown as {
 
 // Create singleton PrismaClient for better connection handling
 function createPrismaClient() {
+  // Create Prisma client without type issues
   const client = new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query'] : [],
-    datasources: {
-      db: {
-        url: process.env.DATABASE_URL,
-      },
-    },
   });
 
   // Add retry logic for connection pooling issues
-  const clientWithExtensions = client.$extends({
+  const clientWithRetry = client.$extends({
     query: {
       $allModels: {
         async $allOperations({ operation, model, args, query }) {
@@ -37,7 +33,7 @@ function createPrismaClient() {
             } catch (error: any) {
               lastError = error;
 
-              // Only retry on connection pool errors (prepared statement already exists)
+              // Check for connection pool errors related to prepared statements
               if (
                 error.message?.includes('prepared statement') &&
                 error.message?.includes('already exists')
@@ -68,7 +64,7 @@ function createPrismaClient() {
     },
   });
 
-  return clientWithExtensions;
+  return clientWithRetry;
 }
 
 // Use existing instance if available (development) or create new one
