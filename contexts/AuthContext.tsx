@@ -124,19 +124,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         console.log(`Sending registration request to ${registerUrl}`);
 
-        // First attempt a preflight OPTIONS request to check if the endpoint is accessible
-        try {
-          const preflightResponse = await fetch(registerUrl, {
-            method: 'OPTIONS',
-            headers: {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-            },
-          });
-          console.log(`Preflight response status: ${preflightResponse.status}`);
-        } catch (preflightError) {
-          console.error('Preflight request failed:', preflightError);
-        }
+        // Skip the preflight in the client code - rely on browser to handle it
+        // Vercel.json now has proper CORS config for this endpoint
 
         const response = await fetch(registerUrl, {
           method: 'POST',
@@ -145,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             Accept: 'application/json',
           },
           body: JSON.stringify({ name, email, password, birthdate }),
-          credentials: 'include',
+          // Don't use credentials: 'include' unless needed for cookie-based auth
         });
 
         console.log(
@@ -154,29 +143,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Leer el cuerpo de la respuesta como texto primero
         const responseText = await response.text();
-        console.log(
-          `Response text: ${responseText.substring(0, 200)}${
-            responseText.length > 200 ? '...' : ''
-          }`
-        );
+
+        // Log only first part of response in case it's large
+        if (responseText.length > 0) {
+          const previewLength = Math.min(200, responseText.length);
+          console.log(
+            `Response text (${
+              responseText.length
+            } chars): ${responseText.substring(0, previewLength)}${
+              previewLength < responseText.length ? '...' : ''
+            }`
+          );
+        } else {
+          console.log('Response body is empty');
+        }
 
         // Intentar parsearlo como JSON
         let data;
         try {
           data = responseText ? JSON.parse(responseText) : {};
         } catch (e) {
-          console.error('Error parsing response:', responseText);
+          console.error('Error parsing response:', e);
           return {
             success: false,
             message: 'Error al procesar la respuesta del servidor',
+            responseText: responseText.substring(0, 100), // Include some of the response text in the error
           };
         }
 
         if (!response.ok) {
-          // En lugar de lanzar el error, lo retornamos como parte de la respuesta
           return {
             success: false,
-            message: data.message || 'Error al crear la cuenta',
+            message:
+              data.message ||
+              `Error al crear la cuenta: ${response.status} ${response.statusText}`,
             status: response.status,
             statusText: response.statusText,
           };
@@ -189,7 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           success: false,
           message:
             error instanceof Error
-              ? error.message
+              ? `Error de conexión: ${error.message}`
               : 'Error de conexión al servidor',
         };
       }

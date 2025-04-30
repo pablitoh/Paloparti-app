@@ -16,13 +16,9 @@ export default async function handler(
     `[REGISTER DEBUG] Request received at ${new Date().toISOString()}`
   );
   console.log(`[REGISTER DEBUG] Request method: ${req.method}`);
-  console.log(
-    `[REGISTER DEBUG] Request headers:`,
-    JSON.stringify(req.headers, null, 2)
-  );
-  console.log(`[REGISTER DEBUG] Request URL:`, req.url);
+  console.log(`[REGISTER DEBUG] Request URL: ${req.url}`);
 
-  // Set CORS headers for all requests
+  // Always set CORS headers first thing
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader(
@@ -34,9 +30,9 @@ export default async function handler(
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
   );
 
-  // Handle OPTIONS request
+  // Handle OPTIONS request immediately
   if (req.method === 'OPTIONS') {
-    console.log('[REGISTER DEBUG] Handling OPTIONS request');
+    console.log('[REGISTER DEBUG] Handling OPTIONS request - returning 200');
     return res.status(200).end();
   }
 
@@ -51,30 +47,33 @@ export default async function handler(
   }
 
   try {
-    console.log('Processing registration request at /api/register');
-    // Check if body is empty or undefined
-    if (!req.body) {
-      console.error('[REGISTER DEBUG] Request body is empty or undefined');
-      return res.status(400).json({ message: 'Request body is empty' });
+    console.log('[REGISTER DEBUG] Processing POST registration request');
+
+    // Try to get the request body
+    let name: string | undefined;
+    let email: string | undefined;
+    let password: string | undefined;
+    let birthdate: string | undefined;
+
+    try {
+      const body = req.body;
+      name = body.name;
+      email = body.email;
+      password = body.password;
+      birthdate = body.birthdate;
+      console.log('[REGISTER DEBUG] Request body parsed');
+    } catch (bodyError) {
+      console.error('[REGISTER DEBUG] Error parsing request body:', bodyError);
+      return res.status(400).json({ message: 'Invalid request body format' });
     }
 
-    const { name, email, password, birthdate } = req.body;
-    console.log('[REGISTER DEBUG] Request body parsed successfully');
-
-    // Log request info in development (not in production)
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('Register request body:', {
-        name,
-        email,
-        hasPassword: !!password,
-        hasBirthdate: !!birthdate,
-      });
-    }
-
-    // Validate input
+    // Validate the required fields
     if (!name || !email || !password) {
       console.error('[REGISTER DEBUG] Missing required fields');
-      return res.status(400).json({ message: 'Missing required fields' });
+      return res.status(400).json({
+        message:
+          'Missing required fields: name, email and password are required',
+      });
     }
 
     // Check if user already exists
@@ -106,11 +105,12 @@ export default async function handler(
         const birthdateValue = new Date(birthdate);
         Object.assign(userData, { birthdate: birthdateValue });
       } catch (err) {
-        console.error('Error parsing birthdate:', err);
+        console.error('[REGISTER DEBUG] Error parsing birthdate:', err);
         // Continue without birthdate if there's a parsing error
       }
     }
 
+    // Create the user in the database
     const user = await prisma.user.create({
       data: userData,
     });
@@ -120,6 +120,7 @@ export default async function handler(
     // Generate token using the signToken function
     const token = signToken({ userId: user.id });
 
+    // Return success response
     return res.status(201).json({
       token,
       user: {
@@ -130,6 +131,8 @@ export default async function handler(
     });
   } catch (error) {
     console.error('[REGISTER DEBUG] Error in /api/register:', error);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res
+      .status(500)
+      .json({ message: 'Internal server error', error: String(error) });
   }
 }
