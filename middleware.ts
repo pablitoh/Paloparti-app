@@ -11,21 +11,21 @@ const publicRoutes = [
   '/api/s/',
 ];
 
-// Configurar las rutas que requieren autenticación
+// Temporarily disable middleware to debug 404 issues
 export const config = {
-  matcher: [
-    '/groups/:path*',
-    '/matches/:path*',
-    '/profile/:path*',
-    '/api/groups/:path*',
-    '/api/matches/:path*',
-    '/api/profile/:path*',
-  ],
+  matcher: [], // Empty matcher = no routes will use this middleware
 };
 
-// Aplicar middleware de autenticación
+// Export a simple middleware that does nothing but allow all requests
+export default function middleware() {
+  return NextResponse.next();
+}
+
+/*
+// Original auth middleware
 export default withAuth({
   pages: {
     signIn: '/auth/signin',
   },
 });
+*/
