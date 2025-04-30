@@ -8,7 +8,8 @@ export function middleware(request: NextRequest) {
   if (
     request.nextUrl.pathname === '/api/auth/register' ||
     request.nextUrl.pathname === '/api/auth/register/index' ||
-    request.nextUrl.pathname === '/api/auth/register/'
+    request.nextUrl.pathname === '/api/auth/register/' ||
+    request.nextUrl.pathname === '/api/register'
   ) {
     // Para solicitudes OPTIONS (preflight), respondemos inmediatamente con OK
     if (request.method === 'OPTIONS') {
@@ -36,7 +37,7 @@ export function middleware(request: NextRequest) {
 // Importante: excluir explícitamente todos los endpoints de registro del matcher
 export const config = {
   matcher: [
-    '/((?!api/auth/register)api/groups)/:path*',
+    '/((?!api/register)(?!api/auth/register)api)/:path*',
     '/api/groups/:id*/invite',
     '/api/groups/:id*/leave',
     '/api/groups/:id*/members',

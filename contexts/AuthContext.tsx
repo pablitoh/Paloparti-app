@@ -119,8 +119,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       birthdate: string;
     }) => {
       try {
-        // Usamos el nuevo endpoint para registro que funciona en ambientes desplegados
-        const registerUrl = '/api/auth/register/';
+        // Usamos el endpoint simplificado en la raíz de la API
+        const registerUrl = '/api/register';
 
         const response = await fetch(registerUrl, {
           method: 'POST',
