@@ -12,6 +12,7 @@ export function middleware(request: NextRequest) {
 // Configurar las rutas que requieren autenticación
 export const config = {
   matcher: [
+    '/api/groups/:path*',
     '/api/groups/:id*/invite',
     '/api/groups/:id*/leave',
     '/api/groups/:id*/members',

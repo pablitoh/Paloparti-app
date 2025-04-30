@@ -1,13 +1,14 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../../auth/[...nextauth]';
 import { prisma } from '../../../../lib/prisma';
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Verificar autenticación
-  const session = await getSession({ req });
+  // Verificar autenticación usando getServerSession en lugar de getSession
+  const session = await getServerSession(req, res, authOptions);
   if (!session || !session.user) {
     return res.status(401).json({ message: 'No autorizado' });
   }
