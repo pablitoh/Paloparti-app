@@ -42,25 +42,64 @@ export const useGroupActions = ({
   const resetAttendanceMutation = useResetAttendanceMutation();
 
   // Helper function to invalidate relevant queries without page reload
-  const invalidateRelevantQueries = async () => {
-    // Invalidate all group-related queries
-    await queryClient.invalidateQueries({ queryKey: ['group', groupId] });
-    await queryClient.invalidateQueries({
-      queryKey: ['group', 'nextMatch', groupId],
-    });
-    await queryClient.invalidateQueries({
-      queryKey: ['group', 'members', groupId],
-    });
-    await queryClient.invalidateQueries({
-      queryKey: ['group', 'history', groupId],
-    });
-    await queryClient.invalidateQueries({
-      queryKey: ['group', 'stats', groupId],
-    });
+  const invalidateRelevantQueries = async (
+    scope: 'all' | 'nextMatch' | 'members' = 'all'
+  ) => {
+    // Use a sequence of invalidations to prevent race conditions
+    const invalidationPromises = [];
 
-    // Also invalidate the general queries
-    await queryClient.invalidateQueries({ queryKey: ['group', 'nextMatch'] });
-    await queryClient.invalidateQueries({ queryKey: ['group', 'members'] });
+    if (scope === 'all' || scope === 'nextMatch') {
+      // Only invalidate next match data when needed
+      invalidationPromises.push(
+        queryClient.invalidateQueries({
+          queryKey: ['group', 'nextMatch', groupId],
+          exact: true,
+          // Don't refetch immediately if not currently visible
+          refetchType: 'active',
+        })
+      );
+    }
+
+    if (scope === 'all' || scope === 'members') {
+      // Only invalidate members data when needed
+      invalidationPromises.push(
+        queryClient.invalidateQueries({
+          queryKey: ['group', 'members', groupId],
+          exact: true,
+          // Don't refetch immediately if not currently visible
+          refetchType: 'active',
+        })
+      );
+    }
+
+    // Only invalidate these if we're doing a full refresh or it's specifically requested
+    if (scope === 'all') {
+      // Wait for previous invalidations before proceeding to prevent race conditions
+      await Promise.all(invalidationPromises);
+
+      // Then invalidate basic info (lowest priority, as it changes less frequently)
+      await queryClient.invalidateQueries({
+        queryKey: ['group', 'basic', groupId],
+        exact: true,
+        refetchType: 'active',
+      });
+
+      // History and stats are lowest priority
+      await queryClient.invalidateQueries({
+        queryKey: ['group', 'history', groupId],
+        exact: false,
+        refetchType: 'active',
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ['group', 'stats', groupId],
+        exact: true,
+        refetchType: 'active',
+      });
+    } else {
+      // For targeted updates, just wait for the specified invalidations
+      await Promise.all(invalidationPromises);
+    }
   };
 
   const executeAction = async (
@@ -106,8 +145,8 @@ export const useGroupActions = ({
 
       const data = await response.json();
 
-      // Invalidate relevant queries
-      await invalidateRelevantQueries();
+      // Only invalidate the next match data - more targeted invalidation
+      await invalidateRelevantQueries('nextMatch');
 
       // Show appropriate message
       const successMessage =
@@ -155,8 +194,8 @@ export const useGroupActions = ({
 
       const data = await response.json();
 
-      // Invalidate relevant queries
-      await invalidateRelevantQueries();
+      // Only invalidate the next match data - more targeted invalidation
+      await invalidateRelevantQueries('nextMatch');
 
       // Show appropriate message
       const successMessage =
@@ -189,13 +228,30 @@ export const useGroupActions = ({
       return;
     }
 
-    await executeAction(async () => {
+    try {
       await membershipRequestMutation.mutateAsync({
         groupId,
         userId,
         action,
       });
-    });
+
+      // Only invalidate members data
+      await invalidateRelevantQueries('members');
+
+      const message =
+        action === 'APPROVE'
+          ? 'Solicitud aprobada correctamente'
+          : 'Solicitud rechazada correctamente';
+
+      showSuccessToast(message);
+
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (error: any) {
+      console.error('Error executing action:', error);
+      showErrorToast(error.message || 'Ocurrió un error inesperado');
+    }
   };
 
   const handleLeaveGroup = async () => {
@@ -298,8 +354,8 @@ export const useGroupActions = ({
         groupId,
       });
 
-      // Invalidate queries to refresh UI
-      await invalidateRelevantQueries();
+      // Only invalidate next match data
+      await invalidateRelevantQueries('nextMatch');
 
       showSuccessToast('Jugador reemplazado exitosamente');
 

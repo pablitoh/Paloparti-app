@@ -71,7 +71,7 @@ export default function HistoryTab({
           Historial de partidos
         </h3>
         <span className='text-sm text-gray-500'>
-          {completedMatches.length} partidos jugados
+          {completedMatches.length} partidos
         </span>
       </div>
 

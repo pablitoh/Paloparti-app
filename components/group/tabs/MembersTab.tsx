@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Avatar } from '@mui/material';
 import type { GroupWithRelations, Member } from '../../../types/group';
 import type { AuthUser } from '../../../types/auth';
+import { CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 interface MembersTabProps {
   group: GroupWithRelations;
@@ -10,6 +11,12 @@ interface MembersTabProps {
   isLoading: boolean;
   handleConfirmAttendance: (memberId: string, userId: string) => Promise<void>;
   handleDeclineAttendance: (memberId: string, userId: string) => Promise<void>;
+}
+
+interface ActionButtonsProps {
+  member: Member;
+  isConfirmedForNextMatch: boolean;
+  isCurrentUser: boolean | null;
 }
 
 export default function MembersTab({
@@ -62,6 +69,114 @@ export default function MembersTab({
     return isConfirmed;
   };
 
+  // Componente para los botones de acciones
+  const ActionButtons: React.FC<ActionButtonsProps> = ({
+    member,
+    isConfirmedForNextMatch,
+    isCurrentUser,
+  }) => {
+    if (isCurrentUser) {
+      return (
+        <span className='text-sm text-gray-500 italic block mt-1 md:mt-0'>
+          Confirmar desde pestaña "Próximo Partido"
+        </span>
+      );
+    }
+
+    if (!currentUserIsAdmin) {
+      return null;
+    }
+
+    return (
+      <div className='flex gap-2 mt-2 md:mt-0'>
+        {!isConfirmedForNextMatch && (
+          <button
+            onClick={() => handleConfirmAttendance(member.id, member.userId)}
+            className='text-green-600 hover:text-green-900 bg-green-100 hover:bg-green-200 px-3 py-1 rounded-md text-xs md:text-sm flex items-center'
+            disabled={
+              isLoading ||
+              (isMaxPlayersReached && !isConfirmedForNextMatch) ||
+              !group?.nextMatchId
+            }
+          >
+            {isLoading ? (
+              <span className='flex items-center'>
+                <svg
+                  className='animate-spin -ml-1 mr-2 h-4 w-4 text-green-700'
+                  xmlns='http://www.w3.org/2000/svg'
+                  fill='none'
+                  viewBox='0 0 24 24'
+                >
+                  <circle
+                    className='opacity-25'
+                    cx='12'
+                    cy='12'
+                    r='10'
+                    stroke='currentColor'
+                    strokeWidth='4'
+                  ></circle>
+                  <path
+                    className='opacity-75'
+                    fill='currentColor'
+                    d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                  ></path>
+                </svg>
+                Procesando...
+              </span>
+            ) : !group?.nextMatchId ? (
+              'Sin partido'
+            ) : isMaxPlayersReached ? (
+              'Cupo completo'
+            ) : (
+              <>
+                <CheckIcon className='h-4 w-4 mr-1' />
+                Confirmar
+              </>
+            )}
+          </button>
+        )}
+        {isConfirmedForNextMatch && (
+          <button
+            onClick={() => handleDeclineAttendance(member.id, member.userId)}
+            className='text-red-600 hover:text-red-900 bg-red-100 hover:bg-red-200 px-3 py-1 rounded-md text-xs md:text-sm flex items-center'
+            disabled={isLoading || !group?.nextMatchId}
+          >
+            {isLoading ? (
+              <span className='flex items-center'>
+                <svg
+                  className='animate-spin -ml-1 mr-2 h-4 w-4 text-red-700'
+                  xmlns='http://www.w3.org/2000/svg'
+                  fill='none'
+                  viewBox='0 0 24 24'
+                >
+                  <circle
+                    className='opacity-25'
+                    cx='12'
+                    cy='12'
+                    r='10'
+                    stroke='currentColor'
+                    strokeWidth='4'
+                  ></circle>
+                  <path
+                    className='opacity-75'
+                    fill='currentColor'
+                    d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                  ></path>
+                </svg>
+                Procesando...
+              </span>
+            ) : (
+              <>
+                <XMarkIcon className='h-4 w-4 mr-1' />
+                Cancelar
+              </>
+            )}
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className='space-y-4'>
       <div className='flex justify-between items-center'>
@@ -84,174 +199,138 @@ export default function MembersTab({
           </p>
         </div>
       )}
-      <div className='overflow-x-auto'>
-        <table className='min-w-full divide-y divide-gray-200'>
-          <thead className='bg-gray-50'>
-            <tr>
-              <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                Nombre
-              </th>
-              <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                Estado para el próximo partido
-              </th>
-              <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                {currentUserIsAdmin ? 'Acciones' : ''}
-              </th>
-            </tr>
-          </thead>
-          <tbody className='bg-white divide-y divide-gray-200'>
-            {group?.members?.map((member: Member) => {
-              // Determinar el estado para el próximo partido específicamente
-              const isConfirmedForNextMatch = isMemberConfirmedForNextMatch(
-                member.userId
-              );
+      {/* Vista de tabla para pantallas medianas y grandes */}
+      <div className='hidden md:block'>
+        <div className='overflow-x-auto'>
+          <table className='min-w-full divide-y divide-gray-200'>
+            <thead className='bg-gray-50'>
+              <tr>
+                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                  Nombre
+                </th>
+                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                  Estado para el próximo partido
+                </th>
+                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                  {currentUserIsAdmin ? 'Acciones' : ''}
+                </th>
+              </tr>
+            </thead>
+            <tbody className='bg-white divide-y divide-gray-200'>
+              {group?.members?.map((member: Member) => {
+                // Determinar el estado para el próximo partido específicamente
+                const isConfirmedForNextMatch = isMemberConfirmedForNextMatch(
+                  member.userId
+                );
 
-              // Verificar si el usuario actual es el dueño de esta fila
-              const isCurrentUser = user && member.userId === user.id;
+                // Verificar si el usuario actual es el dueño de esta fila
+                const isCurrentUser = user && member.userId === user.id;
 
-              return (
-                <tr key={member.id}>
-                  <td className='px-6 py-4 whitespace-nowrap'>
-                    <div className='flex items-center'>
-                      <div className='flex-shrink-0 h-10 w-10'>
-                        <Avatar
-                          alt={member.name || 'Usuario sin nombre'}
-                          src={member.avatar || ''}
-                          className='h-10 w-10 rounded-full'
-                        />
-                      </div>
-                      <div className='ml-4'>
-                        <div className='text-sm font-medium text-gray-900'>
-                          {member.name || 'Usuario sin nombre'}
-                          {member.role === 'ADMIN' && (
-                            <span className='ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800'>
-                              Admin
-                            </span>
-                          )}
+                return (
+                  <tr key={member.id}>
+                    <td className='px-6 py-4 whitespace-nowrap'>
+                      <div className='flex items-center'>
+                        <div className='flex-shrink-0 h-10 w-10'>
+                          <Avatar
+                            alt={member.name || 'Usuario sin nombre'}
+                            src={member.avatar || ''}
+                            className='h-10 w-10 rounded-full'
+                          />
+                        </div>
+                        <div className='ml-4'>
+                          <div className='text-sm font-medium text-gray-900'>
+                            {member.name || 'Usuario sin nombre'}
+                            {member.role === 'ADMIN' && (
+                              <span className='ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800'>
+                                Admin
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
+                    </td>
+                    <td className='px-6 py-4 whitespace-nowrap'>
+                      <div className='flex items-center'>
+                        {isConfirmedForNextMatch ? (
+                          <span className='px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800'>
+                            Confirmado
+                          </span>
+                        ) : (
+                          <span className='px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800'>
+                            Pendiente
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>
+                      <ActionButtons
+                        member={member}
+                        isConfirmedForNextMatch={isConfirmedForNextMatch}
+                        isCurrentUser={isCurrentUser}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Vista de tarjetas para dispositivos móviles */}
+      <div className='md:hidden'>
+        <ul className='space-y-3'>
+          {group?.members?.map((member: Member) => {
+            const isConfirmedForNextMatch = isMemberConfirmedForNextMatch(
+              member.userId
+            );
+            const isCurrentUser = user && member.userId === user.id;
+
+            return (
+              <li
+                key={member.id}
+                className='bg-white rounded-lg shadow-sm border border-gray-200 p-4'
+              >
+                <div className='flex items-center mb-2'>
+                  <Avatar
+                    alt={member.name || 'Usuario sin nombre'}
+                    src={member.avatar || ''}
+                    className='h-10 w-10 rounded-full mr-3'
+                  />
+                  <div>
+                    <div className='flex items-center flex-wrap gap-1'>
+                      <span className='text-sm font-medium text-gray-900'>
+                        {member.name || 'Usuario sin nombre'}
+                      </span>
+                      {member.role === 'ADMIN' && (
+                        <span className='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800'>
+                          Admin
+                        </span>
+                      )}
                     </div>
-                  </td>
-                  <td className='px-6 py-4 whitespace-nowrap'>
-                    <div className='flex items-center'>
+                    <div className='mt-1'>
                       {isConfirmedForNextMatch ? (
-                        <span className='px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800'>
+                        <span className='px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800'>
                           Confirmado
                         </span>
                       ) : (
-                        <span className='px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800'>
+                        <span className='px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800'>
                           Pendiente
                         </span>
                       )}
                     </div>
-                  </td>
-                  <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>
-                    {isCurrentUser ? (
-                      <span className='text-sm text-gray-500 italic'>
-                        Confirmar desde pestaña "Próximo Partido"
-                      </span>
-                    ) : (
-                      // Botones para administradores - solo visible si el usuario es admin
-                      currentUserIsAdmin && (
-                        <>
-                          {!isConfirmedForNextMatch && (
-                            <button
-                              onClick={() =>
-                                handleConfirmAttendance(
-                                  member.id,
-                                  member.userId
-                                )
-                              }
-                              className='text-green-600 hover:text-green-900 bg-green-100 hover:bg-green-200 px-3 py-1 rounded-md mr-2'
-                              disabled={
-                                isLoading ||
-                                (isMaxPlayersReached &&
-                                  !isConfirmedForNextMatch) ||
-                                !group?.nextMatchId
-                              }
-                            >
-                              {isLoading ? (
-                                <span className='flex items-center'>
-                                  <svg
-                                    className='animate-spin -ml-1 mr-2 h-4 w-4 text-green-700'
-                                    xmlns='http://www.w3.org/2000/svg'
-                                    fill='none'
-                                    viewBox='0 0 24 24'
-                                  >
-                                    <circle
-                                      className='opacity-25'
-                                      cx='12'
-                                      cy='12'
-                                      r='10'
-                                      stroke='currentColor'
-                                      strokeWidth='4'
-                                    ></circle>
-                                    <path
-                                      className='opacity-75'
-                                      fill='currentColor'
-                                      d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
-                                    ></path>
-                                  </svg>
-                                  Procesando...
-                                </span>
-                              ) : !group?.nextMatchId ? (
-                                'Sin partido'
-                              ) : isMaxPlayersReached ? (
-                                'Cupo completo'
-                              ) : (
-                                'Confirmar'
-                              )}
-                            </button>
-                          )}
-                          {isConfirmedForNextMatch && (
-                            <button
-                              onClick={() =>
-                                handleDeclineAttendance(
-                                  member.id,
-                                  member.userId
-                                )
-                              }
-                              className='text-red-600 hover:text-red-900 bg-red-100 hover:bg-red-200 px-3 py-1 rounded-md'
-                              disabled={isLoading || !group?.nextMatchId}
-                            >
-                              {isLoading ? (
-                                <span className='flex items-center'>
-                                  <svg
-                                    className='animate-spin -ml-1 mr-2 h-4 w-4 text-red-700'
-                                    xmlns='http://www.w3.org/2000/svg'
-                                    fill='none'
-                                    viewBox='0 0 24 24'
-                                  >
-                                    <circle
-                                      className='opacity-25'
-                                      cx='12'
-                                      cy='12'
-                                      r='10'
-                                      stroke='currentColor'
-                                      strokeWidth='4'
-                                    ></circle>
-                                    <path
-                                      className='opacity-75'
-                                      fill='currentColor'
-                                      d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
-                                    ></path>
-                                  </svg>
-                                  Procesando...
-                                </span>
-                              ) : (
-                                'Cancelar asistencia'
-                              )}
-                            </button>
-                          )}
-                        </>
-                      )
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  </div>
+                </div>
+
+                <ActionButtons
+                  member={member}
+                  isConfirmedForNextMatch={isConfirmedForNextMatch}
+                  isCurrentUser={isCurrentUser}
+                />
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </div>
   );
