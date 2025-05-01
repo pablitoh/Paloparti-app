@@ -274,7 +274,7 @@ export const useGroupActions = ({
       return;
     }
 
-    await executeAction(async () => {
+    try {
       // Obtener los jugadores confirmados del grupo
       const confirmedPlayers = group?.nextMatchDetails?.confirmedPlayers || [];
 
@@ -299,6 +299,8 @@ export const useGroupActions = ({
         }
       }
 
+      console.log('Sending resort request with:', { players, tbdPlayers });
+
       const response = await fetch(`/api/matches/${nextMatchId}/resort`, {
         method: 'POST',
         headers: {
@@ -315,8 +317,27 @@ export const useGroupActions = ({
         throw new Error(error.message || 'Error al formar equipos');
       }
 
-      return response.json();
-    }, 'Equipos formados correctamente');
+      const result = await response.json();
+      console.log('Resort API response:', result);
+
+      // Just do one invalidation, no need for refetch as data will be fetched by the component
+      await queryClient.invalidateQueries({
+        queryKey: ['group', 'nextMatch', groupId],
+        exact: true,
+      });
+
+      showSuccessToast('Equipos formados correctamente');
+
+      if (onSuccess) {
+        onSuccess();
+      }
+
+      return result;
+    } catch (error: any) {
+      console.error('Error executing action:', error);
+      showErrorToast(error.message || 'Ocurrió un error inesperado');
+      return null;
+    }
   };
 
   const handleDeleteMatch = async (matchId: string) => {

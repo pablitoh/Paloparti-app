@@ -107,20 +107,13 @@ const LazyNextMatchTab = ({
   setAllowFillIn,
   router,
 }: LazyNextMatchTabProps) => {
-  const { data, isLoading } = useGroupNextMatch(groupId, {
+  const [isTeamsSorting, setIsTeamsSorting] = useState(false);
+  const { data, isLoading, refetch } = useGroupNextMatch(groupId, {
     enabled: !!groupId,
-    staleTime: 60 * 1000,
+    staleTime: isTeamsSorting ? 0 : 30 * 1000, // Set to 0 only during team sorting, otherwise 30 seconds
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
-
-  if (isLoading) {
-    return (
-      <div className='w-full py-20 flex justify-center'>
-        <div className='animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500'></div>
-      </div>
-    );
-  }
 
   // Construct the group object expected by NextMatchTab
   const group = {
@@ -140,24 +133,47 @@ const LazyNextMatchTab = ({
     }
   };
 
+  // Wrap handleRandomTeams to ensure we refetch after team sorting
+  const handleTeamSorting = async () => {
+    try {
+      setIsTeamsSorting(true);
+      await handleRandomTeams();
+      // Use a single refetch and reset the state
+      await refetch();
+    } catch (error) {
+      console.error('Error sorting teams:', error);
+      showErrorToast('Error al formar equipos');
+    } finally {
+      setIsTeamsSorting(false);
+    }
+  };
+
   return (
-    <NextMatchTab
-      group={group}
-      user={user}
-      id={groupId}
-      currentUserIsAdmin={currentUserIsAdmin}
-      isUserInGroup={isUserInGroup}
-      setShowReplaceTbdModal={setShowReplaceTbdModal}
-      handleGroupAttendance={handleGroupAttendance}
-      handleSortTeams={handleRandomTeams}
-      handleAddResults={() =>
-        router.push(`/matches/${group?.nextMatchId}/results?edit=true`)
-      }
-      handleDeleteMatch={handleDeleteMatch}
-      userAttendanceStatus={data?.userAttendance || undefined}
-      allowFillIn={allowFillIn}
-      setAllowFillIn={setAllowFillIn}
-    />
+    <div className='relative min-h-[300px]'>
+      {isLoading ? (
+        <div className='absolute inset-0 flex justify-center items-center bg-white bg-opacity-70 z-10'>
+          <div className='animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500'></div>
+        </div>
+      ) : null}
+
+      <NextMatchTab
+        group={group}
+        user={user}
+        id={groupId}
+        currentUserIsAdmin={currentUserIsAdmin}
+        isUserInGroup={isUserInGroup}
+        setShowReplaceTbdModal={setShowReplaceTbdModal}
+        handleGroupAttendance={handleGroupAttendance}
+        handleSortTeams={handleTeamSorting}
+        handleAddResults={() =>
+          router.push(`/matches/${group?.nextMatchId}/results?edit=true`)
+        }
+        handleDeleteMatch={handleDeleteMatch}
+        userAttendanceStatus={data?.userAttendance || undefined}
+        allowFillIn={allowFillIn}
+        setAllowFillIn={setAllowFillIn}
+      />
+    </div>
   );
 };
 
@@ -169,14 +185,6 @@ const LazyHistoryTab = ({ groupId }: LazyHistoryTabProps) => {
     refetchOnMount: false,
   });
 
-  if (isLoading) {
-    return (
-      <div className='w-full py-20 flex justify-center'>
-        <div className='animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500'></div>
-      </div>
-    );
-  }
-
   const sortedMatches = data?.matches
     ? [...data.matches].sort((a, b) => {
         const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -186,14 +194,22 @@ const LazyHistoryTab = ({ groupId }: LazyHistoryTabProps) => {
     : [];
 
   return (
-    <HistoryTab
-      completedMatches={sortedMatches}
-      id={groupId}
-      formatMatchDate={formatMatchDate}
-      getScoreForTeam={getScoreForTeam}
-      getPlayerGoals={getPlayerGoals}
-      renderGoalBalls={renderGoalBalls}
-    />
+    <div className='relative min-h-[300px]'>
+      {isLoading ? (
+        <div className='absolute inset-0 flex justify-center items-center bg-white bg-opacity-70 z-10'>
+          <div className='animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500'></div>
+        </div>
+      ) : null}
+
+      <HistoryTab
+        completedMatches={sortedMatches}
+        id={groupId}
+        formatMatchDate={formatMatchDate}
+        getScoreForTeam={getScoreForTeam}
+        getPlayerGoals={getPlayerGoals}
+        renderGoalBalls={renderGoalBalls}
+      />
+    </div>
   );
 };
 
@@ -205,19 +221,21 @@ const LazyStatsTab = ({ groupId, type }: LazyStatsTabProps) => {
     refetchOnMount: false,
   });
 
-  if (isLoading) {
-    return (
-      <div className='w-full py-20 flex justify-center'>
-        <div className='animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500'></div>
-      </div>
-    );
-  }
+  return (
+    <div className='relative min-h-[300px]'>
+      {isLoading ? (
+        <div className='absolute inset-0 flex justify-center items-center bg-white bg-opacity-70 z-10'>
+          <div className='animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500'></div>
+        </div>
+      ) : null}
 
-  if (type === 'goals') {
-    return <GoalsTab goleadores={data?.goleadores || []} />;
-  } else {
-    return <MvpTab mvps={data?.mvps || []} />;
-  }
+      {type === 'goals' ? (
+        <GoalsTab goleadores={data?.goleadores || []} />
+      ) : (
+        <MvpTab mvps={data?.mvps || []} />
+      )}
+    </div>
+  );
 };
 
 const LazyMembersTab = ({
@@ -229,18 +247,10 @@ const LazyMembersTab = ({
 }: LazyMembersTabProps) => {
   const { data, isLoading } = useGroupMembers(groupId, {
     enabled: !!groupId,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
-
-  if (isLoading) {
-    return (
-      <div className='w-full py-20 flex justify-center'>
-        <div className='animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500'></div>
-      </div>
-    );
-  }
 
   const groupWithMembers = {
     ...basicData,
@@ -248,18 +258,26 @@ const LazyMembersTab = ({
   };
 
   return (
-    <MembersTab
-      group={groupWithMembers}
-      user={user}
-      currentUserIsAdmin={currentUserIsAdmin}
-      isLoading={false}
-      handleConfirmAttendance={async (memberId: string, userId: string) => {
-        await handleAdminAttendanceUpdate(userId, 'CONFIRMED');
-      }}
-      handleDeclineAttendance={async (memberId: string, userId: string) => {
-        await handleAdminAttendanceUpdate(userId, 'DECLINED');
-      }}
-    />
+    <div className='relative min-h-[300px]'>
+      {isLoading ? (
+        <div className='absolute inset-0 flex justify-center items-center bg-white bg-opacity-70 z-10'>
+          <div className='animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500'></div>
+        </div>
+      ) : null}
+
+      <MembersTab
+        group={groupWithMembers}
+        user={user}
+        currentUserIsAdmin={currentUserIsAdmin}
+        isLoading={false}
+        handleConfirmAttendance={async (memberId: string, userId: string) => {
+          await handleAdminAttendanceUpdate(userId, 'CONFIRMED');
+        }}
+        handleDeclineAttendance={async (memberId: string, userId: string) => {
+          await handleAdminAttendanceUpdate(userId, 'DECLINED');
+        }}
+      />
+    </div>
   );
 };
 
@@ -275,111 +293,111 @@ const LazyRequestsTab = ({
     refetchOnMount: false,
   });
 
-  if (isLoading) {
-    return (
-      <div className='w-full py-20 flex justify-center'>
-        <div className='animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500'></div>
-      </div>
-    );
-  }
-
   const pendingRequests = data?.pendingRequests || [];
 
   return (
-    <div className='space-y-6'>
-      <div className='flex justify-between items-center'>
-        <h3 className='text-xl font-semibold text-gray-900'>
-          Solicitudes pendientes
-        </h3>
-        <span className='text-sm text-gray-500'>
-          {pendingRequests.length || 0} solicitudes
-        </span>
-      </div>
-
-      {pendingRequests && pendingRequests.length > 0 ? (
-        <div className='bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden'>
-          <ul className='divide-y divide-gray-200'>
-            {pendingRequests.map((request: any) => (
-              <li
-                key={request.id}
-                className='hover:bg-gray-50 transition-colors'
-              >
-                <div className='px-6 py-4 flex items-center justify-between'>
-                  <div className='flex items-center'>
-                    <div className='flex-shrink-0 h-10 w-10'>
-                      <Avatar
-                        className='h-10 w-10 rounded-full'
-                        src={request.avatar || ''}
-                        alt={request.name || ''}
-                      />
-                    </div>
-                    <div className='ml-4'>
-                      <div className='flex items-center'>
-                        <div className='text-sm font-medium text-gray-900'>
-                          {request.name}
-                        </div>
-                        <span className='ml-2 px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-700'>
-                          Pendiente
-                        </span>
-                      </div>
-                      {request.email && (
-                        <div className='text-sm text-gray-500'>
-                          {request.email}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className='flex space-x-2'>
-                    <button
-                      onClick={() =>
-                        handleMembershipRequest(request.userId, 'APPROVE')
-                      }
-                      className='inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 transition-colors'
-                    >
-                      <CheckCircleIcon className='h-4 w-4 mr-1' />
-                      Aprobar
-                    </button>
-                    <button
-                      onClick={() =>
-                        handleMembershipRequest(request.userId, 'REJECT')
-                      }
-                      className='inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 transition-colors'
-                    >
-                      <XCircleIcon className='h-4 w-4 mr-1' />
-                      Rechazar
-                    </button>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+    <div className='relative min-h-[300px]'>
+      {isLoading ? (
+        <div className='absolute inset-0 flex justify-center items-center bg-white bg-opacity-70 z-10'>
+          <div className='animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500'></div>
         </div>
-      ) : (
-        <div className='bg-white rounded-lg p-6 text-center border border-gray-200 shadow-sm'>
-          <svg
-            xmlns='http://www.w3.org/2000/svg'
-            className='h-12 w-12 mx-auto text-gray-400 mb-4'
-            fill='none'
-            viewBox='0 0 24 24'
-            stroke='currentColor'
-          >
-            <path
-              strokeLinecap='round'
-              strokeLinejoin='round'
-              strokeWidth={1}
-              d='M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z'
-            />
-          </svg>
-          <h3 className='text-lg font-medium text-gray-900 mb-2'>
-            No hay solicitudes pendientes
+      ) : null}
+
+      <div className='space-y-6'>
+        <div className='flex justify-between items-center'>
+          <h3 className='text-xl font-semibold text-gray-900'>
+            Solicitudes pendientes
           </h3>
-          <p className='text-gray-500 max-w-md mx-auto'>
-            No tienes usuarios esperando aprobación para unirse al grupo en este
-            momento.
-          </p>
+          <span className='text-sm text-gray-500'>
+            {pendingRequests.length || 0} solicitudes
+          </span>
         </div>
-      )}
+
+        {pendingRequests && pendingRequests.length > 0 ? (
+          <div className='bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden'>
+            <ul className='divide-y divide-gray-200'>
+              {pendingRequests.map((request: any) => (
+                <li
+                  key={request.id}
+                  className='hover:bg-gray-50 transition-colors'
+                >
+                  <div className='px-6 py-4 flex items-center justify-between'>
+                    <div className='flex items-center'>
+                      <div className='flex-shrink-0 h-10 w-10'>
+                        <Avatar
+                          className='h-10 w-10 rounded-full'
+                          src={request.avatar || ''}
+                          alt={request.name || ''}
+                        />
+                      </div>
+                      <div className='ml-4'>
+                        <div className='flex items-center'>
+                          <div className='text-sm font-medium text-gray-900'>
+                            {request.name}
+                          </div>
+                          <span className='ml-2 px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-700'>
+                            Pendiente
+                          </span>
+                        </div>
+                        {request.email && (
+                          <div className='text-sm text-gray-500'>
+                            {request.email}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className='flex space-x-2'>
+                      <button
+                        onClick={() =>
+                          handleMembershipRequest(request.userId, 'APPROVE')
+                        }
+                        className='inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 transition-colors'
+                      >
+                        <CheckCircleIcon className='h-4 w-4 mr-1' />
+                        Aprobar
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleMembershipRequest(request.userId, 'REJECT')
+                        }
+                        className='inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 transition-colors'
+                      >
+                        <XCircleIcon className='h-4 w-4 mr-1' />
+                        Rechazar
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <div className='bg-white rounded-lg p-6 text-center border border-gray-200 shadow-sm'>
+            <svg
+              xmlns='http://www.w3.org/2000/svg'
+              className='h-12 w-12 mx-auto text-gray-400 mb-4'
+              fill='none'
+              viewBox='0 0 24 24'
+              stroke='currentColor'
+            >
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                strokeWidth={1}
+                d='M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z'
+              />
+            </svg>
+            <h3 className='text-lg font-medium text-gray-900 mb-2'>
+              No hay solicitudes pendientes
+            </h3>
+            <p className='text-gray-500 max-w-md mx-auto'>
+              No tienes usuarios esperando aprobación para unirse al grupo en
+              este momento.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -421,11 +439,80 @@ export default function GroupDetails() {
     refetch: refetchBasicInfo,
   } = useGroupBasicInfo(groupId, {
     enabled: !!groupId && isRouterReady,
-    staleTime: 10 * 60 * 1000, // 10 minutes - much longer to prevent refetches
-    cacheTime: 30 * 60 * 1000, // 30 minutes cache time
+    staleTime: 30 * 60 * 1000, // 30 minutes - much longer to prevent refetches
+    cacheTime: 60 * 60 * 1000, // 60 minutes cache time
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
+
+  return (
+    <Layout>
+      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+        {isGroupBasicLoading ? (
+          <div className='flex justify-center items-center min-h-screen'>
+            <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500'></div>
+          </div>
+        ) : groupBasicError ? (
+          <div className='text-center text-red-600'>
+            {groupBasicError instanceof Error
+              ? groupBasicError.message
+              : String(groupBasicError)}
+          </div>
+        ) : groupBasicData ? (
+          <GroupContent
+            groupBasicData={groupBasicData}
+            groupId={groupId}
+            user={user}
+            router={router}
+            selectedTab={selectedTab}
+            setSelectedTab={setSelectedTab}
+            showReplaceTbdModal={showReplaceTbdModal}
+            setShowReplaceTbdModal={setShowReplaceTbdModal}
+            allowFillIn={allowFillIn}
+            setAllowFillIn={setAllowFillIn}
+            onRefreshData={refetchBasicInfo}
+          />
+        ) : (
+          <div className='text-center text-gray-600'>Grupo no encontrado</div>
+        )}
+      </div>
+    </Layout>
+  );
+}
+
+// Separate component to ensure stable rendering
+const GroupContent = ({
+  groupBasicData,
+  groupId,
+  user,
+  router,
+  selectedTab,
+  setSelectedTab,
+  showReplaceTbdModal,
+  setShowReplaceTbdModal,
+  allowFillIn,
+  setAllowFillIn,
+  onRefreshData,
+}: {
+  groupBasicData: any;
+  groupId: string;
+  user: AuthUser | null;
+  router: any;
+  selectedTab: number;
+  setSelectedTab: (tab: number) => void;
+  showReplaceTbdModal: string;
+  setShowReplaceTbdModal: (id: string) => void;
+  allowFillIn: boolean;
+  setAllowFillIn: (value: boolean) => void;
+  onRefreshData: () => void;
+}) => {
+  // Refs para la funcionalidad de swipe
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
+
+  const [isCopying, setIsCopying] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState('');
 
   // Hook de acciones del grupo
   const {
@@ -476,22 +563,15 @@ export default function GroupDetails() {
     touchEndX.current = e.touches[0].clientX;
   };
 
-  // Prefetch basic group data to ensure it's always in cache
+  // Efecto para procesar datos del grupo
   useEffect(() => {
-    if (!isRouterReady || !groupId || hasRendered.current) return;
+    if (!groupBasicData) return;
 
-    // Mark that we've done the initial prefetch
-    hasRendered.current = true;
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    setInviteUrl(`${baseUrl}/invite/${groupId}`);
+  }, [groupBasicData, groupId]);
 
-    // Prefetch basic info with a high priority and long cache time
-    queryClient.prefetchQuery({
-      queryKey: ['group', 'basic', groupId],
-      queryFn: () => fetch(`/api/groups/${groupId}`).then((res) => res.json()),
-      staleTime: 10 * 60 * 1000, // 10 minutes - much longer to prevent refetches
-    });
-  }, [groupId, isRouterReady, queryClient]);
-
-  // Efecto para cargar pestaña desde URL
+  // Efecto para leer la pestaña de la URL y sincronizar con el estado local
   useEffect(() => {
     if (!router.isReady) return;
 
@@ -499,14 +579,43 @@ export default function GroupDetails() {
     if (tabParam && !isNaN(Number(tabParam))) {
       const tabIndex = Number(tabParam);
       const maxTabs = currentUserIsAdmin ? 6 : 5;
-      if (tabIndex >= 0 && tabIndex < maxTabs) {
-        // Only update if different to prevent unnecessary renders
-        if (tabIndex !== selectedTab) {
-          setSelectedTab(tabIndex);
-        }
+
+      if (tabIndex >= 0 && tabIndex < maxTabs && tabIndex !== selectedTab) {
+        setSelectedTab(tabIndex);
       }
     }
-  }, [router.isReady, router.query.tab, selectedTab, currentUserIsAdmin]);
+  }, [
+    router.isReady,
+    router.query.tab,
+    currentUserIsAdmin,
+    selectedTab,
+    setSelectedTab,
+  ]);
+
+  // Función para copiar enlace de invitación
+  const copyInviteLink = () => {
+    if (!groupBasicData?.inviteToken && !groupId) return;
+
+    setIsCopying(true);
+    const baseUrl = window.location.origin;
+    const urlToCopy = groupBasicData?.inviteToken
+      ? `${baseUrl}/invite/${groupBasicData.inviteToken}`
+      : `${baseUrl}/invite/${groupId}`;
+
+    navigator.clipboard
+      .writeText(urlToCopy)
+      .then(() => {
+        showSuccessToast('Enlace copiado al portapapeles');
+        setTimeout(() => {
+          setIsCopying(false);
+        }, 2000);
+      })
+      .catch((err) => {
+        console.error('Error al copiar enlace:', err);
+        showErrorToast('Error al copiar enlace');
+        setIsCopying(false);
+      });
+  };
 
   // Simple tab change handler that only updates state and URL
   const handleTabChange = useCallback(
@@ -547,39 +656,6 @@ export default function GroupDetails() {
         handleTabChange(selectedTab - 1);
       }
     }
-  };
-
-  // Efecto para procesar datos del grupo
-  useEffect(() => {
-    if (!groupBasicData) return;
-
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    setInviteUrl(`${baseUrl}/invite/${id}`);
-  }, [groupBasicData, id]);
-
-  // Función para copiar enlace de invitación
-  const copyInviteLink = () => {
-    if (!groupBasicData?.inviteToken && !id) return;
-
-    setIsCopying(true);
-    const baseUrl = window.location.origin;
-    const urlToCopy = groupBasicData?.inviteToken
-      ? `${baseUrl}/invite/${groupBasicData.inviteToken}`
-      : `${baseUrl}/invite/${id}`;
-
-    navigator.clipboard
-      .writeText(urlToCopy)
-      .then(() => {
-        showSuccessToast('Enlace copiado al portapapeles');
-        setTimeout(() => {
-          setIsCopying(false);
-        }, 2000);
-      })
-      .catch((err) => {
-        console.error('Error al copiar enlace:', err);
-        showErrorToast('Error al copiar enlace');
-        setIsCopying(false);
-      });
   };
 
   // Renderizar las pestañas disponibles según el rol del usuario
@@ -633,8 +709,6 @@ export default function GroupDetails() {
 
   // Renderizar el contenido de la pestaña seleccionada
   const renderTabContent = useMemo(() => {
-    if (!groupBasicData) return null;
-
     switch (selectedTab) {
       case 0:
         return (
@@ -702,55 +776,37 @@ export default function GroupDetails() {
   ]);
 
   return (
-    <Layout>
-      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-        {isGroupBasicLoading ? (
-          <div className='flex justify-center items-center min-h-screen'>
-            <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500'></div>
-          </div>
-        ) : groupBasicError ? (
-          <div className='text-center text-red-600'>
-            {groupBasicError instanceof Error
-              ? groupBasicError.message
-              : String(groupBasicError)}
-          </div>
-        ) : groupBasicData ? (
-          <div className='space-y-6'>
-            <SimpleHeaderComponent
-              group={groupBasicData}
-              currentUserIsAdmin={currentUserIsAdmin}
-              isUserInGroup={isUserInGroup}
-              handleLeaveGroup={handleLeaveGroup}
-              recurrenceText={getRecurrenceText(groupBasicData)}
-              shortInviteUrl={inviteUrl}
-              inviteUrl={inviteUrl}
-              copyInviteLink={copyInviteLink}
-              isCopying={isCopying}
-              router={router}
-            />
+    <div className='space-y-6'>
+      <SimpleHeaderComponent
+        group={groupBasicData}
+        currentUserIsAdmin={currentUserIsAdmin}
+        isUserInGroup={isUserInGroup}
+        handleLeaveGroup={handleLeaveGroup}
+        recurrenceText={getRecurrenceText(groupBasicData)}
+        shortInviteUrl={inviteUrl}
+        inviteUrl={inviteUrl}
+        copyInviteLink={copyInviteLink}
+        isCopying={isCopying}
+        router={router}
+      />
 
-            <div className='bg-white rounded-xl shadow-sm mb-0'>
-              <nav
-                className='flex overflow-x-auto rounded-t-xl scrollbar-hide'
-                aria-label='Tabs'
-                ref={tabsContainerRef}
-              >
-                {renderTabs}
-              </nav>
-            </div>
+      <div className='bg-white rounded-xl shadow-sm mb-0'>
+        <nav
+          className='flex overflow-x-auto rounded-t-xl scrollbar-hide'
+          aria-label='Tabs'
+          ref={tabsContainerRef}
+        >
+          {renderTabs}
+        </nav>
+      </div>
 
-            <div
-              className='bg-white rounded-xl shadow-sm p-4 sm:p-6'
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-            >
-              {renderTabContent}
-            </div>
-          </div>
-        ) : (
-          <div className='text-center text-gray-600'>Grupo no encontrado</div>
-        )}
+      <div
+        className='bg-white rounded-xl shadow-sm p-4 sm:p-6'
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {renderTabContent}
       </div>
 
       {showReplaceTbdModal && groupBasicData && (
@@ -759,11 +815,9 @@ export default function GroupDetails() {
           setShowReplaceTbdModal={setShowReplaceTbdModal}
           group={groupBasicData}
           handleReplaceTbdPlayer={handleReplaceTbdPlayer}
-          onSuccessfulReplace={() => {
-            refetchBasicInfo();
-          }}
+          onSuccessfulReplace={onRefreshData}
         />
       )}
-    </Layout>
+    </div>
   );
-}
+};

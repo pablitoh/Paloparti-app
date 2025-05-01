@@ -213,9 +213,57 @@ export default function NextMatchTab({
   const requiredPlayers = group?.requiredPlayers || 10;
   const confirmedCount = confirmedPlayers.length;
 
-  // Check if teams are formed
-  const teamsFormed =
-    matchDetails?.playersA && matchDetails.playersA.length > 0;
+  // Get TBD players by team
+  const tbdPlayersTeamA = normalizedTbdPlayers.filter(
+    (p) => p.isTeamA === true
+  );
+  const tbdPlayersTeamB = normalizedTbdPlayers.filter(
+    (p) => p.isTeamA === false
+  );
+
+  // Check if we have TBD players in the original structure
+  const hasTbdTeams = !!(
+    matchDetails?.tbdPlayers &&
+    ((typeof matchDetails.tbdPlayers === 'object' &&
+      ((matchDetails.tbdPlayers as any).teamA?.length > 0 ||
+        (matchDetails.tbdPlayers as any).teamB?.length > 0)) ||
+      (Array.isArray(matchDetails.tbdPlayers) &&
+        matchDetails.tbdPlayers.length > 0))
+  );
+
+  // Check if teams are formed - consider both regular players and TBD players
+  const teamsFormed = !!(
+    (playersA?.length > 0 ||
+      tbdPlayersTeamA.length > 0 ||
+      (hasTbdTeams && (matchDetails?.tbdPlayers as any)?.teamA?.length > 0)) &&
+    (playersB?.length > 0 ||
+      tbdPlayersTeamB.length > 0 ||
+      (hasTbdTeams && (matchDetails?.tbdPlayers as any)?.teamB?.length > 0))
+  );
+
+  // Debug teams state - remove in production
+  useEffect(() => {
+    if (matchDetails) {
+      console.log('Teams state updated:', {
+        teamsFormed,
+        hasTbdTeams,
+        playersACount: playersA?.length || 0,
+        playersBCount: playersB?.length || 0,
+        tbdPlayersTeamACount: tbdPlayersTeamA.length,
+        tbdPlayersTeamBCount: tbdPlayersTeamB.length,
+        tbdPlayers: matchDetails.tbdPlayers,
+        matchDetails,
+      });
+    }
+  }, [
+    matchDetails,
+    teamsFormed,
+    playersA,
+    playersB,
+    tbdPlayersTeamA,
+    tbdPlayersTeamB,
+    hasTbdTeams,
+  ]);
 
   // Normalize participant status string to uppercase
   const normalizeStatus = (
@@ -335,15 +383,75 @@ export default function NextMatchTab({
       // Si tenemos un handler personalizado, lo usamos
       if (handleSortTeams) {
         await handleSortTeams();
+        // Don't do additional refreshes here, the parent component will handle it
       } else {
         // Si no, usamos la mutación directamente
-        await randomizeTeamsMutation.mutateAsync({
+        const result = await randomizeTeamsMutation.mutateAsync({
           groupId: id,
           matchId: matchDetails.id,
         });
+
+        // Just do a single invalidation with refetch after direct API call
+        if (queryClient) {
+          await queryClient.invalidateQueries({
+            queryKey: ['group', 'nextMatch', id],
+            exact: true,
+          });
+        }
+
+        // Process the result to update the local state directly
+        if (result && result.match) {
+          console.log('Got resort result:', result);
+
+          // Update playersA and playersB if they exist
+          if (Array.isArray(result.match.playersA)) {
+            matchDetails.playersA = result.match.playersA;
+          }
+
+          if (Array.isArray(result.match.playersB)) {
+            matchDetails.playersB = result.match.playersB;
+          }
+
+          // Process tbdPlayers
+          if (result.match.tbdPlayers) {
+            matchDetails.tbdPlayers = result.match.tbdPlayers;
+
+            // Update the normalized TBD players
+            let newTbdPlayers: TbdPlayer[] = [];
+
+            if (
+              result.match.tbdPlayers.teamA &&
+              Array.isArray(result.match.tbdPlayers.teamA)
+            ) {
+              newTbdPlayers = [
+                ...newTbdPlayers,
+                ...result.match.tbdPlayers.teamA.map((p: any) => ({
+                  ...p,
+                  isTeamA: true,
+                })),
+              ];
+            }
+
+            if (
+              result.match.tbdPlayers.teamB &&
+              Array.isArray(result.match.tbdPlayers.teamB)
+            ) {
+              newTbdPlayers = [
+                ...newTbdPlayers,
+                ...result.match.tbdPlayers.teamB.map((p: any) => ({
+                  ...p,
+                  isTeamA: false,
+                })),
+              ];
+            }
+
+            setNormalizedTbdPlayers(newTbdPlayers);
+          }
+        }
       }
     } catch (error) {
       console.error('Error sorting teams:', error);
+      showErrorToast('Error al formar equipos');
     } finally {
       setSortTeamsLoading(false);
     }
