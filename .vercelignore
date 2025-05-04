@@ -18,4 +18,6 @@ pages/**/*.broken
 pages/**/*.new 
 
 # Ensure clean build
-.vercel/cache/ 
+.vercel/cache/
+.vercel/output/
+node_modules/.cache/ 
