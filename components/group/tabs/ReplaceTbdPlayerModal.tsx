@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Modal, Select, Button, Avatar, message } from 'antd';
-import { UserOutlined } from '@ant-design/icons';
 import {
   showSuccessToast,
   showErrorToast,
@@ -132,9 +131,10 @@ export default function ReplaceTbdPlayerModal({
                 <Avatar
                   size='small'
                   src={member.avatar || member.image}
-                  icon={<UserOutlined />}
                   className='mr-2'
-                />
+                >
+                  {member.name ? member.name.charAt(0).toUpperCase() : 'U'}
+                </Avatar>
                 {member.name}
               </div>
             </Select.Option>
