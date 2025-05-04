@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Modal, Button, List, Avatar, Space, message } from 'antd';
 import { useManualTeamFormationMutation } from '../../../services/reactQueryHooks';
 
+// Modal for manual team formation
 interface Player {
   id: string;
   name: string | null;
