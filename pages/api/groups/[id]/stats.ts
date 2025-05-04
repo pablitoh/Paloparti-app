@@ -134,7 +134,7 @@ export default async function handler(
               wins: 0,
               matches: 0,
               name: player.name || 'Sin nombre',
-              avatar: player.image,
+              avatar: player.avatar,
             };
           }
           playerStats[playerId].matches += 1;
@@ -152,7 +152,7 @@ export default async function handler(
               wins: 0,
               matches: 0,
               name: player.name || 'Sin nombre',
-              avatar: player.image,
+              avatar: player.avatar,
             };
           }
           playerStats[playerId].matches += 1;
