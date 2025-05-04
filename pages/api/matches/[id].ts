@@ -3,6 +3,36 @@ import { prisma } from '../../../lib/prisma';
 import { getCurrentUser } from '../../../lib/auth';
 import { calculateAge } from '../../../lib/utils';
 import { createNextMatch } from '../../../lib/matches';
+import { Prisma, Match, MatchPlayer, User } from '@prisma/client';
+
+type MatchWithRelations = Match & {
+  group: {
+    id: string;
+    name: string;
+    members: {
+      userId: string;
+      role: string;
+    }[];
+  };
+  matchPlayers: (MatchPlayer & {
+    user: {
+      id: string;
+      name: string | null;
+      image: string | null;
+      birthdate: Date | null;
+    };
+  })[];
+  goals: {
+    id: string;
+    minute: number | null;
+    isTeamA: boolean;
+    scorer: {
+      id: string;
+      name: string | null;
+      image: string | null;
+    };
+  }[];
+};
 
 export default async function handler(
   req: NextApiRequest,
@@ -18,7 +48,7 @@ export default async function handler(
 
   if (req.method === 'GET') {
     try {
-      const match = await prisma.match.findUnique({
+      const match = (await prisma.match.findUnique({
         where: { id: matchId },
         include: {
           group: {
@@ -33,7 +63,7 @@ export default async function handler(
               },
             },
           },
-          playersA: {
+          matchPlayers: {
             include: {
               user: {
                 select: {
@@ -57,7 +87,7 @@ export default async function handler(
             },
           },
         },
-      });
+      })) as MatchWithRelations;
 
       if (!match) {
         return res.status(404).json({ message: 'Partido no encontrado' });
@@ -68,16 +98,27 @@ export default async function handler(
         (member) => member.userId === userId && member.role === 'ADMIN'
       );
 
-      // Add age calculated from birthdate
+      // Add age calculated from birthdate and separate players by team
       const matchWithAges = {
         ...match,
-        playersA: match.playersA.map((player) => ({
-          ...player,
-          user: {
-            ...player.user,
-            age: calculateAge(player.user.birthdate),
-          },
-        })),
+        playersA: match.matchPlayers
+          .filter((player) => player.isTeamA)
+          .map((player) => ({
+            ...player,
+            user: {
+              ...player.user,
+              age: calculateAge(player.user.birthdate),
+            },
+          })),
+        playersB: match.matchPlayers
+          .filter((player) => !player.isTeamA)
+          .map((player) => ({
+            ...player,
+            user: {
+              ...player.user,
+              age: calculateAge(player.user.birthdate),
+            },
+          })),
         isAdmin, // Add isAdmin flag for frontend use
       };
 
@@ -163,7 +204,7 @@ export default async function handler(
       }
 
       // Update match details
-      const updatedMatch = await prisma.match.update({
+      const updatedMatch = (await prisma.match.update({
         where: { id: matchId },
         data: {
           date: date ? new Date(date) : undefined,
@@ -177,9 +218,15 @@ export default async function handler(
             select: {
               id: true,
               name: true,
+              members: {
+                select: {
+                  userId: true,
+                  role: true,
+                },
+              },
             },
           },
-          playersA: {
+          matchPlayers: {
             include: {
               user: {
                 select: {
@@ -203,18 +250,28 @@ export default async function handler(
             },
           },
         },
-      });
+      })) as MatchWithRelations;
 
-      // Add calculated age from birthdate
       const updatedMatchWithAges = {
         ...updatedMatch,
-        playersA: updatedMatch.playersA.map((player) => ({
-          ...player,
-          user: {
-            ...player.user,
-            age: calculateAge(player.user.birthdate),
-          },
-        })),
+        playersA: updatedMatch.matchPlayers
+          .filter((player) => player.isTeamA)
+          .map((player) => ({
+            ...player,
+            user: {
+              ...player.user,
+              age: calculateAge(player.user.birthdate),
+            },
+          })),
+        playersB: updatedMatch.matchPlayers
+          .filter((player) => !player.isTeamA)
+          .map((player) => ({
+            ...player,
+            user: {
+              ...player.user,
+              age: calculateAge(player.user.birthdate),
+            },
+          })),
       };
 
       return res.status(200).json(updatedMatchWithAges);
@@ -228,11 +285,14 @@ export default async function handler(
 
   if (req.method === 'DELETE') {
     try {
+      // Obtener el partido con los datos mínimos necesarios para las validaciones
       const match = await prisma.match.findUnique({
         where: { id: matchId },
-        include: {
+        select: {
+          id: true,
+          groupId: true,
           group: {
-            include: {
+            select: {
               members: {
                 select: {
                   userId: true,
@@ -248,98 +308,60 @@ export default async function handler(
         return res.status(404).json({ message: 'Partido no encontrado' });
       }
 
-      // Verify if user is group admin
+      // Verificar si el usuario es admin
       const isAdmin = match.group.members.some(
         (member) => member.userId === userId && member.role === 'ADMIN'
       );
+
       if (!isAdmin) {
         return res
           .status(403)
           .json({ message: 'No tienes permisos para eliminar este partido' });
       }
 
-      // Delete associated goals
-      await prisma.goal.deleteMany({
-        where: { matchId },
-      });
+      // Ejecutar todas las operaciones en una sola transacción
+      await prisma.$transaction([
+        // 1. Eliminar asistencias asociadas a este partido
+        prisma.matchAttendance.deleteMany({
+          where: { matchId },
+        }),
 
-      // Delete associated players
-      await prisma.matchPlayer.deleteMany({
-        where: { matchId },
-      });
+        // 2. Eliminar goles asociados
+        prisma.goal.deleteMany({
+          where: { matchId },
+        }),
 
-      // Resetear los estados de asistencia para futuros partidos
+        // 3. Eliminar jugadores asociados
+        prisma.matchPlayer.deleteMany({
+          where: { matchId },
+        }),
+
+        // 4. Resetear el nextMatchId del grupo si es el partido actual
+        prisma.group.updateMany({
+          where: {
+            nextMatchId: matchId,
+          },
+          data: {
+            nextMatchId: null,
+          },
+        }),
+
+        // 5. Finalmente eliminar el partido
+        prisma.match.delete({
+          where: { id: matchId },
+        }),
+      ]);
+
+      // Crear un nuevo partido automáticamente después de la transacción principal
       try {
-        await prisma.$transaction(async (prisma) => {
-          // Guardar el ID del grupo y la fecha antes de eliminar el partido
-          const groupId = match.groupId;
-
-          // Reset all match attendance status to PENDING for future matches
-          await prisma.matchAttendance.updateMany({
-            where: {
-              groupId: match.groupId,
-              matchDate: {
-                gt: new Date(),
-              },
-            },
-            data: {
-              status: 'PENDING',
-              updatedAt: new Date(),
-            },
-          });
-
-          // Resetear también el estado de asistencia para este partido específico
-          // Esto es redundante porque se eliminarán, pero por seguridad
-          await prisma.matchAttendance.updateMany({
-            where: {
-              matchId,
-            },
-            data: {
-              status: 'PENDING',
-              updatedAt: new Date(),
-            },
-          });
-
-          // Resetear el nextMatchId del grupo si es el partido actual
-          await prisma.$executeRaw`
-            UPDATE "Group"
-            SET "nextMatchId" = NULL, "nextMatch" = NULL
-            WHERE "nextMatchId" = ${matchId}
-          `;
-        });
-
-        console.log(
-          `Estados de asistencia para futuros partidos del grupo ${match.groupId} reseteados a PENDING`
-        );
-
-        // Crear un nuevo partido automáticamente
         const newMatch = await createNextMatch(match.groupId);
         if (newMatch) {
-          console.log(
-            `Nuevo partido creado automáticamente después de eliminar el partido anterior: ${newMatch.id}`
-          );
+          console.log(`Nuevo partido creado automáticamente: ${newMatch.id}`);
         }
       } catch (error) {
-        console.error(
-          'Error al resetear asistencias futuras o crear nuevo partido:',
-          error
-        );
-        // Continuamos con el flujo normal aunque falle el reseteo de asistencias
+        console.error('Error al crear nuevo partido:', error);
+        // No fallamos la petición completa si esto falla
       }
-
-      // Solo limpiar las asistencias específicas de este partido después de resetearlas
-      await prisma.matchAttendance.deleteMany({
-        where: { matchId },
-      });
-
-      console.log(
-        `Asistencias del partido ${matchId} eliminadas correctamente`
-      );
-
-      // Delete the match
-      await prisma.match.delete({
-        where: { id: matchId },
-      });
 
       return res
         .status(200)

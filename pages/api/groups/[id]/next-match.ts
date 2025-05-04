@@ -2,6 +2,34 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
 import { prisma } from '../../../../lib/prisma';
+import { Match, MatchPlayer, User } from '@prisma/client';
+
+// Interfaces for type safety
+interface MatchWithRelations extends Match {
+  matchPlayers: (MatchPlayer & {
+    user: Pick<User, 'id' | 'name' | 'image'> | null;
+  })[];
+  attendance: Array<{
+    userId: string;
+    status: string;
+    user: Pick<User, 'id' | 'name' | 'image'> | null;
+  }>;
+}
+
+interface PlayerData {
+  id: string;
+  name: string | null;
+  avatar: string | null;
+  isTeamA?: boolean;
+}
+
+interface TbdPlayer {
+  id: string;
+  name: string;
+  avatar: string | null;
+  isTeamA: boolean;
+  playerType: 'TBD';
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -50,8 +78,20 @@ export default async function handler(
     // Obtener detalles del próximo partido
     const match = await prisma.match.findUnique({
       where: { id: group.nextMatchId },
-      include: {
-        playersA: {
+      select: {
+        id: true,
+        date: true,
+        location: true,
+        groupId: true,
+        teamA: true,
+        teamB: true,
+        scoreA: true,
+        scoreB: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        tbdPlayers: true, // Intentar obtener los tbdPlayers si existen
+        matchPlayers: {
           include: {
             user: {
               select: {
@@ -95,8 +135,8 @@ export default async function handler(
     );
 
     // Formatear la respuesta
-    // Separar playersA en equipos A y B basados en isTeamA
-    const teamAPlayers = match.playersA
+    // Usar matchPlayers para obtener los jugadores de cada equipo
+    const teamAPlayers = (match.matchPlayers as any[])
       .filter((player) => player.isTeamA)
       .map((player) => ({
         id: player.userId,
@@ -105,7 +145,7 @@ export default async function handler(
         isTeamA: true,
       }));
 
-    const teamBPlayers = match.playersA
+    const teamBPlayers = (match.matchPlayers as any[])
       .filter((player) => !player.isTeamA)
       .map((player) => ({
         id: player.userId,
@@ -113,6 +153,91 @@ export default async function handler(
         avatar: player.user?.image || null,
         isTeamA: false,
       }));
+
+    // Procesar los TBD players
+    let tbdPlayers: TbdPlayer[] = [];
+
+    // Intentar extraer y parsear tbdPlayers almacenados
+    if (match.tbdPlayers) {
+      try {
+        // Si es un string, intentar parsearlo como JSON
+        if (typeof match.tbdPlayers === 'string' && match.tbdPlayers !== '') {
+          const parsed = JSON.parse(match.tbdPlayers);
+
+          // Si es un array, usarlo directamente
+          if (Array.isArray(parsed)) {
+            tbdPlayers = parsed;
+          }
+          // Si es un objeto con teamA/teamB, procesarlo
+          else if (parsed.teamA || parsed.teamB) {
+            const teamATbd = Array.isArray(parsed.teamA) ? parsed.teamA : [];
+            const teamBTbd = Array.isArray(parsed.teamB) ? parsed.teamB : [];
+
+            tbdPlayers = [
+              ...teamATbd.map((p: any) => ({
+                ...p,
+                isTeamA: true,
+                playerType: 'TBD',
+              })),
+              ...teamBTbd.map((p: any) => ({
+                ...p,
+                isTeamA: false,
+                playerType: 'TBD',
+              })),
+            ];
+          }
+        }
+        // Si ya es un array, usarlo directamente
+        else if (Array.isArray(match.tbdPlayers)) {
+          tbdPlayers = match.tbdPlayers.map((p: any) => ({
+            id:
+              p.id ||
+              `tbd-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            name: p.name || 'TBD Player',
+            avatar: p.avatar || null,
+            isTeamA: typeof p.isTeamA === 'boolean' ? p.isTeamA : true,
+            playerType: 'TBD',
+          }));
+        }
+      } catch (error) {
+        console.error('Error parsing tbdPlayers:', error);
+        // En caso de error, continuar con tbdPlayers como array vacío
+        tbdPlayers = [];
+      }
+    }
+
+    // Si no hay TBD players o no pudimos parsearlos, generar nuevos si son necesarios
+    if (tbdPlayers.length === 0) {
+      const requiredPlayersPerTeam = Math.ceil(group.requiredPlayers / 2) || 5;
+
+      // Generar TBD players para el equipo A si es necesario
+      if (teamAPlayers.length < requiredPlayersPerTeam) {
+        const missingA = requiredPlayersPerTeam - teamAPlayers.length;
+        for (let i = 0; i < missingA; i++) {
+          tbdPlayers.push({
+            id: `tbd-${Date.now()}-a-${i}`,
+            name: `TBD A${i + 1}`,
+            avatar: null,
+            isTeamA: true,
+            playerType: 'TBD',
+          });
+        }
+      }
+
+      // Generar TBD players para el equipo B si es necesario
+      if (teamBPlayers.length < requiredPlayersPerTeam) {
+        const missingB = requiredPlayersPerTeam - teamBPlayers.length;
+        for (let i = 0; i < missingB; i++) {
+          tbdPlayers.push({
+            id: `tbd-${Date.now()}-b-${i}`,
+            name: `TBD B${i + 1}`,
+            avatar: null,
+            isTeamA: false,
+            playerType: 'TBD',
+          });
+        }
+      }
+    }
 
     const nextMatchDetails = {
       id: match.id,
@@ -126,7 +251,7 @@ export default async function handler(
       playersA: teamAPlayers,
       playersB: teamBPlayers,
       confirmedPlayers,
-      tbdPlayers: match.tbdPlayers || [],
+      tbdPlayers,
       requiredPlayers: group.requiredPlayers,
     };
 
@@ -136,6 +261,11 @@ export default async function handler(
     });
   } catch (error) {
     console.error('Error al obtener próximo partido:', error);
-    return res.status(500).json({ message: 'Error interno del servidor' });
+    return res.status(500).json({
+      message: 'Error interno del servidor',
+      error: String(error),
+      // Add stack trace for better debugging
+      stack: error instanceof Error ? error.stack : undefined,
+    });
   }
 }

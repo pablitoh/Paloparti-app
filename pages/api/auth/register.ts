@@ -7,7 +7,7 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Set CORS headers for all requests
+  // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader(
@@ -19,31 +19,17 @@ export default async function handler(
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
   );
 
-  // Handle OPTIONS request - critically important for preflight in production
+  // Handle OPTIONS request
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  // Ensure only POST method is allowed
   if (req.method !== 'POST') {
-    console.error(`Method ${req.method} not allowed at /api/auth/register`);
-    return res.status(405).json({
-      message: `Method ${req.method} not allowed`,
-    });
+    return res.status(405).json({ message: 'Method not allowed' });
   }
 
   try {
     const { name, email, password, birthdate } = req.body;
-
-    // Log request info in development (not in production)
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('Register request body:', {
-        name,
-        email,
-        hasPassword: !!password,
-        hasBirthdate: !!birthdate,
-      });
-    }
 
     // Validate input
     if (!name || !email || !password) {
@@ -56,12 +42,7 @@ export default async function handler(
     });
 
     if (existingUser) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'El correo electrónico ya está registrado. Por favor, utiliza otro o inicia sesión.',
-        });
+      return res.status(400).json({ message: 'User already exists' });
     }
 
     // Hash password

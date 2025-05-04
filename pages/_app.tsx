@@ -32,9 +32,11 @@ function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
   // Forzar invalidación de todas las consultas en cambios de ruta
   useEffect(() => {
     const handleRouteChange = (url: string) => {
-      console.log('Invalidando todas las consultas en cambio de ruta a:', url);
-      // Limpiar la caché de React Query
-      queryClient.clear();
+      console.log('Invalidando consultas relevantes en cambio de ruta a:', url);
+      // Solo invalidar las consultas activas en lugar de limpiar toda la caché
+      queryClient.invalidateQueries({
+        refetchType: 'active',
+      });
       // Limpiar los toasts activos
       clearAllToasts();
     };

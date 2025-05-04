@@ -49,53 +49,76 @@ export const useGroupActions = ({
     const invalidationPromises = [];
 
     if (scope === 'all' || scope === 'nextMatch') {
-      // Only invalidate next match data when needed
-      invalidationPromises.push(
-        queryClient.invalidateQueries({
-          queryKey: ['group', 'nextMatch', groupId],
-          exact: true,
-          // Don't refetch immediately if not currently visible
-          refetchType: 'active',
-        })
-      );
+      // Solo invalidar si no hay datos en caché
+      const nextMatchData = queryClient.getQueryData([
+        'group',
+        'nextMatch',
+        groupId,
+      ]);
+      if (!nextMatchData) {
+        invalidationPromises.push(
+          queryClient.invalidateQueries({
+            queryKey: ['group', 'nextMatch', groupId],
+            exact: true,
+            refetchType: 'active',
+          })
+        );
+      }
     }
 
     if (scope === 'all' || scope === 'members') {
-      // Only invalidate members data when needed
-      invalidationPromises.push(
-        queryClient.invalidateQueries({
-          queryKey: ['group', 'members', groupId],
-          exact: true,
-          // Don't refetch immediately if not currently visible
-          refetchType: 'active',
-        })
-      );
+      // Solo invalidar si no hay datos en caché
+      const membersData = queryClient.getQueryData([
+        'group',
+        'members',
+        groupId,
+      ]);
+      if (!membersData) {
+        invalidationPromises.push(
+          queryClient.invalidateQueries({
+            queryKey: ['group', 'members', groupId],
+            exact: true,
+            refetchType: 'active',
+          })
+        );
+      }
     }
 
-    // Only invalidate these if we're doing a full refresh or it's specifically requested
+    // Solo invalidar estos si es necesario y no hay datos en caché
     if (scope === 'all') {
-      // Wait for previous invalidations before proceeding to prevent race conditions
+      // Wait for previous invalidations before proceeding
       await Promise.all(invalidationPromises);
 
-      // Then invalidate basic info (lowest priority, as it changes less frequently)
-      await queryClient.invalidateQueries({
-        queryKey: ['group', 'basic', groupId],
-        exact: true,
-        refetchType: 'active',
-      });
+      const basicData = queryClient.getQueryData(['group', 'basic', groupId]);
+      if (!basicData) {
+        await queryClient.invalidateQueries({
+          queryKey: ['group', 'basic', groupId],
+          exact: true,
+          refetchType: 'active',
+        });
+      }
 
-      // History and stats are lowest priority
-      await queryClient.invalidateQueries({
-        queryKey: ['group', 'history', groupId],
-        exact: false,
-        refetchType: 'active',
-      });
+      const historyData = queryClient.getQueryData([
+        'group',
+        'history',
+        groupId,
+      ]);
+      if (!historyData) {
+        await queryClient.invalidateQueries({
+          queryKey: ['group', 'history', groupId],
+          exact: false,
+          refetchType: 'active',
+        });
+      }
 
-      await queryClient.invalidateQueries({
-        queryKey: ['group', 'stats', groupId],
-        exact: true,
-        refetchType: 'active',
-      });
+      const statsData = queryClient.getQueryData(['group', 'stats', groupId]);
+      if (!statsData) {
+        await queryClient.invalidateQueries({
+          queryKey: ['group', 'stats', groupId],
+          exact: true,
+          refetchType: 'active',
+        });
+      }
     } else {
       // For targeted updates, just wait for the specified invalidations
       await Promise.all(invalidationPromises);
@@ -126,27 +149,87 @@ export const useGroupActions = ({
   };
 
   const handleAttendance = async (status: ParticipantStatus): Promise<void> => {
+    if (!groupId) {
+      console.error('ID de grupo inválido');
+      showErrorToast('ID de grupo inválido');
+      return;
+    }
+
     try {
+      // First, ensure we have the latest match ID by fetching it if necessary
+      let currentMatchId = nextMatchId;
+      if (!currentMatchId) {
+        try {
+          // Get the latest match ID from the API
+          const matchResponse = await fetch(
+            `/api/groups/${groupId}/next-match`
+          );
+          if (matchResponse.ok) {
+            const matchData = await matchResponse.json();
+            if (matchData?.nextMatchDetails?.id) {
+              currentMatchId = matchData.nextMatchDetails.id;
+            } else {
+              throw new Error('No hay un partido activo para este grupo');
+            }
+          } else {
+            throw new Error('Error al obtener información del partido');
+          }
+        } catch (error) {
+          console.error('Error fetching match data:', error);
+          showErrorToast('No hay un partido programado para este grupo');
+          return;
+        }
+      }
+
       const response = await fetch(`/api/attendances`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          matchId: nextMatchId,
+          matchId: currentMatchId,
           status,
           groupId,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update attendance');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update attendance');
       }
 
       const data = await response.json();
 
-      // Only invalidate the next match data - more targeted invalidation
-      await invalidateRelevantQueries('nextMatch');
+      // Forzar la invalidación de todas las consultas relevantes
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['group', 'nextMatch', groupId],
+          exact: true,
+          refetchType: 'active',
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['group', 'members', groupId],
+          exact: true,
+          refetchType: 'active',
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['group', 'basic', groupId],
+          exact: true,
+          refetchType: 'active',
+        }),
+      ]);
+
+      // Actualizar manualmente el caché con los nuevos datos si están disponibles
+      if (data.nextMatchDetails) {
+        queryClient.setQueryData(
+          ['group', 'nextMatch', groupId],
+          (oldData: any) => ({
+            ...oldData,
+            nextMatchDetails: data.nextMatchDetails,
+            userAttendance: status,
+          })
+        );
+      }
 
       // Show appropriate message
       const successMessage =
@@ -166,7 +249,7 @@ export const useGroupActions = ({
     } catch (error) {
       console.error('Error updating attendance:', error);
       showErrorToast('Error al actualizar asistencia');
-      throw error;
+      throw error; // Re-throw the error to be handled by the component
     }
   };
 
@@ -174,7 +257,37 @@ export const useGroupActions = ({
     userId: string,
     status: ParticipantStatus
   ) => {
+    if (!groupId) {
+      showErrorToast('ID de grupo inválido');
+      return;
+    }
+
     try {
+      // First, ensure we have the latest match ID by fetching it if necessary
+      let currentMatchId = nextMatchId;
+      if (!currentMatchId) {
+        try {
+          // Get the latest match ID from the API
+          const matchResponse = await fetch(
+            `/api/groups/${groupId}/next-match`
+          );
+          if (matchResponse.ok) {
+            const matchData = await matchResponse.json();
+            if (matchData?.nextMatchDetails?.id) {
+              currentMatchId = matchData.nextMatchDetails.id;
+            } else {
+              throw new Error('No hay un partido activo para este grupo');
+            }
+          } else {
+            throw new Error('Error al obtener información del partido');
+          }
+        } catch (error) {
+          console.error('Error fetching match data:', error);
+          showErrorToast('No hay un partido programado para este grupo');
+          return;
+        }
+      }
+
       const response = await fetch(`/api/attendances`, {
         method: 'POST',
         headers: {
@@ -182,7 +295,7 @@ export const useGroupActions = ({
         },
         body: JSON.stringify({
           userId,
-          matchId: nextMatchId,
+          matchId: currentMatchId,
           status,
           groupId,
         }),
@@ -194,7 +307,7 @@ export const useGroupActions = ({
 
       const data = await response.json();
 
-      // Only invalidate the next match data - more targeted invalidation
+      // Solo invalidamos la consulta del próximo partido ya que es lo único que cambia
       await invalidateRelevantQueries('nextMatch');
 
       // Show appropriate message
@@ -266,7 +379,7 @@ export const useGroupActions = ({
     }, 'Has abandonado el grupo correctamente');
   };
 
-  const handleRandomTeams = async () => {
+  const handleRandomTeams = async (providedConfirmedPlayers?: any[]) => {
     if (!nextMatchId || !groupId) {
       showErrorToast(
         'No hay próximo partido configurado o ID de grupo inválido'
@@ -275,8 +388,17 @@ export const useGroupActions = ({
     }
 
     try {
-      // Obtener los jugadores confirmados del grupo
-      const confirmedPlayers = group?.nextMatchDetails?.confirmedPlayers || [];
+      // Use provided confirmed players if available, otherwise fall back to group data
+      const confirmedPlayers =
+        providedConfirmedPlayers ||
+        group?.nextMatchDetails?.confirmedPlayers ||
+        [];
+
+      // Verificar que los jugadores estén efectivamente confirmados
+      console.log(
+        'Jugadores confirmados antes del filtro:',
+        confirmedPlayers.length
+      );
 
       // Crear el formato de jugadores que espera la API
       const players = confirmedPlayers.map((player: any) => ({
@@ -284,31 +406,67 @@ export const useGroupActions = ({
         name: player.name,
       }));
 
+      console.log('Jugadores enviados para sorteo:', players.length);
+
+      if (players.length < 2) {
+        showErrorToast(
+          'Se necesitan al menos 2 jugadores confirmados para sortear equipos'
+        );
+        return;
+      }
+
       // Crear jugadores TBD si es necesario
       const requiredPlayers = group?.requiredPlayers || 10;
       const missingPlayers = Math.max(0, requiredPlayers - players.length);
-      const tbdPlayers = [];
+
+      // Formato correcto para tbdPlayers que evita el error de prisma
+      const tbdPlayersData = {
+        teamA: [] as any[],
+        teamB: [] as any[],
+      };
 
       if (allowFillIn && missingPlayers > 0) {
-        for (let i = 0; i < missingPlayers; i++) {
-          tbdPlayers.push({
-            id: `tbd-${Date.now()}-${i}`,
-            name: `TBD ${i + 1}`,
+        // Decidir cuántos jugadores TBD van a cada equipo
+        const halfMissing = Math.ceil(missingPlayers / 2);
+
+        for (let i = 0; i < halfMissing; i++) {
+          tbdPlayersData.teamA.push({
+            id: `tbd-${Date.now()}-a-${i}`,
+            name: `TBD A${i + 1}`,
             avatar: null,
+            isTeamA: true,
+            playerType: 'TBD',
+          });
+        }
+
+        for (let i = 0; i < missingPlayers - halfMissing; i++) {
+          tbdPlayersData.teamB.push({
+            id: `tbd-${Date.now()}-b-${i}`,
+            name: `TBD B${i + 1}`,
+            avatar: null,
+            isTeamA: false,
+            playerType: 'TBD',
           });
         }
       }
 
-      console.log('Sending resort request with:', { players, tbdPlayers });
+      console.log('Sending team formation request with:', {
+        players,
+        tbdPlayers: tbdPlayersData,
+      });
 
-      const response = await fetch(`/api/matches/${nextMatchId}/resort`, {
+      const response = await fetch(`/api/matches/create-match`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          groupId,
+          matchId: nextMatchId,
+          mode: 'auto',
+          isResort: true,
           players,
-          tbdPlayers,
+          tbdPlayers: tbdPlayersData,
         }),
       });
 
@@ -318,13 +476,34 @@ export const useGroupActions = ({
       }
 
       const result = await response.json();
-      console.log('Resort API response:', result);
+      console.log('Create match API response:', result);
 
-      // Just do one invalidation, no need for refetch as data will be fetched by the component
-      await queryClient.invalidateQueries({
-        queryKey: ['group', 'nextMatch', groupId],
-        exact: true,
-      });
+      // Here's the issue - we should only invalidate if needed
+      // Check if the result has proper team data
+      if (!result.teamA || !result.teamB) {
+        // Only invalidate if we didn't get complete data back
+        await queryClient.invalidateQueries({
+          queryKey: ['group', 'nextMatch', groupId],
+          exact: true,
+        });
+      } else {
+        // Otherwise, update the cache directly without triggering a refetch
+        queryClient.setQueryData(
+          ['group', 'nextMatch', groupId],
+          (oldData: any) => {
+            if (!oldData) return oldData;
+            return {
+              ...oldData,
+              nextMatchDetails: {
+                ...oldData.nextMatchDetails,
+                playersA: result.teamA,
+                playersB: result.teamB,
+                tbdPlayers: result.tbdPlayers,
+              },
+            };
+          }
+        );
+      }
 
       showSuccessToast('Equipos formados correctamente');
 
@@ -375,8 +554,8 @@ export const useGroupActions = ({
         groupId,
       });
 
-      // Only invalidate next match data
-      await invalidateRelevantQueries('nextMatch');
+      // Invalidar tanto nextMatch como members para actualizar ambas pestañas
+      await invalidateRelevantQueries('all');
 
       showSuccessToast('Jugador reemplazado exitosamente');
 

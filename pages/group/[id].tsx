@@ -28,11 +28,9 @@ import {
   getRecurrenceText,
 } from '../../utils/groupUtils';
 import { useQueryClient } from '@tanstack/react-query';
-import type {
-  Group,
-  MatchInterface,
-  ParticipantStatus,
-} from '../../types/group';
+import type { Group, ParticipantStatus } from '../../types/group';
+import type { MatchInterface } from '../../types/match';
+import ManualTeamFormationModal from '../../components/group/modals/ManualTeamFormationModal';
 
 // Add AuthUser interface
 interface AuthUser {
@@ -49,17 +47,18 @@ interface LazyTabProps {
 }
 
 interface LazyNextMatchTabProps extends LazyTabProps {
-  basicData: any;
+  basicData: GroupWithRelations;
   user: AuthUser | null;
   currentUserIsAdmin: boolean;
   isUserInGroup: boolean;
   handleAttendance: (status: ParticipantStatus) => Promise<void>;
-  handleRandomTeams: () => Promise<void>;
+  handleRandomTeams: (confirmedPlayers?: any[]) => Promise<void>;
   handleDeleteMatch: (matchId: string) => Promise<void>;
   setShowReplaceTbdModal: (id: string) => void;
   allowFillIn: boolean;
   setAllowFillIn: (value: boolean) => void;
   router: any;
+  setShowManualTeamFormationModal: (value: boolean) => void;
 }
 
 interface LazyHistoryTabProps extends LazyTabProps {}
@@ -92,6 +91,47 @@ interface TabConfig {
   badgeCount?: number;
 }
 
+interface GroupBasicData {
+  id: string;
+  name: string;
+  description: string;
+  teamAName: string;
+  teamBName: string;
+  nextMatchId: string;
+  nextMatchDetails?: {
+    id: string;
+    confirmedPlayers: Array<{
+      id: string;
+      name: string;
+      image?: string | null;
+    }>;
+  };
+}
+
+interface GroupWithRelations {
+  id: string;
+  name: string;
+  sport?: string;
+  location?: string;
+  requiredPlayers?: number;
+  teamAName?: string;
+  teamBName?: string;
+  nextMatchDetails?: MatchInterface;
+  nextMatchId?: string;
+  members?: any[];
+  userStatus?: string;
+  isAdmin?: boolean;
+  createdBy?: string;
+  inviteToken?: string;
+  pendingRequestsCount?: number;
+  userAttendanceStatus?: ParticipantStatus;
+}
+
+interface ApiResponse {
+  nextMatchDetails?: MatchInterface;
+  userAttendance?: ParticipantStatus;
+}
+
 // Components for each tab that handle their own data loading
 const LazyNextMatchTab = ({
   groupId,
@@ -106,22 +146,30 @@ const LazyNextMatchTab = ({
   allowFillIn,
   setAllowFillIn,
   router,
+  setShowManualTeamFormationModal,
 }: LazyNextMatchTabProps) => {
   const [isTeamsSorting, setIsTeamsSorting] = useState(false);
   const { data, isLoading, refetch } = useGroupNextMatch(groupId, {
     enabled: !!groupId,
-    staleTime: isTeamsSorting ? 0 : 30 * 1000, // Set to 0 only during team sorting, otherwise 30 seconds
+    staleTime: isTeamsSorting ? 0 : 30 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
 
   // Construct the group object expected by NextMatchTab
-  const group = {
+  const apiData = data as ApiResponse | undefined;
+  const group: GroupWithRelations = {
     ...basicData,
-    nextMatchDetails: data?.nextMatchDetails || null,
-    userAttendanceStatus: data?.userAttendance || null,
-    nextMatchId: basicData?.nextMatchId,
+    nextMatchDetails: apiData?.nextMatchDetails,
+    userAttendanceStatus: apiData?.userAttendance,
+    nextMatchId: apiData?.nextMatchDetails?.id || basicData?.nextMatchId,
   };
+
+  // Only refetch once on initial mount to ensure we have the latest data
+  useEffect(() => {
+    // Initial data load - no need to refetch on every render
+    // The delete and other operations will trigger their own refetches
+  }, []);
 
   // Create a handler function that wraps handleAttendance
   const handleGroupAttendance = async (status: ParticipantStatus) => {
@@ -137,14 +185,27 @@ const LazyNextMatchTab = ({
   const handleTeamSorting = async () => {
     try {
       setIsTeamsSorting(true);
-      await handleRandomTeams();
-      // Use a single refetch and reset the state
-      await refetch();
+      // Pass the current next match data to make sure we have the confirmed players
+      await handleRandomTeams(apiData?.nextMatchDetails?.confirmedPlayers);
+      // Don't refetch here as the mutation already handles it
+      // This prevents double calls to the API
     } catch (error) {
       console.error('Error sorting teams:', error);
       showErrorToast('Error al formar equipos');
     } finally {
       setIsTeamsSorting(false);
+    }
+  };
+
+  // Wrap handleDeleteMatch to ensure we refetch after match deletion
+  const handleMatchDeletion = async (matchId: string) => {
+    try {
+      await handleDeleteMatch(matchId);
+      // Don't refetch here as the mutation already handles it
+      // This prevents double calls to the API
+    } catch (error) {
+      console.error('Error deleting match:', error);
+      showErrorToast('Error al eliminar el partido');
     }
   };
 
@@ -168,10 +229,11 @@ const LazyNextMatchTab = ({
         handleAddResults={() =>
           router.push(`/matches/${group?.nextMatchId}/results?edit=true`)
         }
-        handleDeleteMatch={handleDeleteMatch}
-        userAttendanceStatus={data?.userAttendance || undefined}
+        handleDeleteMatch={handleMatchDeletion}
+        userAttendanceStatus={(data as ApiResponse)?.userAttendance}
         allowFillIn={allowFillIn}
         setAllowFillIn={setAllowFillIn}
+        setShowManualTeamFormationModal={setShowManualTeamFormationModal}
       />
     </div>
   );
@@ -245,21 +307,35 @@ const LazyMembersTab = ({
   currentUserIsAdmin,
   handleAdminAttendanceUpdate,
 }: LazyMembersTabProps) => {
-  const { data, isLoading } = useGroupMembers(groupId, {
-    enabled: !!groupId,
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-  });
+  const { data: nextMatchData, isLoading: isNextMatchLoading } =
+    useGroupNextMatch(groupId, {
+      enabled: !!groupId,
+      staleTime: 30 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+    });
+
+  const { data: membersData, isLoading: isMembersLoading } = useGroupMembers(
+    groupId,
+    {
+      enabled: !!groupId,
+      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+    }
+  );
 
   const groupWithMembers = {
     ...basicData,
-    members: data?.members || [],
+    members: membersData?.members || [],
+    nextMatchDetails:
+      (nextMatchData as ApiResponse | undefined)?.nextMatchDetails ||
+      basicData.nextMatchDetails,
   };
 
   return (
     <div className='relative min-h-[300px]'>
-      {isLoading ? (
+      {isNextMatchLoading || isMembersLoading ? (
         <div className='absolute inset-0 flex justify-center items-center bg-white bg-opacity-70 z-10'>
           <div className='animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500'></div>
         </div>
@@ -269,7 +345,7 @@ const LazyMembersTab = ({
         group={groupWithMembers}
         user={user}
         currentUserIsAdmin={currentUserIsAdmin}
-        isLoading={false}
+        isLoading={isNextMatchLoading || isMembersLoading}
         handleConfirmAttendance={async (memberId: string, userId: string) => {
           await handleAdminAttendanceUpdate(userId, 'CONFIRMED');
         }}
@@ -416,6 +492,8 @@ export default function GroupDetails() {
   const [isCopying, setIsCopying] = useState(false);
   const [inviteUrl, setInviteUrl] = useState('');
   const [allowFillIn, setAllowFillIn] = useState(true);
+  const [showManualTeamFormationModal, setShowManualTeamFormationModal] =
+    useState(false);
 
   // Refs para la funcionalidad de swipe
   const touchStartX = useRef(0);
@@ -431,7 +509,6 @@ export default function GroupDetails() {
   const isRouterReady = router.isReady;
 
   // Fetch basic group info once and cache it for a long time
-  // We'll use a much bigger staleTime to prevent unnecessary refetching
   const {
     data: groupBasicData,
     isLoading: isGroupBasicLoading,
@@ -460,7 +537,7 @@ export default function GroupDetails() {
           </div>
         ) : groupBasicData ? (
           <GroupContent
-            groupBasicData={groupBasicData}
+            groupBasicData={groupBasicData as GroupWithRelations}
             groupId={groupId}
             user={user}
             router={router}
@@ -471,6 +548,8 @@ export default function GroupDetails() {
             allowFillIn={allowFillIn}
             setAllowFillIn={setAllowFillIn}
             onRefreshData={refetchBasicInfo}
+            showManualTeamFormationModal={showManualTeamFormationModal}
+            setShowManualTeamFormationModal={setShowManualTeamFormationModal}
           />
         ) : (
           <div className='text-center text-gray-600'>Grupo no encontrado</div>
@@ -493,8 +572,10 @@ const GroupContent = ({
   allowFillIn,
   setAllowFillIn,
   onRefreshData,
+  showManualTeamFormationModal,
+  setShowManualTeamFormationModal,
 }: {
-  groupBasicData: any;
+  groupBasicData: GroupWithRelations;
   groupId: string;
   user: AuthUser | null;
   router: any;
@@ -505,7 +586,12 @@ const GroupContent = ({
   allowFillIn: boolean;
   setAllowFillIn: (value: boolean) => void;
   onRefreshData: () => void;
+  showManualTeamFormationModal: boolean;
+  setShowManualTeamFormationModal: (value: boolean) => void;
 }) => {
+  // Get the React Query client instance
+  const queryClient = useQueryClient();
+
   // Refs para la funcionalidad de swipe
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
@@ -725,6 +811,7 @@ const GroupContent = ({
             allowFillIn={allowFillIn}
             setAllowFillIn={setAllowFillIn}
             router={router}
+            setShowManualTeamFormationModal={setShowManualTeamFormationModal}
           />
         );
       case 1:
@@ -773,7 +860,24 @@ const GroupContent = ({
     setAllowFillIn,
     setShowReplaceTbdModal,
     router,
+    setShowManualTeamFormationModal,
   ]);
+
+  // Agregar la consulta del próximo partido
+  const { data: nextMatchData } = useGroupNextMatch(groupId, {
+    enabled: !!groupId,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  });
+
+  // Ensure nextMatchId is always up to date
+  useEffect(() => {
+    // Re-fetch groupBasicData when a match is deleted to get updated matchId
+    if (groupBasicData?.nextMatchId === null) {
+      onRefreshData();
+    }
+  }, [groupBasicData?.nextMatchId, onRefreshData]);
 
   return (
     <div className='space-y-6'>
@@ -813,9 +917,64 @@ const GroupContent = ({
         <ReplaceTbdPlayerModal
           showReplaceTbdModal={showReplaceTbdModal}
           setShowReplaceTbdModal={setShowReplaceTbdModal}
-          group={groupBasicData}
+          group={{
+            ...groupBasicData,
+            nextMatchDetails:
+              (nextMatchData as ApiResponse | undefined)?.nextMatchDetails ||
+              groupBasicData.nextMatchDetails,
+          }}
           handleReplaceTbdPlayer={handleReplaceTbdPlayer}
           onSuccessfulReplace={onRefreshData}
+        />
+      )}
+
+      {showManualTeamFormationModal && groupBasicData && (
+        <ManualTeamFormationModal
+          isOpen={showManualTeamFormationModal}
+          onClose={() => setShowManualTeamFormationModal(false)}
+          matchId={groupBasicData.nextMatchId || ''}
+          groupId={groupId}
+          confirmedPlayers={(
+            (nextMatchData as ApiResponse)?.nextMatchDetails
+              ?.confirmedPlayers || []
+          ).map(
+            (player: {
+              id: string;
+              name: string | null;
+              avatar: string | null;
+            }) => ({
+              id: player.id,
+              name: player.name || '',
+              avatar: player.avatar,
+              image: player.avatar,
+            })
+          )}
+          onSuccess={() => {
+            // Force refresh of all relevant data
+            console.log('Manual team formation successful, refreshing data...');
+            // First explicitly invalidate the next match query to guarantee a refetch
+            queryClient.invalidateQueries({
+              queryKey: ['group', 'nextMatch', groupId],
+              exact: true,
+              refetchType: 'all', // Force immediate refetch
+            });
+
+            // Then call the generic refresh function
+            onRefreshData();
+
+            // Set a small delay and check if the UI updated
+            setTimeout(() => {
+              const currentData = queryClient.getQueryData([
+                'group',
+                'nextMatch',
+                groupId,
+              ]);
+              console.log(
+                'Current next match data after refresh:',
+                currentData
+              );
+            }, 500);
+          }}
         />
       )}
     </div>

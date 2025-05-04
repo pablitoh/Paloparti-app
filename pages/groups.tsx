@@ -35,12 +35,6 @@ export default function Groups() {
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  // Forzar una invalidación completa al montar la página de grupos
-  useEffect(() => {
-    console.log('Página de grupos montada - Invalidando todas las consultas');
-    queryClient.clear(); // Limpiar toda la caché de consultas
-  }, [queryClient]);
-
   useEffect(() => {
     if (status === 'unauthenticated') {
       console.log('No user found, redirecting to home');
@@ -70,7 +64,15 @@ export default function Groups() {
 
         if (!response.ok) {
           console.error('Error response:', data);
-          throw new Error(data.message || 'Error fetching groups');
+          throw new Error(
+            data.message ||
+              `Error fetching groups: ${response.status} ${response.statusText}`
+          );
+        }
+
+        if (!Array.isArray(data)) {
+          console.error('Invalid response format:', data);
+          throw new Error('Invalid response format from server');
         }
 
         console.log('Groups data:', data);
@@ -80,7 +82,7 @@ export default function Groups() {
         if (error instanceof Error) {
           setError(error.message);
         } else {
-          setError('An unexpected error occurred');
+          setError('An unexpected error occurred while fetching groups');
         }
       } finally {
         setIsLoading(false);
@@ -88,12 +90,17 @@ export default function Groups() {
     };
 
     fetchGroups();
-  }, [status, router, queryClient]); // Añadir queryClient a las dependencias
+  }, [status, router]);
 
   // Forzar recarga al hacer clic en un grupo
   const handleGroupClick = (groupId: string) => {
-    console.log(`Navegando a grupo ${groupId} - Invalidando consultas`);
-    queryClient.clear(); // Limpiar toda la caché de consultas
+    console.log(
+      `Navegando a grupo ${groupId} - Invalidando consultas relevantes`
+    );
+    queryClient.invalidateQueries({
+      queryKey: ['group', groupId],
+      refetchType: 'active',
+    });
     router.push(`/group/${groupId}`);
   };
 

@@ -211,13 +211,17 @@ export const randomizeTeams = async (
   groupId: string,
   matchId: string
 ): Promise<{ success: boolean; groupId: string }> => {
-  const response = await fetch(`/api/matches/${matchId}/resort`, {
+  const response = await fetch(`/api/matches/create-match`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       groupId,
+      matchId,
+      mode: 'auto',
+      // Using the matchId indicates this is a re-sort of an existing match
+      isResort: true,
     }),
   });
 
@@ -253,6 +257,7 @@ export const randomizeTeams = async (
     }
   }
 
+  const data = await response.json();
   return { success: true, groupId };
 };
 

@@ -57,8 +57,8 @@ export default async function handler(
         status: 'COMPLETED',
       },
       orderBy: [
-        { createdAt: 'asc' }, // Primary sort by creation date
-        { date: 'asc' }, // Secondary sort by match date
+        { createdAt: 'desc' }, // Primary sort by creation date
+        { date: 'desc' }, // Secondary sort by match date
       ],
       skip,
       take: limit,
@@ -74,7 +74,7 @@ export default async function handler(
             },
           },
         },
-        playersA: {
+        matchPlayers: {
           include: {
             user: {
               select: {
@@ -101,20 +101,23 @@ export default async function handler(
       }));
 
       // Separar jugadores en equipos A y B basados en isTeamA
-      const teamAPlayers = match.playersA
+      const teamAPlayers = (match.matchPlayers as any[])
         .filter((player) => player.isTeamA)
         .map((player) => ({
           id: player.userId,
           name: player.user?.name || null,
           avatar: player.user?.image || null,
+          isTeamA: true,
+          birthdate: player.user?.birthdate || null,
         }));
 
-      const teamBPlayers = match.playersA
+      const teamBPlayers = (match.matchPlayers as any[])
         .filter((player) => !player.isTeamA)
         .map((player) => ({
           id: player.userId,
           name: player.user?.name || null,
           avatar: player.user?.image || null,
+          isTeamA: false,
         }));
 
       return {

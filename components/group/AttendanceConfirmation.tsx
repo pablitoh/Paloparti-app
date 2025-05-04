@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CheckCircleIcon,
   XCircleIcon,
@@ -15,6 +15,7 @@ interface AttendanceConfirmationProps {
   disabled?: boolean;
   confirmedCount?: number;
   requiredPlayers?: number;
+  matchId?: string;
 }
 
 const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
@@ -23,7 +24,22 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
   disabled = false,
   confirmedCount = 0,
   requiredPlayers = 0,
+  matchId,
 }) => {
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isDeclining, setIsDeclining] = useState(false);
+  const [localAttendanceStatus, setLocalAttendanceStatus] = useState<
+    ParticipantStatus | undefined
+  >(userAttendanceStatus);
+
+  // Update local state when props change or match ID changes
+  useEffect(() => {
+    // Reset local status when match ID changes (new match)
+    if (matchId) {
+      setLocalAttendanceStatus(userAttendanceStatus);
+    }
+  }, [userAttendanceStatus, matchId]);
+
   // Normalized status check function to handle both uppercase and lowercase variants
   const isStatus = (
     status: string,
@@ -33,11 +49,11 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
   };
 
   const isConfirmed =
-    userAttendanceStatus && isStatus(userAttendanceStatus, 'CONFIRMED');
+    localAttendanceStatus && isStatus(localAttendanceStatus, 'CONFIRMED');
   const isDeclined =
-    userAttendanceStatus && isStatus(userAttendanceStatus, 'DECLINED');
+    localAttendanceStatus && isStatus(localAttendanceStatus, 'DECLINED');
   const isPending =
-    userAttendanceStatus && isStatus(userAttendanceStatus, 'PENDING');
+    localAttendanceStatus && isStatus(localAttendanceStatus, 'PENDING');
 
   // Check if all spots are filled (excluding the current user if they're already confirmed)
   const allSpotsFilled =
@@ -57,6 +73,31 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
     if (isDeclined) return 'Has indicado que no asistirás';
     if (isPending) return 'Aún no has decidido';
     return 'Confirma tu asistencia';
+  };
+
+  // Handle attendance with loading state
+  const handleAttendance = async (status: ParticipantStatus) => {
+    if (status === 'CONFIRMED') {
+      setIsConfirming(true);
+    } else {
+      setIsDeclining(true);
+    }
+
+    try {
+      await handleGroupAttendance(status);
+
+      // Update local status immediately
+      setLocalAttendanceStatus(status);
+    } catch (error) {
+      console.error('Error updating attendance:', error);
+      // No need to show error toast as it's handled in the hook
+    } finally {
+      if (status === 'CONFIRMED') {
+        setIsConfirming(false);
+      } else {
+        setIsDeclining(false);
+      }
+    }
   };
 
   return (
@@ -102,8 +143,14 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
 
       <div className='flex flex-col sm:flex-row gap-3'>
         <button
-          onClick={() => handleGroupAttendance('CONFIRMED')}
-          disabled={disabled || isConfirmed || allSpotsFilled}
+          onClick={() => handleAttendance('CONFIRMED')}
+          disabled={
+            disabled ||
+            isConfirmed ||
+            allSpotsFilled ||
+            isConfirming ||
+            isDeclining
+          }
           className={`flex-1 py-2.5 px-4 rounded-md shadow-sm text-sm font-medium flex items-center justify-center transition-all ${
             isConfirmed
               ? 'bg-green-100 text-green-800 border border-green-300 cursor-default'
@@ -112,7 +159,31 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
               : 'bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'
           }`}
         >
-          {isConfirmed ? (
+          {isConfirming ? (
+            <span className='flex items-center'>
+              <svg
+                className='animate-spin -ml-1 mr-2 h-4 w-4 text-white'
+                xmlns='http://www.w3.org/2000/svg'
+                fill='none'
+                viewBox='0 0 24 24'
+              >
+                <circle
+                  className='opacity-25'
+                  cx='12'
+                  cy='12'
+                  r='10'
+                  stroke='currentColor'
+                  strokeWidth='4'
+                ></circle>
+                <path
+                  className='opacity-75'
+                  fill='currentColor'
+                  d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                ></path>
+              </svg>
+              Procesando...
+            </span>
+          ) : isConfirmed ? (
             <>
               <CheckCircleIconSolid className='h-5 w-5 mr-2' />
               <span>Confirmado</span>
@@ -126,15 +197,39 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
         </button>
 
         <button
-          onClick={() => handleGroupAttendance('DECLINED')}
-          disabled={disabled || isDeclined}
+          onClick={() => handleAttendance('DECLINED')}
+          disabled={disabled || isDeclined || isConfirming || isDeclining}
           className={`flex-1 py-2.5 px-4 rounded-md shadow-sm text-sm font-medium flex items-center justify-center transition-all ${
             isDeclined
               ? 'bg-red-100 text-red-800 border border-red-300 cursor-default'
               : 'bg-red-600 text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500'
           }`}
         >
-          {isDeclined ? (
+          {isDeclining ? (
+            <span className='flex items-center'>
+              <svg
+                className='animate-spin -ml-1 mr-2 h-4 w-4 text-white'
+                xmlns='http://www.w3.org/2000/svg'
+                fill='none'
+                viewBox='0 0 24 24'
+              >
+                <circle
+                  className='opacity-25'
+                  cx='12'
+                  cy='12'
+                  r='10'
+                  stroke='currentColor'
+                  strokeWidth='4'
+                ></circle>
+                <path
+                  className='opacity-75'
+                  fill='currentColor'
+                  d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                ></path>
+              </svg>
+              Procesando...
+            </span>
+          ) : isDeclined ? (
             <>
               <XCircleIconSolid className='h-5 w-5 mr-2' />
               <span>No asistiré</span>

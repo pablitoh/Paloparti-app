@@ -17,6 +17,20 @@ import {
 export const parseTbdPlayers = (match: any) => {
   if (!match) return match;
 
+  // Si ya tiene los datos correctamente formateados, no los procesamos de nuevo
+  if (
+    match.tbdPlayers &&
+    typeof match.tbdPlayers === 'object' &&
+    !Array.isArray(match.tbdPlayers) &&
+    match.tbdPlayers.teamA &&
+    match.tbdPlayers.teamB &&
+    match.tbdPlayers.teamA.every((p: any) => p.playerType === 'TBD') &&
+    match.tbdPlayers.teamB.every((p: any) => p.playerType === 'TBD')
+  ) {
+    // Los datos ya están en formato correcto, no los procesamos
+    return match;
+  }
+
   let parsedTbdPlayers: any[] = [];
 
   // Try to parse tbdPlayers if it exists
@@ -85,14 +99,67 @@ export const parseTbdPlayers = (match: any) => {
 const normalizeGroupData = (data: any) => {
   if (!data) return data;
 
-  // Process the next match details if present
-  if (data.nextMatchDetails) {
-    data.nextMatchDetails = parseTbdPlayers(data.nextMatchDetails);
-  }
+  try {
+    // Process the next match details if present
+    if (data.nextMatchDetails) {
+      // Asegurémonos de que playersA y playersB estén disponibles
+      if (data.nextMatchDetails.playersA) {
+        // Si ya es un array, no lo procesamos
+        if (!Array.isArray(data.nextMatchDetails.playersA)) {
+          try {
+            data.nextMatchDetails.playersA = JSON.parse(
+              data.nextMatchDetails.playersA
+            );
+          } catch (e) {
+            console.error('Error parsing playersA:', e);
+            data.nextMatchDetails.playersA = [];
+          }
+        }
+      }
 
-  // Process all matches in the group
-  if (data.matches && Array.isArray(data.matches)) {
-    data.matches = data.matches.map((match: any) => parseTbdPlayers(match));
+      if (data.nextMatchDetails.playersB) {
+        // Si ya es un array, no lo procesamos
+        if (!Array.isArray(data.nextMatchDetails.playersB)) {
+          try {
+            data.nextMatchDetails.playersB = JSON.parse(
+              data.nextMatchDetails.playersB
+            );
+          } catch (e) {
+            console.error('Error parsing playersB:', e);
+            data.nextMatchDetails.playersB = [];
+          }
+        }
+      }
+
+      // Procesar tbdPlayers para mantener consistencia
+      data.nextMatchDetails = parseTbdPlayers(data.nextMatchDetails);
+    }
+
+    // Process all matches in the group
+    if (data.matches && Array.isArray(data.matches)) {
+      data.matches = data.matches.map((match: any) => {
+        // Procesar playersA y playersB para cada partido
+        if (match.playersA && !Array.isArray(match.playersA)) {
+          try {
+            match.playersA = JSON.parse(match.playersA);
+          } catch (e) {
+            match.playersA = [];
+          }
+        }
+
+        if (match.playersB && !Array.isArray(match.playersB)) {
+          try {
+            match.playersB = JSON.parse(match.playersB);
+          } catch (e) {
+            match.playersB = [];
+          }
+        }
+
+        return parseTbdPlayers(match);
+      });
+    }
+  } catch (error) {
+    console.error('Error normalizing group data:', error);
   }
 
   return data;
@@ -159,8 +226,9 @@ interface MutationResponse {
 
 interface UserAttendanceParams {
   matchId: string;
-  status: ParticipantStatus;
+  status: string;
   groupId: string;
+  userId: string;
 }
 
 interface AdminAttendanceParams {
@@ -199,62 +267,84 @@ interface RandomizeTeamsParams {
   groupId: string;
 }
 
+interface AttendanceMutationParams {
+  matchId: string;
+  status: string;
+  groupId: string;
+  userId: string;
+}
+
+interface ManualTeamFormationResponse {
+  message: string;
+  match: {
+    groupId: string;
+  };
+}
+
+interface ManualTeamFormationVariables {
+  matchId: string;
+  teamA: any[];
+  teamB: any[];
+}
+
+interface CreateMatchParams {
+  groupId: string;
+  date?: string | Date;
+  location?: string;
+  balanceByAge?: boolean;
+  teamA?: any[]; // Optional for manual mode
+  teamB?: any[]; // Optional for manual mode
+  mode?: 'auto' | 'manual'; // 'auto' for randomized teams, 'manual' for pre-defined teams
+}
+
 // Mutación para actualizar asistencia como admin
 export const useAdminAttendanceMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: AdminAttendanceParams) => {
-      try {
-        const response = await fetch(
-          `/api/matches/${params.matchId}/admin-attendance`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              userId: params.userId,
-              status: params.status,
-              groupId: params.groupId,
-            }),
-          }
-        );
+    mutationFn: async ({
+      userId,
+      matchId,
+      status,
+      groupId,
+    }: {
+      userId: string;
+      matchId: string;
+      status: string;
+      groupId?: string;
+    }) => {
+      const response = await fetch('/api/attendances/admin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          matchId,
+          status,
+        }),
+      });
 
-        // Verificar si la respuesta es JSON
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          throw new Error('La respuesta del servidor no es JSON válido');
-        }
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Error al actualizar asistencia');
-        }
-
-        return response.json();
-      } catch (error: any) {
-        console.error('Error en adminAttendanceMutation:', error);
-        throw new Error(error.message || 'Error al actualizar asistencia');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al actualizar asistencia');
       }
+
+      return response.json();
     },
-    onSuccess: (data: MutationResponse) => {
-      // Invalidar caché específica del grupo
-      if (data && data.groupId) {
-        // Invalidate both the nextMatch and members queries
+    onSuccess: (_, variables) => {
+      if (variables.groupId) {
+        // Invalidar y refetch la consulta del próximo partido
         queryClient.invalidateQueries({
-          queryKey: ['group', 'nextMatch', data.groupId],
+          queryKey: ['group', 'nextMatch', variables.groupId],
+          exact: true,
+          refetchType: 'active',
         });
-        queryClient.invalidateQueries({
-          queryKey: ['group', 'members', data.groupId],
-        });
-      } else {
-        queryClient.invalidateQueries({ queryKey: ['group'] });
       }
+
       showSuccessToast('Asistencia actualizada correctamente');
     },
     onError: (error: Error) => {
-      console.error('Error en adminAttendanceMutation:', error);
       showErrorToast(error.message || 'Error al actualizar asistencia');
     },
   });
@@ -265,35 +355,51 @@ export const useUserAttendanceMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: UserAttendanceParams) => {
-      const response = await fetch(
-        `/api/matches/${params.matchId}/attendance`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            status: params.status,
-            groupId: params.groupId,
-          }),
-        }
-      );
+    mutationFn: async ({
+      matchId,
+      status,
+      groupId,
+    }: {
+      matchId: string;
+      status: string;
+      groupId: string;
+    }) => {
+      const response = await fetch('/api/attendances', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          matchId,
+          status,
+          groupId,
+        }),
+      });
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Error al actualizar asistencia');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al actualizar asistencia');
       }
+
       return response.json();
     },
-    onSuccess: (data: MutationResponse) => {
-      console.log('Attendance updated successfully');
+    onSuccess: (_, variables) => {
+      // Invalidar y refetch la consulta del próximo partido
+      queryClient.invalidateQueries({
+        queryKey: ['group', 'nextMatch', variables.groupId],
+        exact: true,
+        refetchType: 'active',
+      });
 
-      // Invalidar caché específica del grupo
-      if (data && data.groupId) {
-        queryClient.invalidateQueries({ queryKey: ['group', data.groupId] });
-      } else {
-        queryClient.invalidateQueries({ queryKey: ['group'] });
-      }
+      // Mensaje personalizado según el estado
+      const message =
+        variables.status === 'CONFIRMED'
+          ? '¡Tu asistencia ha sido confirmada!'
+          : variables.status === 'DECLINED'
+          ? 'Has rechazado la asistencia al partido'
+          : 'Tu estado de asistencia ha sido actualizado';
+
+      showSuccessToast(message);
     },
     onError: (error: Error) => {
       showErrorToast(error.message || 'Error al actualizar asistencia');
@@ -327,7 +433,26 @@ export const useMembershipRequestMutation = () => {
       return response.json();
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['group', variables.groupId] });
+      // Actualizar el caché de miembros
+      const queryKey = ['group', 'members', variables.groupId];
+      const currentData = queryClient.getQueryData(queryKey);
+
+      if (currentData) {
+        queryClient.setQueryData(queryKey, (oldData: any) => {
+          if (!oldData) return oldData;
+
+          // Filtrar la solicitud procesada
+          const updatedData = {
+            ...oldData,
+            pendingRequests: oldData.pendingRequests.filter(
+              (request: any) => request.userId !== variables.userId
+            ),
+          };
+
+          return updatedData;
+        });
+      }
+
       showSuccessToast(
         `Solicitud ${
           variables.action === 'APPROVE' ? 'aprobada' : 'rechazada'
@@ -356,8 +481,12 @@ export const useLeaveGroupMutation = () => {
       return response.json();
     },
     onSuccess: (_, groupId) => {
-      queryClient.invalidateQueries({ queryKey: ['group', groupId] });
-      queryClient.invalidateQueries({ queryKey: ['userGroups'] }); // Invalida también la lista de grupos del usuario
+      // Actualizar el caché de grupos del usuario
+      queryClient.setQueryData(['userGroups'], (oldData: any) => {
+        if (!oldData) return oldData;
+        return oldData.filter((group: any) => group.id !== groupId);
+      });
+
       showSuccessToast('Has abandonado el grupo correctamente');
     },
     onError: (error: Error) => {
@@ -372,13 +501,16 @@ export const useRandomizeTeamsMutation = () => {
 
   return useMutation({
     mutationFn: async (params: RandomizeTeamsParams) => {
-      const response = await fetch(`/api/matches/${params.matchId}/resort`, {
+      const response = await fetch(`/api/matches/create-match`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           groupId: params.groupId,
+          matchId: params.matchId,
+          mode: 'auto',
+          isResort: true,
         }),
       });
       if (!response.ok) {
@@ -387,8 +519,23 @@ export const useRandomizeTeamsMutation = () => {
       }
       return response.json();
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['group', variables.groupId] });
+    onSuccess: (data, variables) => {
+      // Actualizar el caché del próximo partido directamente
+      // This approach updates the cache without triggering a refetch
+      const queryKey = ['group', 'nextMatch', variables.groupId];
+      queryClient.setQueryData(queryKey, (oldData: any) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          nextMatchDetails: {
+            ...oldData.nextMatchDetails,
+            playersA: data.teamA,
+            playersB: data.teamB,
+            tbdPlayers: data.tbdPlayers,
+          },
+        };
+      });
+
       showSuccessToast('Equipos formados aleatoriamente');
     },
     onError: (error: Error) => {
@@ -419,7 +566,29 @@ export const useDeleteMatchMutation = () => {
       return response.json();
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['group', variables.groupId] });
+      // Actualizar el caché del próximo partido
+      const queryKey = ['group', 'nextMatch', variables.groupId];
+      queryClient.setQueryData(queryKey, (oldData: any) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          nextMatchDetails: null,
+          userAttendance: undefined, // Clear attendance status
+        };
+      });
+
+      // Invalidar la consulta para forzar una recarga cuando sea necesario
+      queryClient.invalidateQueries({
+        queryKey: ['group', 'nextMatch', variables.groupId],
+        refetchType: 'active', // Force active refetch
+      });
+
+      // Also invalidate any related queries to ensure consistent state
+      queryClient.invalidateQueries({
+        queryKey: ['group', 'basic', variables.groupId],
+        refetchType: 'active',
+      });
+
       showSuccessToast('Partido eliminado correctamente');
     },
     onError: (error: Error) => {
@@ -435,7 +604,7 @@ export const useReplaceTbdPlayerMutation = () => {
   return useMutation({
     mutationFn: async (params: ReplaceTbdPlayerParams) => {
       const response = await fetch(
-        `/api/matches/${params.matchId}/replace-tbd`,
+        `/api/matches/${params.matchId}/edit-match`,
         {
           method: 'POST',
           headers: {
@@ -446,6 +615,7 @@ export const useReplaceTbdPlayerMutation = () => {
             userId: params.userId,
             isTeamA: params.isTeamA,
             groupId: params.groupId,
+            action: 'replace-tbd',
           }),
         }
       );
@@ -455,23 +625,17 @@ export const useReplaceTbdPlayerMutation = () => {
       }
       return response.json();
     },
-    onSuccess: (_, variables) => {
-      // Invalida todas las consultas relevantes para asegurar que la UI se actualice
-      console.log('Invalidating queries after replacing TBD player');
-
-      // Invalidar la consulta del grupo
-      queryClient.invalidateQueries({ queryKey: ['group', variables.groupId] });
-
-      // Invalidar específicamente las consultas del partido y próximo partido
+    onSuccess: (data, variables) => {
+      // Invalidate and refetch the next match data
       queryClient.invalidateQueries({
-        queryKey: ['nextMatch', variables.groupId],
+        queryKey: ['group', 'nextMatch', variables.groupId],
+        refetchType: 'active',
       });
-      queryClient.invalidateQueries({ queryKey: ['match', variables.matchId] });
 
-      // Forzar una recarga completa de los datos del grupo
-      queryClient.refetchQueries({ queryKey: ['group', variables.groupId] });
-      queryClient.refetchQueries({
-        queryKey: ['nextMatch', variables.groupId],
+      // Also invalidate the group data to ensure everything is in sync
+      queryClient.invalidateQueries({
+        queryKey: ['group', 'details', variables.groupId],
+        refetchType: 'active',
       });
 
       showSuccessToast('Jugador reemplazado correctamente');
@@ -507,12 +671,206 @@ export const useResetAttendanceMutation = () => {
       }
       return response.json();
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['group', variables.groupId] });
+    onSuccess: (data, variables) => {
+      // Actualizar el caché del próximo partido
+      const queryKey = ['group', 'nextMatch', variables.groupId];
+      queryClient.setQueryData(queryKey, (oldData: any) => {
+        if (!oldData) return oldData;
+
+        const updatedData = {
+          ...oldData,
+          nextMatchDetails: {
+            ...oldData.nextMatchDetails,
+            ...data,
+          },
+        };
+
+        return updatedData;
+      });
+
       showSuccessToast('Asistencia reseteada correctamente');
     },
     onError: (error: Error) => {
       showErrorToast(error.message || 'Error al resetear asistencia');
+    },
+  });
+};
+
+export const useManualTeamFormationMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      matchId,
+      groupId,
+      teamA,
+      teamB,
+    }: {
+      matchId: string;
+      groupId: string;
+      teamA: Array<{ id: string; name: string | null; avatar: string | null }>;
+      teamB: Array<{ id: string; name: string | null; avatar: string | null }>;
+    }) => {
+      const response = await fetch('/api/matches/create-match', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          matchId,
+          groupId,
+          teamA,
+          teamB,
+          mode: 'manual',
+          isResort: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al formar equipos');
+      }
+
+      return response.json();
+    },
+    onSuccess: (data, variables) => {
+      try {
+        // Parse player data if necessary
+        let playersA = variables.teamA; // Default to what was sent
+        let playersB = variables.teamB;
+
+        // If the response includes parsed player data, use that instead
+        if (data.match) {
+          // Handle string data that needs parsing
+          if (data.match.playersA && typeof data.match.playersA === 'string') {
+            try {
+              playersA = JSON.parse(data.match.playersA);
+            } catch (e) {
+              console.error('Error parsing playersA:', e);
+            }
+          } else if (data.match.playersA) {
+            // Use array data directly
+            playersA = data.match.playersA;
+          }
+
+          if (data.match.playersB && typeof data.match.playersB === 'string') {
+            try {
+              playersB = JSON.parse(data.match.playersB);
+            } catch (e) {
+              console.error('Error parsing playersB:', e);
+            }
+          } else if (data.match.playersB) {
+            // Use array data directly
+            playersB = data.match.playersB;
+          }
+        }
+
+        // Make sure we have the data in the correct format
+        // Update the cache directly - no need to removeQueries
+        queryClient.setQueryData(
+          ['group', 'nextMatch', variables.groupId],
+          (oldData: any) => {
+            if (!oldData) {
+              // If there's no old data, create a new structure
+              return {
+                nextMatchDetails: {
+                  ...data.match,
+                  playersA: playersA,
+                  playersB: playersB,
+                },
+                userAttendance: oldData?.userAttendance,
+              };
+            }
+
+            // If we have old data, update it properly
+            return {
+              ...oldData,
+              nextMatchDetails: {
+                ...oldData.nextMatchDetails,
+                ...data.match,
+                playersA: playersA,
+                playersB: playersB,
+              },
+            };
+          }
+        );
+
+        // Force a refetch to make sure components get the latest data
+        queryClient.invalidateQueries({
+          queryKey: ['group', 'nextMatch', variables.groupId],
+          refetchType: 'active',
+        });
+
+        showSuccessToast('Equipos formados correctamente');
+      } catch (error) {
+        console.error('Error processing mutation response:', error);
+        showErrorToast('Error al procesar la respuesta del servidor');
+      }
+    },
+    onError: (error: Error) => {
+      showErrorToast(error.message || 'Error al formar equipos');
+    },
+  });
+};
+
+// Mutación para crear partido (unificado)
+export const useCreateMatchMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: CreateMatchParams) => {
+      const response = await fetch('/api/matches/create-match', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Error al crear el partido');
+      }
+
+      return response.json();
+    },
+    onSuccess: (data, variables) => {
+      // Invalidate and refetch the group data
+      queryClient.invalidateQueries({
+        queryKey: ['group', variables.groupId],
+        refetchType: 'active',
+      });
+
+      // Invalidate the next match data specifically
+      queryClient.invalidateQueries({
+        queryKey: ['group', 'nextMatch', variables.groupId],
+        refetchType: 'active',
+      });
+
+      // If we have team information, we can update the TeamsList directly
+      if (data.teamA && data.teamB) {
+        // Update the next match details with the newly created match
+        const queryKey = ['group', 'nextMatch', variables.groupId];
+        queryClient.setQueryData(queryKey, (oldData: any) => {
+          if (!oldData) return oldData;
+
+          // Return updated data with the new match
+          return {
+            ...oldData,
+            nextMatchDetails: {
+              ...data.match,
+              playersA: data.teamA,
+              playersB: data.teamB,
+              tbdPlayers: data.tbdPlayers,
+            },
+          };
+        });
+      }
+
+      showSuccessToast(data.message || 'Partido creado correctamente');
+    },
+    onError: (error: Error) => {
+      showErrorToast(error.message || 'Error al crear el partido');
     },
   });
 };

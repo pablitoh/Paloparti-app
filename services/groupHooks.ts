@@ -256,16 +256,24 @@ export const useGroupBasicInfo = (
 };
 
 // Hook para obtener el próximo partido del grupo
-export const useGroupNextMatch = (
-  groupId: string | undefined,
-  options = {}
-) => {
+export const useGroupNextMatch = (groupId?: string, options?: any) => {
   return useQuery({
     queryKey: ['group', 'nextMatch', groupId],
-    queryFn: () => fetchGroupNextMatch(groupId as string),
+    queryFn: async () => {
+      if (!groupId) throw new Error('Group ID is required');
+      const response = await fetch(`/api/groups/${groupId}/next-match`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch next match');
+      }
+      return response.json();
+    },
     enabled: !!groupId,
-    ...defaultQueryOptions,
-    staleTime: 60 * 1000, // 1 minute for next match data (more frequent updates)
+    staleTime: 30 * 1000, // 30 segundos de stale time
+    gcTime: 5 * 60 * 1000, // 5 minutos de tiempo de caché
+    refetchOnWindowFocus: true, // Permitir refetch al enfocar la ventana
+    refetchOnMount: true, // Permitir refetch al montar el componente
+    refetchOnReconnect: true, // Permitir refetch al reconectar
+    retry: 1,
     ...options,
   });
 };
@@ -376,19 +384,49 @@ export const useUserAttendanceMutation = () => {
       return response.json();
     },
     onSuccess: (_, variables) => {
-      // Invalidar consultas relacionadas
-      const matchId = variables.matchId;
-      queryClient.invalidateQueries({ queryKey: ['group', 'nextMatch'] });
+      // Actualizar el caché directamente
+      const queryKey = ['group', 'nextMatch', variables.groupId];
+      const currentData = queryClient.getQueryData(queryKey);
 
-      // Mensaje personalizado según el estado seleccionado
-      let message = '';
-      if (variables.status === 'CONFIRMED') {
-        message = '¡Tu asistencia ha sido confirmada!';
-      } else if (variables.status === 'DECLINED') {
-        message = 'Has rechazado la asistencia al partido';
-      } else {
-        message = 'Tu estado de asistencia ha sido actualizado';
+      if (currentData) {
+        queryClient.setQueryData(queryKey, (oldData: any) => {
+          if (!oldData) return oldData;
+
+          // Actualizar el estado de asistencia del usuario actual
+          const updatedData = {
+            ...oldData,
+            userAttendance: variables.status,
+            nextMatchDetails: {
+              ...oldData.nextMatchDetails,
+              confirmedPlayers: oldData.nextMatchDetails.confirmedPlayers.map(
+                (player: any) => {
+                  if (
+                    player.id ===
+                    (queryClient.getQueryData(['auth', 'user']) as any)?.id
+                  ) {
+                    return {
+                      ...player,
+                      status: variables.status,
+                    };
+                  }
+                  return player;
+                }
+              ),
+            },
+          };
+
+          return updatedData;
+        });
       }
+
+      // Mensaje personalizado según el estado
+      const message =
+        variables.status === 'CONFIRMED'
+          ? '¡Tu asistencia ha sido confirmada!'
+          : variables.status === 'DECLINED'
+          ? 'Has rechazado la asistencia al partido'
+          : 'Tu estado de asistencia ha sido actualizado';
+
       showSuccessToast(message);
     },
     onError: (error: Error) => {
@@ -433,14 +471,35 @@ export const useAdminAttendanceMutation = () => {
       return response.json();
     },
     onSuccess: (_, variables) => {
-      // More specific query invalidation using groupId when available
-      if (variables.groupId) {
-        queryClient.invalidateQueries({
-          queryKey: ['group', 'nextMatch', variables.groupId],
+      // Actualizar el caché directamente
+      const queryKey = ['group', 'nextMatch', variables.groupId];
+      const currentData = queryClient.getQueryData(queryKey);
+
+      if (currentData) {
+        queryClient.setQueryData(queryKey, (oldData: any) => {
+          if (!oldData) return oldData;
+
+          // Actualizar el estado de asistencia del usuario
+          const updatedData = {
+            ...oldData,
+            nextMatchDetails: {
+              ...oldData.nextMatchDetails,
+              confirmedPlayers: oldData.nextMatchDetails.confirmedPlayers.map(
+                (player: any) => {
+                  if (player.id === variables.userId) {
+                    return {
+                      ...player,
+                      status: variables.status,
+                    };
+                  }
+                  return player;
+                }
+              ),
+            },
+          };
+
+          return updatedData;
         });
-      } else {
-        // Fallback to more general invalidation if no groupId is provided
-        queryClient.invalidateQueries({ queryKey: ['group', 'nextMatch'] });
       }
 
       showSuccessToast('Asistencia actualizada correctamente');
@@ -484,9 +543,25 @@ export const useMembershipRequestMutation = () => {
       return response.json();
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ['group', 'members', variables.groupId],
-      });
+      // Actualizar el caché de miembros
+      const queryKey = ['group', 'members', variables.groupId];
+      const currentData = queryClient.getQueryData(queryKey);
+
+      if (currentData) {
+        queryClient.setQueryData(queryKey, (oldData: any) => {
+          if (!oldData) return oldData;
+
+          // Filtrar la solicitud procesada
+          const updatedData = {
+            ...oldData,
+            pendingRequests: oldData.pendingRequests.filter(
+              (request: any) => request.userId !== variables.userId
+            ),
+          };
+
+          return updatedData;
+        });
+      }
 
       const message =
         variables.action === 'APPROVE'

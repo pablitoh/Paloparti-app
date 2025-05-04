@@ -110,12 +110,12 @@ model Match {
   status         String            @default("PENDING")
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
-  tbdPlayers     Json?             // Campo para almacenar los jugadores TBD
-  goals          Goal[]
+  tbdPlayers     Json?
   groupNextMatch Group?            @relation("NextMatch")
   group          Group             @relation(fields: [groupId], references: [id])
   attendance     MatchAttendance[]
-  playersA       MatchPlayer[]     @relation("TeamAPlayers")
+  matchPlayers   MatchPlayer[]     @relation("MatchPlayers")
+  goals          Goal[]
 }
 
 model MatchPlayer {
@@ -123,8 +123,8 @@ model MatchPlayer {
   userId  String
   matchId String
   isTeamA Boolean
+  match   Match   @relation("MatchPlayers", fields: [matchId], references: [id])
   user    User    @relation(fields: [userId], references: [id])
-  match   Match   @relation("TeamAPlayers", fields: [matchId], references: [id], map: "TeamARelation")
 }
 
 model Goal {

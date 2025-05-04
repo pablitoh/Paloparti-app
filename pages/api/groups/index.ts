@@ -75,80 +75,101 @@ export default async function handler(
   if (req.method === 'GET') {
     try {
       console.log('Fetching groups for user:', userId);
-      console.log('Prisma client:', prisma ? 'Available' : 'Not available');
-      console.log('Query parameters:', {
-        where: { members: { some: { userId } } },
-      });
 
-      try {
-        const groups = await prisma.group.findMany({
-          where: {
-            members: {
-              some: {
-                userId: userId,
-              },
+      if (!prisma) {
+        console.error('Prisma client not available');
+        return res.status(500).json({ message: 'Database connection error' });
+      }
+
+      const groups = await prisma.group.findMany({
+        where: {
+          members: {
+            some: {
+              userId: userId,
             },
           },
-          include: {
-            members: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    name: true,
-                    image: true,
-                  },
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          sport: true,
+          location: true,
+          createdAt: true,
+          createdBy: true,
+          nextMatch: true,
+          totalMatches: true,
+          members: {
+            select: {
+              userId: true,
+              role: true,
+              status: true,
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  image: true,
                 },
               },
             },
-            matches: {
-              orderBy: {
-                date: 'desc',
-              },
-              take: 1,
+          },
+          matches: {
+            orderBy: {
+              date: 'desc',
+            },
+            take: 1,
+            select: {
+              date: true,
             },
           },
-        });
+        },
+      });
 
-        console.log('Query executed successfully');
-        console.log('Found groups count:', groups.length);
-        console.log('First group (if any):', groups[0] ? groups[0].id : 'None');
+      console.log('Query executed successfully');
+      console.log('Found groups count:', groups.length);
+      console.log('First group (if any):', groups[0] ? groups[0].id : 'None');
 
-        const formattedGroups = groups.map((group) => {
-          // Buscar el miembro actual para obtener su estado
-          const currentUserMember = group.members.find(
-            (member) => member.userId === userId
-          );
+      const formattedGroups = groups.map((group) => {
+        // Buscar el miembro actual para obtener su estado
+        const currentUserMember = group.members.find(
+          (member) => member.userId === userId
+        );
 
-          return {
-            id: group.id,
-            name: group.name,
-            description: group.description,
-            sport: group.sport,
-            location: group.location,
-            members: group.members.map((member) => ({
-              id: member.user.id,
-              name: member.user.name,
-              avatar: member.user.image,
-              role: member.role,
-            })),
-            createdAt: group.createdAt,
-            createdBy: group.createdBy,
-            nextMatch: group.nextMatch || group.matches[0]?.date || null,
-            totalMatches: group.totalMatches,
-            userStatus: currentUserMember?.status || undefined,
-          };
-        });
+        return {
+          id: group.id,
+          name: group.name,
+          description: group.description,
+          sport: group.sport,
+          location: group.location,
+          members: group.members.map((member) => ({
+            id: member.user.id,
+            name: member.user.name,
+            avatar: member.user.image,
+            role: member.role,
+          })),
+          createdAt: group.createdAt,
+          createdBy: group.createdBy,
+          nextMatch: group.nextMatch || group.matches[0]?.date || null,
+          totalMatches: group.totalMatches,
+          userStatus: currentUserMember?.status || undefined,
+        };
+      });
 
-        console.log('Formatted groups:', formattedGroups);
-        return res.status(200).json(formattedGroups);
-      } catch (error) {
-        console.error('Error fetching groups:', error);
-        return res.status(500).json({ message: 'Error fetching groups' });
-      }
+      console.log('Formatted groups:', formattedGroups);
+      return res.status(200).json(formattedGroups);
     } catch (error) {
-      console.error('Error fetching groups:', error);
-      return res.status(500).json({ message: 'Error fetching groups' });
+      console.error('Error in GET /api/groups:', error);
+      if (error instanceof Error) {
+        return res.status(500).json({
+          message: 'Error fetching groups',
+          error: error.message,
+          stack:
+            process.env.NODE_ENV === 'development' ? error.stack : undefined,
+        });
+      }
+      return res.status(500).json({
+        message: 'An unexpected error occurred while fetching groups',
+      });
     }
   } else if (req.method === 'POST') {
     try {

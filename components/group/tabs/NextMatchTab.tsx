@@ -9,6 +9,7 @@ import {
   XCircleIcon,
   TrashIcon,
   ArrowPathIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import Button from '../../../components/Button';
 import { useState, useEffect } from 'react';
@@ -109,6 +110,7 @@ interface NextMatchTabProps {
   userAttendanceStatus?: ParticipantStatus;
   allowFillIn: boolean;
   setAllowFillIn: (value: boolean) => void;
+  setShowManualTeamFormationModal: (value: boolean) => void;
 }
 
 export default function NextMatchTab({
@@ -125,6 +127,7 @@ export default function NextMatchTab({
   userAttendanceStatus,
   allowFillIn,
   setAllowFillIn,
+  setShowManualTeamFormationModal,
 }: NextMatchTabProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -213,6 +216,66 @@ export default function NextMatchTab({
   const requiredPlayers = group?.requiredPlayers || 10;
   const confirmedCount = confirmedPlayers.length;
 
+  // Normalize participant status string to uppercase
+  const normalizeStatus = (
+    status: string | undefined
+  ): ParticipantStatus | undefined => {
+    if (!status) return undefined;
+
+    // Convert to uppercase to ensure consistency
+    const upperStatus = status.toUpperCase();
+
+    if (
+      upperStatus === 'CONFIRMED' ||
+      upperStatus === 'PENDING' ||
+      upperStatus === 'DECLINED'
+    ) {
+      return upperStatus as ParticipantStatus;
+    }
+
+    return status as ParticipantStatus;
+  };
+
+  // Check if the current user is confirmed - use localUserAttendanceStatus for this
+  const isCurrentUserConfirmed =
+    confirmedPlayers.some((player: Player) => player.id === user?.id) ||
+    normalizeStatus(localUserAttendanceStatus) === 'CONFIRMED';
+
+  // Make sure we sync user attendance status with the match details
+  useEffect(() => {
+    if (matchDetails && user) {
+      // Check direct match details first for most accurate status
+      const isUserConfirmed = confirmedPlayers.some(
+        (player: Player) => player.id === user.id
+      );
+
+      const isUserDeclined = declinedPlayers.some(
+        (player: Player) => player.id === user.id
+      );
+
+      const isUserPending = pendingPlayers.some(
+        (player: Player) => player.id === user.id
+      );
+
+      // Update local status based on actual match data
+      if (isUserConfirmed && localUserAttendanceStatus !== 'CONFIRMED') {
+        setLocalUserAttendanceStatus('CONFIRMED');
+      } else if (isUserDeclined && localUserAttendanceStatus !== 'DECLINED') {
+        setLocalUserAttendanceStatus('DECLINED');
+      } else if (isUserPending && localUserAttendanceStatus !== 'PENDING') {
+        setLocalUserAttendanceStatus('PENDING');
+      } else if (
+        !isUserConfirmed &&
+        !isUserDeclined &&
+        !isUserPending &&
+        localUserAttendanceStatus
+      ) {
+        // If user isn't in any list but has a status, reset it
+        setLocalUserAttendanceStatus(undefined);
+      }
+    }
+  }, [matchDetails, user, confirmedPlayers, declinedPlayers, pendingPlayers]);
+
   // Get TBD players by team
   const tbdPlayersTeamA = normalizedTbdPlayers.filter(
     (p) => p.isTeamA === true
@@ -265,31 +328,6 @@ export default function NextMatchTab({
     hasTbdTeams,
   ]);
 
-  // Normalize participant status string to uppercase
-  const normalizeStatus = (
-    status: string | undefined
-  ): ParticipantStatus | undefined => {
-    if (!status) return undefined;
-
-    // Convert to uppercase to ensure consistency
-    const upperStatus = status.toUpperCase();
-
-    if (
-      upperStatus === 'CONFIRMED' ||
-      upperStatus === 'PENDING' ||
-      upperStatus === 'DECLINED'
-    ) {
-      return upperStatus as ParticipantStatus;
-    }
-
-    return status as ParticipantStatus;
-  };
-
-  // Check if the current user is confirmed - use localUserAttendanceStatus for this
-  const isCurrentUserConfirmed =
-    confirmedPlayers.some((player: Player) => player.id === user?.id) ||
-    normalizeStatus(localUserAttendanceStatus) === 'CONFIRMED';
-
   // Format date for next match display
   const formatNextMatchDate = (date: string | Date) => {
     if (!date) return 'No programado';
@@ -314,7 +352,25 @@ export default function NextMatchTab({
     status: ParticipantStatus,
     userId?: string
   ) => {
-    if (!matchDetails?.id) return;
+    // Check if there's a valid match with a valid ID and also check if the group has a nextMatchId
+    if (!matchDetails?.id || !group?.nextMatchId) {
+      showErrorToast('No hay un partido activo para actualizar la asistencia');
+      return;
+    }
+
+    // Verify that the match ID matches the group's nextMatchId
+    if (matchDetails.id !== group.nextMatchId) {
+      console.error('Match ID mismatch after deletion, refreshing match data');
+      // Refresh the data
+      queryClient.invalidateQueries({
+        queryKey: ['group', 'nextMatch', id],
+        exact: true,
+      });
+      showErrorToast(
+        'La información del partido ha cambiado, por favor intente nuevamente'
+      );
+      return;
+    }
 
     setAttendanceLoading(true);
     try {
@@ -329,31 +385,19 @@ export default function NextMatchTab({
       // Si tenemos un handler personalizado, lo usamos
       if (handleGroupAttendance) {
         await handleGroupAttendance(status);
-
-        // No need to do anything further as the parent component
-        // will handle the refresh
         return;
       }
 
-      // Si no, usamos la mutación directamente
-      const result = await userAttendanceMutation.mutateAsync({
+      // Si no, usamos la mutación directamente - the API handles getting the current user ID
+      await userAttendanceMutation.mutateAsync({
         matchId: matchDetails.id,
         status,
         groupId: id,
-        userId: targetUserId, // Use the target user ID
-      } as AttendanceMutationParams);
-
-      console.log('Attendance update response:', result);
+      });
 
       // Update local state immediately for better UX
       if (!userId || userId === user?.id) {
         setLocalUserAttendanceStatus(status);
-      }
-
-      // Invalidate queries to refresh data in the background
-      if (queryClient) {
-        queryClient.invalidateQueries({ queryKey: ['group', 'nextMatch'] });
-        queryClient.invalidateQueries({ queryKey: ['group', id, 'nextMatch'] });
       }
 
       // Show success message
@@ -368,6 +412,12 @@ export default function NextMatchTab({
     } catch (error) {
       console.error('Error updating attendance:', error);
       showErrorToast('Error al actualizar asistencia');
+
+      // In case of error, force refresh data - this helps recover from deleted matches
+      queryClient.invalidateQueries({
+        queryKey: ['group', 'nextMatch', id],
+        exact: true,
+      });
     } finally {
       setAttendanceLoading(false);
     }
@@ -383,71 +433,15 @@ export default function NextMatchTab({
       // Si tenemos un handler personalizado, lo usamos
       if (handleSortTeams) {
         await handleSortTeams();
-        // Don't do additional refreshes here, the parent component will handle it
+        // The parent component handles invalidation/refetch
       } else {
         // Si no, usamos la mutación directamente
-        const result = await randomizeTeamsMutation.mutateAsync({
+        // This mutation internally handles cache updates
+        await randomizeTeamsMutation.mutateAsync({
           groupId: id,
           matchId: matchDetails.id,
         });
-
-        // Just do a single invalidation with refetch after direct API call
-        if (queryClient) {
-          await queryClient.invalidateQueries({
-            queryKey: ['group', 'nextMatch', id],
-            exact: true,
-          });
-        }
-
-        // Process the result to update the local state directly
-        if (result && result.match) {
-          console.log('Got resort result:', result);
-
-          // Update playersA and playersB if they exist
-          if (Array.isArray(result.match.playersA)) {
-            matchDetails.playersA = result.match.playersA;
-          }
-
-          if (Array.isArray(result.match.playersB)) {
-            matchDetails.playersB = result.match.playersB;
-          }
-
-          // Process tbdPlayers
-          if (result.match.tbdPlayers) {
-            matchDetails.tbdPlayers = result.match.tbdPlayers;
-
-            // Update the normalized TBD players
-            let newTbdPlayers: TbdPlayer[] = [];
-
-            if (
-              result.match.tbdPlayers.teamA &&
-              Array.isArray(result.match.tbdPlayers.teamA)
-            ) {
-              newTbdPlayers = [
-                ...newTbdPlayers,
-                ...result.match.tbdPlayers.teamA.map((p: any) => ({
-                  ...p,
-                  isTeamA: true,
-                })),
-              ];
-            }
-
-            if (
-              result.match.tbdPlayers.teamB &&
-              Array.isArray(result.match.tbdPlayers.teamB)
-            ) {
-              newTbdPlayers = [
-                ...newTbdPlayers,
-                ...result.match.tbdPlayers.teamB.map((p: any) => ({
-                  ...p,
-                  isTeamA: false,
-                })),
-              ];
-            }
-
-            setNormalizedTbdPlayers(newTbdPlayers);
-          }
-        }
+        // No need to invalidate queries here as the mutation already does that
       }
     } catch (error) {
       console.error('Error sorting teams:', error);
@@ -479,8 +473,13 @@ export default function NextMatchTab({
           groupId: id,
         });
       }
+
+      // No need to invalidate queries here as the mutation already does that
+      // Just reset local state
+      setLocalUserAttendanceStatus(undefined);
     } catch (error) {
       console.error('Error deleting match:', error);
+      showErrorToast('Error al eliminar el partido');
     } finally {
       setDeleteLoading(false);
     }
@@ -498,46 +497,54 @@ export default function NextMatchTab({
         <>
           {/* Cabecera con información del partido */}
           <div className='bg-white rounded-lg overflow-hidden'>
-            <div className='bg-blue-600 px-6 py-4'>
-              <h3 className='text-xl font-semibold text-white'>
-                Próximo partido
-              </h3>
-              <p className='text-blue-100 mt-1'>
-                {matchDetails.date && formatNextMatchDate(matchDetails.date)}
-              </p>
+            <div className='bg-blue-600 px-6 py-4 flex justify-between items-center'>
+              <div>
+                <h3 className='text-xl font-semibold text-white'>
+                  Próximo partido
+                </h3>
+                <p className='text-blue-100 mt-1'>
+                  {matchDetails.date && formatNextMatchDate(matchDetails.date)}
+                </p>
+                <p className='text-blue-100 mt-1 flex items-center'>
+                  <MapPinIcon className='mr-1 h-4 w-4 flex-shrink-0' />
+                  <span>
+                    {matchDetails.location || group.location || 'Sin ubicación'}
+                  </span>
+                </p>
+              </div>
+              {currentUserIsAdmin && (
+                <Button
+                  variant='outline'
+                  className='bg-blue-500 text-white border-blue-400 hover:bg-blue-700'
+                  onClick={() => {
+                    // Abrir modal de edición
+                    window.open(
+                      `/matches/edit/${matchDetails.id}?groupId=${id}`,
+                      '_self'
+                    );
+                  }}
+                >
+                  <svg
+                    xmlns='http://www.w3.org/2000/svg'
+                    fill='none'
+                    viewBox='0 0 24 24'
+                    strokeWidth={1.5}
+                    stroke='currentColor'
+                    className='w-5 h-5'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      d='m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10'
+                    />
+                  </svg>
+                  <span className='ml-1'>Editar</span>
+                </Button>
+              )}
             </div>
 
             <div className='p-6'>
-              <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-                {/* Detalles del partido */}
-                <div className='bg-gray-50 rounded-lg p-4'>
-                  <h4 className='text-md font-medium text-gray-800 mb-3'>
-                    Detalles
-                  </h4>
-                  <ul className='space-y-3'>
-                    <li className='flex items-start text-sm text-gray-600'>
-                      <CalendarIcon className='mr-2 h-5 w-5 flex-shrink-0 text-gray-500' />
-                      <span>
-                        {matchDetails.date
-                          ? formatNextMatchDate(matchDetails.date)
-                          : 'Fecha no programada'}
-                      </span>
-                    </li>
-                    <li className='flex items-start text-sm text-gray-600'>
-                      <MapPinIcon className='mr-2 h-5 w-5 flex-shrink-0 text-gray-500' />
-                      <span>
-                        {matchDetails.location ||
-                          group.location ||
-                          'Sin ubicación'}
-                      </span>
-                    </li>
-                    <li className='flex items-start text-sm text-gray-600'>
-                      <UserIcon className='mr-2 h-5 w-5 flex-shrink-0 text-gray-500' />
-                      <span>Jugadores necesarios: {requiredPlayers}</span>
-                    </li>
-                  </ul>
-                </div>
-
+              <div className='grid grid-cols-1 md:grid-cols-1 gap-6'>
                 {/* Estado de la asistencia */}
                 <div className='bg-gray-50 rounded-lg p-4'>
                   <h4 className='text-md font-medium text-gray-800 mb-3'>
@@ -564,9 +571,10 @@ export default function NextMatchTab({
                         localUserAttendanceStatus
                       )}
                       handleGroupAttendance={handleAttendance}
-                      disabled={attendanceLoading}
+                      disabled={attendanceLoading || !matchDetails?.id}
                       confirmedCount={confirmedCount}
                       requiredPlayers={requiredPlayers}
+                      matchId={matchDetails?.id}
                     />
                   )}
                 </div>
@@ -619,7 +627,7 @@ export default function NextMatchTab({
                     </label>
                   </div>
 
-                  <div className='flex justify-end'>
+                  <div className='flex justify-end space-x-2'>
                     <Button
                       onClick={handleSortTeamsClick}
                       variant='primary'
@@ -657,10 +665,21 @@ export default function NextMatchTab({
                       ) : (
                         <>
                           <PlusIcon className='mr-1 h-5 w-5' />
-                          Formar equipos
+                          Sortear equipos
                         </>
                       )}
                     </Button>
+
+                    {currentUserIsAdmin && (
+                      <Button
+                        onClick={() => setShowManualTeamFormationModal(true)}
+                        variant='outline'
+                        className='flex items-center'
+                      >
+                        <UserGroupIcon className='mr-1 h-5 w-5' />
+                        Formar equipos manualmente
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
@@ -691,6 +710,16 @@ export default function NextMatchTab({
                     >
                       <ArrowPathIcon className='h-4 w-4 mr-1' />
                       Re-sortear
+                    </Button>
+
+                    <Button
+                      variant='outline'
+                      onClick={() => setShowManualTeamFormationModal(true)}
+                      className='flex items-center text-xs'
+                      size='sm'
+                    >
+                      <UserGroupIcon className='h-4 w-4 mr-1' />
+                      Formar manualmente
                     </Button>
 
                     <Button

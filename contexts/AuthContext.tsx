@@ -118,68 +118,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password: string;
       birthdate: string;
     }) => {
-      try {
-        // Usamos el endpoint simplificado en la raíz de la API
-        const registerUrl = '/api/register';
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, birthdate }),
+      });
 
-        const response = await fetch(registerUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({ name, email, password, birthdate }),
-          credentials: 'include',
-        });
-
-        // Leer el cuerpo de la respuesta como texto primero
-        const responseText = await response.text();
-
-        // Intentar parsearlo como JSON
-        let data;
-        try {
-          data = responseText ? JSON.parse(responseText) : {};
-        } catch (e) {
-          console.error('Error parsing response:', responseText);
-          return {
-            success: false,
-            message: 'Error al procesar la respuesta del servidor',
-          };
-        }
-
-        if (!response.ok) {
-          // En lugar de lanzar el error, lo retornamos como parte de la respuesta
-          return {
-            success: false,
-            message: data.message || 'Error al crear la cuenta',
-            status: response.status,
-          };
-        }
-
-        return { success: true, data };
-      } catch (error) {
-        console.error('Network error during registration:', error);
-        return {
-          success: false,
-          message:
-            error instanceof Error
-              ? error.message
-              : 'Error de conexión al servidor',
-        };
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Error creating account');
       }
+
+      return response.json();
     },
-    onSuccess: async (result, variables) => {
-      // Solo intentamos auto-login si el registro fue exitoso
-      if (result.success) {
-        try {
-          await loginMutation.mutateAsync({
-            email: variables.email,
-            password: variables.password,
-          });
-        } catch (error) {
-          console.error('Error auto-login after registration:', error);
-        }
-      }
+    onSuccess: async (_, variables) => {
+      // Auto-login después del registro
+      await loginMutation.mutateAsync({
+        email: variables.email,
+        password: variables.password,
+      });
+    },
+    onError: (error: Error) => {
+      console.error('Error registering:', error);
+      throw error;
     },
   });
 
@@ -197,19 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string,
     birthdate: string
   ) => {
-    const result = await registerMutation.mutateAsync({
-      name,
-      email,
-      password,
-      birthdate,
-    });
-
-    // Si no fue exitoso, lanzamos el error para que el componente pueda manejarlo
-    if (!result.success) {
-      throw new Error(result.message);
-    }
-
-    return result.data;
+    await registerMutation.mutateAsync({ name, email, password, birthdate });
   };
 
   return (

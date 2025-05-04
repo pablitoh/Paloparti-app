@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Button from '../../Button';
 import {
   showSuccessToast,
@@ -28,13 +28,52 @@ const ReplaceTbdPlayerModal = ({
   const [isReplacing, setIsReplacing] = useState(false);
   const [availableMembers, setAvailableMembers] = useState<any[]>([]);
 
+  // Normalizar tbdPlayers para asegurar que sea un array
+  const normalizeTbdPlayers = (tbdPlayers: any): any[] => {
+    if (!tbdPlayers) return [];
+
+    // Si ya es un array, usarlo directamente
+    if (Array.isArray(tbdPlayers)) {
+      return tbdPlayers;
+    }
+
+    // Si es un objeto con teamA/teamB
+    if (typeof tbdPlayers === 'object') {
+      const teamA = Array.isArray(tbdPlayers.teamA) ? tbdPlayers.teamA : [];
+      const teamB = Array.isArray(tbdPlayers.teamB) ? tbdPlayers.teamB : [];
+
+      return [
+        ...teamA.map((p: any) => ({ ...p, isTeamA: true })),
+        ...teamB.map((p: any) => ({ ...p, isTeamA: false })),
+      ];
+    }
+
+    // Si es un string, intentar parsearlo como JSON
+    if (typeof tbdPlayers === 'string') {
+      try {
+        const parsed = JSON.parse(tbdPlayers);
+        return normalizeTbdPlayers(parsed);
+      } catch (e) {
+        console.error('Error parsing tbdPlayers string:', e);
+        return [];
+      }
+    }
+
+    return [];
+  };
+
   // Get the TBD player details from the match details
-  const tbdPlayer =
-    showReplaceTbdModal && group?.nextMatchDetails?.tbdPlayers
-      ? group.nextMatchDetails.tbdPlayers.find(
-          (p: any) => p.id === showReplaceTbdModal
-        )
-      : null;
+  const tbdPlayer = useMemo(() => {
+    if (!showReplaceTbdModal || !group?.nextMatchDetails) return null;
+
+    const normalizedTbdPlayers = normalizeTbdPlayers(
+      group.nextMatchDetails.tbdPlayers
+    );
+    return (
+      normalizedTbdPlayers.find((p: any) => p.id === showReplaceTbdModal) ||
+      null
+    );
+  }, [showReplaceTbdModal, group?.nextMatchDetails]);
 
   // Process available members when the modal is shown
   useEffect(() => {

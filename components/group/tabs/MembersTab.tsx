@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Avatar } from '@mui/material';
 import type { GroupWithRelations, Member } from '../../../types/group';
 import type { AuthUser } from '../../../types/auth';
@@ -27,46 +27,46 @@ export default function MembersTab({
   handleConfirmAttendance,
   handleDeclineAttendance,
 }: MembersTabProps) {
-  const confirmedMembersCount =
-    group?.nextMatchDetails?.confirmedPlayers?.length || 0;
+  // Estado local para mantener el estado de confirmación de cada miembro
+  const [membersConfirmationStatus, setMembersConfirmationStatus] = useState<
+    Record<string, boolean>
+  >({});
+  // Estado local para el contador de confirmados
+  const [localConfirmedCount, setLocalConfirmedCount] = useState(0);
+  // Estado para el botón que está siendo procesado
+  const [processingButton, setProcessingButton] = useState<{
+    id: string;
+    action: 'confirm' | 'decline';
+  } | null>(null);
+
+  // Inicializar el estado local con los datos del grupo
+  useEffect(() => {
+    const initialStatus: Record<string, boolean> = {};
+    const confirmedCount =
+      group?.nextMatchDetails?.confirmedPlayers?.length || 0;
+    setLocalConfirmedCount(confirmedCount);
+
+    group?.members?.forEach((member) => {
+      initialStatus[member.userId] = isMemberConfirmedForNextMatch(
+        member.userId
+      );
+    });
+    setMembersConfirmationStatus(initialStatus);
+  }, [group?.members, group?.nextMatchDetails?.confirmedPlayers]);
 
   // Determinar si se alcanzó el límite de jugadores requeridos
   const requiredPlayers = group?.requiredPlayers || 10;
-  const isMaxPlayersReached = confirmedMembersCount >= requiredPlayers;
-
-  // Información de depuración
-  const nextMatchInfo = group?.nextMatchDetails
-    ? { id: group.nextMatchDetails.id, date: group.nextMatchDetails.date }
-    : null;
-
-  console.log('MembersTab - Datos importantes:', {
-    nextMatchId: group?.nextMatchId,
-    nextMatchInfo,
-    confirmedPlayers: group?.nextMatchDetails?.confirmedPlayers?.map((p) => ({
-      id: p.id,
-      name: p.name,
-    })),
-    groupId: group?.id,
-  });
+  const isMaxPlayersReached = localConfirmedCount >= requiredPlayers;
 
   // Verificar si un miembro está confirmado para el próximo partido
   const isMemberConfirmedForNextMatch = (userId: string) => {
     if (!group?.nextMatchDetails?.confirmedPlayers) {
-      console.log(`No confirmedPlayers found for userId: ${userId}`);
       return false;
     }
 
-    const isConfirmed = group.nextMatchDetails.confirmedPlayers.some(
+    return group.nextMatchDetails.confirmedPlayers.some(
       (player) => player.id === userId
     );
-
-    console.log(
-      `Checking confirmation for user ${userId}: ${
-        isConfirmed ? 'CONFIRMED' : 'NOT CONFIRMED'
-      }`
-    );
-
-    return isConfirmed;
   };
 
   // Componente para los botones de acciones
@@ -75,6 +75,36 @@ export default function MembersTab({
     isConfirmedForNextMatch,
     isCurrentUser,
   }) => {
+    const handleConfirm = async () => {
+      if (isMaxPlayersReached && !isConfirmedForNextMatch) return;
+
+      setProcessingButton({ id: member.id, action: 'confirm' });
+      try {
+        await handleConfirmAttendance(member.id, member.userId);
+        setMembersConfirmationStatus((prev) => ({
+          ...prev,
+          [member.userId]: true,
+        }));
+        setLocalConfirmedCount((prev) => prev + 1);
+      } finally {
+        setProcessingButton(null);
+      }
+    };
+
+    const handleDecline = async () => {
+      setProcessingButton({ id: member.id, action: 'decline' });
+      try {
+        await handleDeclineAttendance(member.id, member.userId);
+        setMembersConfirmationStatus((prev) => ({
+          ...prev,
+          [member.userId]: false,
+        }));
+        setLocalConfirmedCount((prev) => prev - 1);
+      } finally {
+        setProcessingButton(null);
+      }
+    };
+
     if (isCurrentUser) {
       return (
         <span className='text-sm text-gray-500 italic block mt-1 md:mt-0'>
@@ -87,19 +117,24 @@ export default function MembersTab({
       return null;
     }
 
+    const isConfirmed =
+      membersConfirmationStatus[member.userId] ?? isConfirmedForNextMatch;
+    const isProcessing = processingButton?.id === member.id;
+
     return (
       <div className='flex gap-2 mt-2 md:mt-0'>
-        {!isConfirmedForNextMatch && (
+        {!isConfirmed && (
           <button
-            onClick={() => handleConfirmAttendance(member.id, member.userId)}
+            onClick={handleConfirm}
             className='text-green-600 hover:text-green-900 bg-green-100 hover:bg-green-200 px-3 py-1 rounded-md text-xs md:text-sm flex items-center'
             disabled={
               isLoading ||
-              (isMaxPlayersReached && !isConfirmedForNextMatch) ||
-              !group?.nextMatchId
+              (isMaxPlayersReached && !isConfirmed) ||
+              !group?.nextMatchId ||
+              processingButton !== null
             }
           >
-            {isLoading ? (
+            {isProcessing && processingButton?.action === 'confirm' ? (
               <span className='flex items-center'>
                 <svg
                   className='animate-spin -ml-1 mr-2 h-4 w-4 text-green-700'
@@ -135,13 +170,15 @@ export default function MembersTab({
             )}
           </button>
         )}
-        {isConfirmedForNextMatch && (
+        {isConfirmed && (
           <button
-            onClick={() => handleDeclineAttendance(member.id, member.userId)}
+            onClick={handleDecline}
             className='text-red-600 hover:text-red-900 bg-red-100 hover:bg-red-200 px-3 py-1 rounded-md text-xs md:text-sm flex items-center'
-            disabled={isLoading || !group?.nextMatchId}
+            disabled={
+              isLoading || !group?.nextMatchId || processingButton !== null
+            }
           >
-            {isLoading ? (
+            {isProcessing && processingButton?.action === 'decline' ? (
               <span className='flex items-center'>
                 <svg
                   className='animate-spin -ml-1 mr-2 h-4 w-4 text-red-700'
@@ -181,7 +218,7 @@ export default function MembersTab({
     <div className='space-y-4'>
       <div className='flex justify-between items-center'>
         <h3 className='text-lg font-semibold'>
-          Miembros ({confirmedMembersCount} confirmados para el próximo partido)
+          Miembros ({localConfirmedCount} confirmados para el próximo partido)
         </h3>
       </div>
       {isMaxPlayersReached && (
@@ -219,9 +256,9 @@ export default function MembersTab({
             <tbody className='bg-white divide-y divide-gray-200'>
               {group?.members?.map((member: Member) => {
                 // Determinar el estado para el próximo partido específicamente
-                const isConfirmedForNextMatch = isMemberConfirmedForNextMatch(
-                  member.userId
-                );
+                const isConfirmedForNextMatch =
+                  membersConfirmationStatus[member.userId] ??
+                  isMemberConfirmedForNextMatch(member.userId);
 
                 // Verificar si el usuario actual es el dueño de esta fila
                 const isCurrentUser = user && member.userId === user.id;
@@ -250,19 +287,17 @@ export default function MembersTab({
                       </div>
                     </td>
                     <td className='px-6 py-4 whitespace-nowrap'>
-                      <div className='flex items-center'>
-                        {isConfirmedForNextMatch ? (
-                          <span className='px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800'>
-                            Confirmado
-                          </span>
-                        ) : (
-                          <span className='px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800'>
-                            Pendiente
-                          </span>
-                        )}
-                      </div>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          isConfirmedForNextMatch
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {isConfirmedForNextMatch ? 'Confirmado' : 'Pendiente'}
+                      </span>
                     </td>
-                    <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>
+                    <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
                       <ActionButtons
                         member={member}
                         isConfirmedForNextMatch={isConfirmedForNextMatch}
@@ -277,60 +312,59 @@ export default function MembersTab({
         </div>
       </div>
 
-      {/* Vista de tarjetas para dispositivos móviles */}
-      <div className='md:hidden'>
-        <ul className='space-y-3'>
-          {group?.members?.map((member: Member) => {
-            const isConfirmedForNextMatch = isMemberConfirmedForNextMatch(
-              member.userId
-            );
-            const isCurrentUser = user && member.userId === user.id;
+      {/* Vista móvil */}
+      <div className='md:hidden space-y-4'>
+        {group?.members?.map((member: Member) => {
+          const isConfirmedForNextMatch =
+            membersConfirmationStatus[member.userId] ??
+            isMemberConfirmedForNextMatch(member.userId);
+          const isCurrentUser = user && member.userId === user.id;
 
-            return (
-              <li
-                key={member.id}
-                className='bg-white rounded-lg shadow-sm border border-gray-200 p-4'
-              >
-                <div className='flex items-center mb-2'>
+          return (
+            <div
+              key={member.id}
+              className='bg-white shadow rounded-lg p-4 flex flex-col'
+            >
+              <div className='flex items-center justify-between'>
+                <div className='flex items-center'>
                   <Avatar
                     alt={member.name || 'Usuario sin nombre'}
                     src={member.avatar || ''}
-                    className='h-10 w-10 rounded-full mr-3'
+                    className='h-10 w-10 rounded-full'
                   />
-                  <div>
-                    <div className='flex items-center flex-wrap gap-1'>
-                      <span className='text-sm font-medium text-gray-900'>
-                        {member.name || 'Usuario sin nombre'}
-                      </span>
+                  <div className='ml-3'>
+                    <div className='text-sm font-medium text-gray-900'>
+                      {member.name || 'Usuario sin nombre'}
                       {member.role === 'ADMIN' && (
-                        <span className='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800'>
+                        <span className='ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800'>
                           Admin
                         </span>
                       )}
                     </div>
                     <div className='mt-1'>
-                      {isConfirmedForNextMatch ? (
-                        <span className='px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800'>
-                          Confirmado
-                        </span>
-                      ) : (
-                        <span className='px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800'>
-                          Pendiente
-                        </span>
-                      )}
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          isConfirmedForNextMatch
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {isConfirmedForNextMatch ? 'Confirmado' : 'Pendiente'}
+                      </span>
                     </div>
                   </div>
                 </div>
-
+              </div>
+              <div className='mt-3'>
                 <ActionButtons
                   member={member}
                   isConfirmedForNextMatch={isConfirmedForNextMatch}
                   isCurrentUser={isCurrentUser}
                 />
-              </li>
-            );
-          })}
-        </ul>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

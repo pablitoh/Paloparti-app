@@ -55,7 +55,7 @@ export default async function handler(
             },
           },
         },
-        playersA: {
+        matchPlayers: {
           include: {
             user: {
               select: {
@@ -86,7 +86,8 @@ export default async function handler(
       // Registrar goles
       if (match.goals && match.goals.length > 0) {
         match.goals.forEach((goal) => {
-          const scorerId = goal.userId;
+          const scorerId = goal.scorer.id;
+
           if (!goalsCount[scorerId]) {
             goalsCount[scorerId] = {
               goals: 0,
@@ -103,19 +104,37 @@ export default async function handler(
       const isDraw = match.scoreA === match.scoreB;
 
       // Separar jugadores en equipos A y B basados en isTeamA
-      const teamAPlayers = match.playersA.filter((player) => player.isTeamA);
-      const teamBPlayers = match.playersA.filter((player) => !player.isTeamA);
+      // const teamAPlayers = match.playersA.filter((player) => player.isTeamA);
+      // const teamBPlayers = match.playersA.filter((player) => !player.isTeamA);
+
+      const teamAPlayers = (match.matchPlayers as any[])
+        .filter((player) => player.isTeamA)
+        .map((player) => ({
+          id: player.userId,
+          name: player.user?.name || null,
+          avatar: player.user?.image || null,
+          isTeamA: true,
+        }));
+
+      const teamBPlayers = (match.matchPlayers as any[])
+        .filter((player) => !player.isTeamA)
+        .map((player) => ({
+          id: player.userId,
+          name: player.user?.name || null,
+          avatar: player.user?.image || null,
+          isTeamA: false,
+        }));
 
       // Registrar victorias y partidos para jugadores del Equipo A
       if (teamAPlayers) {
         teamAPlayers.forEach((player) => {
-          const playerId = player.userId;
+          const playerId = player.id;
           if (!playerStats[playerId]) {
             playerStats[playerId] = {
               wins: 0,
               matches: 0,
-              name: player.user?.name || 'Sin nombre',
-              avatar: player.user?.image,
+              name: player.name || 'Sin nombre',
+              avatar: player.image,
             };
           }
           playerStats[playerId].matches += 1;
@@ -127,13 +146,13 @@ export default async function handler(
       // Registrar victorias y partidos para jugadores del Equipo B
       if (teamBPlayers) {
         teamBPlayers.forEach((player) => {
-          const playerId = player.userId;
+          const playerId = player.id;
           if (!playerStats[playerId]) {
             playerStats[playerId] = {
               wins: 0,
               matches: 0,
-              name: player.user?.name || 'Sin nombre',
-              avatar: player.user?.image,
+              name: player.name || 'Sin nombre',
+              avatar: player.image,
             };
           }
           playerStats[playerId].matches += 1;
