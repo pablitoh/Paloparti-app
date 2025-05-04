@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Modal, Button, List, Avatar, Space, message } from 'antd';
-import { UserOutlined } from '@ant-design/icons';
 import { useManualTeamFormationMutation } from '../../../services/reactQueryHooks';
 
 interface Player {
@@ -128,10 +127,13 @@ export default function ManualTeamFormationModal({
         >
           <List.Item.Meta
             avatar={
-              <Avatar
-                src={player.avatar}
-                icon={!player.avatar && <UserOutlined />}
-              />
+              player.avatar ? (
+                <Avatar src={player.avatar} />
+              ) : (
+                <Avatar>
+                  {player.name ? player.name.charAt(0).toUpperCase() : 'U'}
+                </Avatar>
+              )
             }
             title={player.name || 'Jugador sin nombre'}
           />
@@ -196,10 +198,15 @@ export default function ManualTeamFormationModal({
               >
                 <List.Item.Meta
                   avatar={
-                    <Avatar
-                      src={player.avatar}
-                      icon={!player.avatar && <UserOutlined />}
-                    />
+                    player.avatar ? (
+                      <Avatar src={player.avatar} />
+                    ) : (
+                      <Avatar>
+                        {player.name
+                          ? player.name.charAt(0).toUpperCase()
+                          : 'U'}
+                      </Avatar>
+                    )
                   }
                   title={player.name || 'Jugador sin nombre'}
                 />
