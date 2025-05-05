@@ -159,7 +159,8 @@ export default async function handler(
         const matchWithDetails = await prisma.match.findUnique({
           where: { id: match.id },
           include: {
-            playersA: {
+            matchPlayers: {
+              where: { isTeamA: true },
               include: {
                 user: {
                   select: {
