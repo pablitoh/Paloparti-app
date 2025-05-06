@@ -9,6 +9,7 @@ import NextMatchTab from '../../components/group/tabs/NextMatchTab';
 import HistoryTab from '../../components/group/tabs/HistoryTab';
 import GoalsTab from '../../components/group/tabs/GoalsTab';
 import MvpTab from '../../components/group/tabs/MvpTab';
+import MobileDrawer from '../../components/group/MobileDrawer';
 import { Avatar } from '@mui/material';
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { showSuccessToast, showErrorToast } from '../../services/toastService';
@@ -495,11 +496,6 @@ export default function GroupDetails() {
   const [showManualTeamFormationModal, setShowManualTeamFormationModal] =
     useState(false);
 
-  // Refs para la funcionalidad de swipe
-  const touchStartX = useRef(0);
-  const touchEndX = useRef(0);
-  const tabsContainerRef = useRef<HTMLDivElement>(null);
-
   // Normalize groupId to prevent unnecessary re-renders
   const groupId = useMemo(() => {
     return Array.isArray(id) ? id[0] : id || '';
@@ -592,11 +588,8 @@ const GroupContent = ({
   // Get the React Query client instance
   const queryClient = useQueryClient();
 
-  // Refs para la funcionalidad de swipe
-  const touchStartX = useRef(0);
-  const touchEndX = useRef(0);
-  const tabsContainerRef = useRef<HTMLDivElement>(null);
-
+  // Estado para controlar el drawer de navegación móvil
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
   const [inviteUrl, setInviteUrl] = useState('');
 
@@ -639,15 +632,6 @@ const GroupContent = ({
     }
     return groupBasicData.createdBy === user.id;
   }, [groupBasicData, user]);
-
-  // Funciones para manejar el swipe
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    touchEndX.current = e.touches[0].clientX;
-  };
 
   // Efecto para procesar datos del grupo
   useEffect(() => {
@@ -728,25 +712,9 @@ const GroupContent = ({
     [router, selectedTab, currentUserIsAdmin]
   );
 
-  const handleTouchEnd = () => {
-    const swipeThreshold = 50; // Mínima distancia para considerar un swipe
-    const swipeDistance = touchEndX.current - touchStartX.current;
-
-    if (Math.abs(swipeDistance) > swipeThreshold) {
-      // Swipe derecha (negativo) -> pestaña anterior
-      if (swipeDistance < 0 && selectedTab < (currentUserIsAdmin ? 5 : 4)) {
-        handleTabChange(selectedTab + 1);
-      }
-      // Swipe izquierda (positivo) -> pestaña siguiente
-      else if (swipeDistance > 0 && selectedTab > 0) {
-        handleTabChange(selectedTab - 1);
-      }
-    }
-  };
-
-  // Renderizar las pestañas disponibles según el rol del usuario
-  const renderTabs = useMemo(() => {
-    const tabs: TabConfig[] = [
+  // Configuración de pestañas
+  const tabs: TabConfig[] = useMemo(() => {
+    const baseTabs: TabConfig[] = [
       { label: 'Próximo Partido' },
       { label: 'Historial' },
       { label: 'Goleadores' },
@@ -755,13 +723,18 @@ const GroupContent = ({
     ];
 
     if (currentUserIsAdmin) {
-      tabs.push({
+      baseTabs.push({
         label: 'Solicitudes',
         showBadge: !!groupBasicData?.pendingRequestsCount,
         badgeCount: groupBasicData?.pendingRequestsCount || 0,
       });
     }
 
+    return baseTabs;
+  }, [currentUserIsAdmin, groupBasicData?.pendingRequestsCount]);
+
+  // Renderizar las pestañas disponibles según el rol del usuario
+  const renderTabs = useMemo(() => {
     return tabs.map((tab, index) => (
       <button
         key={index}
@@ -786,12 +759,7 @@ const GroupContent = ({
         )}
       </button>
     ));
-  }, [
-    selectedTab,
-    handleTabChange,
-    currentUserIsAdmin,
-    groupBasicData?.pendingRequestsCount,
-  ]);
+  }, [tabs, selectedTab, handleTabChange]);
 
   // Renderizar el contenido de la pestaña seleccionada
   const renderTabContent = useMemo(() => {
@@ -880,7 +848,7 @@ const GroupContent = ({
   }, [groupBasicData?.nextMatchId, onRefreshData]);
 
   return (
-    <div className='space-y-6'>
+    <div className='space-y-4'>
       <SimpleHeaderComponent
         group={groupBasicData}
         currentUserIsAdmin={currentUserIsAdmin}
@@ -892,24 +860,30 @@ const GroupContent = ({
         copyInviteLink={copyInviteLink}
         isCopying={isCopying}
         router={router}
+        onToggleDrawer={() => setIsDrawerOpen(!isDrawerOpen)}
       />
 
-      <div className='bg-white rounded-xl shadow-sm mb-0'>
+      {/* Tabs de navegación - ocultos en móvil */}
+      <div className='hidden md:block bg-white rounded-xl shadow-sm mb-0'>
         <nav
           className='flex overflow-x-auto rounded-t-xl scrollbar-hide'
           aria-label='Tabs'
-          ref={tabsContainerRef}
         >
           {renderTabs}
         </nav>
       </div>
 
-      <div
-        className='bg-white rounded-xl shadow-sm p-4 sm:p-6'
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
+      {/* Mobile drawer para navegación en móvil */}
+      <MobileDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        tabs={tabs}
+        selectedTab={selectedTab}
+        onTabChange={handleTabChange}
+      />
+
+      {/* Área de contenido principal */}
+      <div className='bg-white rounded-xl shadow-sm p-4 sm:p-6'>
         {renderTabContent}
       </div>
 

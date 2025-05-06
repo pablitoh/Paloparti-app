@@ -98,31 +98,13 @@ export default async function handler(
         (member) => member.userId === userId && member.role === 'ADMIN'
       );
 
-      // Add age calculated from birthdate and separate players by team
-      const matchWithAges = {
+      // Solo devolver matchPlayers y no separar en playersA y playersB
+      const matchWithDetails = {
         ...match,
-        playersA: match.matchPlayers
-          .filter((player) => player.isTeamA)
-          .map((player) => ({
-            ...player,
-            user: {
-              ...player.user,
-              age: calculateAge(player.user.birthdate),
-            },
-          })),
-        playersB: match.matchPlayers
-          .filter((player) => !player.isTeamA)
-          .map((player) => ({
-            ...player,
-            user: {
-              ...player.user,
-              age: calculateAge(player.user.birthdate),
-            },
-          })),
         isAdmin, // Add isAdmin flag for frontend use
       };
 
-      return res.status(200).json(matchWithAges);
+      return res.status(200).json(matchWithDetails);
     } catch (error) {
       console.error('Error fetching match:', error);
       return res.status(500).json({ message: 'Error al obtener el partido' });
@@ -252,29 +234,11 @@ export default async function handler(
         },
       })) as MatchWithRelations;
 
-      const updatedMatchWithAges = {
+      const updatedMatchWithDetails = {
         ...updatedMatch,
-        playersA: updatedMatch.matchPlayers
-          .filter((player) => player.isTeamA)
-          .map((player) => ({
-            ...player,
-            user: {
-              ...player.user,
-              age: calculateAge(player.user.birthdate),
-            },
-          })),
-        playersB: updatedMatch.matchPlayers
-          .filter((player) => !player.isTeamA)
-          .map((player) => ({
-            ...player,
-            user: {
-              ...player.user,
-              age: calculateAge(player.user.birthdate),
-            },
-          })),
       };
 
-      return res.status(200).json(updatedMatchWithAges);
+      return res.status(200).json(updatedMatchWithDetails);
     } catch (error) {
       console.error('Error updating match:', error);
       return res

@@ -492,14 +492,14 @@ export default function NextMatchTab({
   );
 
   return (
-    <div className='space-y-6'>
+    <div className='space-y-4'>
       {matchDetails ? (
         <>
           {/* Cabecera con información del partido */}
           <div className='bg-white rounded-lg overflow-hidden'>
-            <div className='bg-blue-600 px-6 py-4 flex justify-between items-center'>
+            <div className='bg-blue-600 px-4 py-3 flex justify-between items-center'>
               <div>
-                <h3 className='text-xl font-semibold text-white'>
+                <h3 className='text-lg font-semibold text-white'>
                   Próximo partido
                 </h3>
                 <p className='text-blue-100 mt-1'>
@@ -538,45 +538,51 @@ export default function NextMatchTab({
                       d='m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10'
                     />
                   </svg>
-                  <span className='ml-1'>Editar</span>
                 </Button>
               )}
             </div>
 
-            <div className='p-6'>
-              <div className='grid grid-cols-1 md:grid-cols-1 gap-6'>
+            <div className='p-4'>
+              <div className='grid grid-cols-1 gap-4'>
                 {/* Estado de la asistencia */}
-                <div className='bg-gray-50 rounded-lg p-4'>
+                <div className='bg-gray-50 rounded-lg p-3'>
                   <h4 className='text-md font-medium text-gray-800 mb-3'>
                     Estado
                   </h4>
-                  <div className='mb-3'>
-                    <div className='flex justify-between text-xs font-medium text-gray-700 mb-1'>
-                      <span>
-                        Confirmados: {confirmedCount} de {requiredPlayers}
-                      </span>
-                      <span>{progressPercentage}%</span>
-                    </div>
-                    <div className='bg-gray-200 rounded-full h-2.5'>
-                      <div
-                        className='bg-green-500 h-2.5 rounded-full transition-all duration-500'
-                        style={{ width: `${progressPercentage}%` }}
-                      ></div>
-                    </div>
-                  </div>
 
-                  {isUserInGroup && (
-                    <AttendanceConfirmation
-                      userAttendanceStatus={normalizeStatus(
-                        localUserAttendanceStatus
-                      )}
-                      handleGroupAttendance={handleAttendance}
-                      disabled={attendanceLoading || !matchDetails?.id}
-                      confirmedCount={confirmedCount}
-                      requiredPlayers={requiredPlayers}
-                      matchId={matchDetails?.id}
-                    />
-                  )}
+                  <div className='flex flex-col sm:flex-row gap-4'>
+                    {/* Barra de progreso */}
+                    <div className='flex-1'>
+                      <div className='flex justify-between text-xs font-medium text-gray-700 mb-1'>
+                        <span>
+                          Confirmados: {confirmedCount}/{requiredPlayers}
+                        </span>
+                        <span>{progressPercentage}%</span>
+                      </div>
+                      <div className='bg-gray-200 rounded-full h-2.5 mt-1.5'>
+                        <div
+                          className='bg-green-500 h-2.5 rounded-full transition-all duration-500'
+                          style={{ width: `${progressPercentage}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    {/* Toggle de asistencia */}
+                    {isUserInGroup && (
+                      <div className='flex-1'>
+                        <AttendanceConfirmation
+                          userAttendanceStatus={normalizeStatus(
+                            localUserAttendanceStatus
+                          )}
+                          handleGroupAttendance={handleAttendance}
+                          disabled={attendanceLoading || !matchDetails?.id}
+                          confirmedCount={confirmedCount}
+                          requiredPlayers={requiredPlayers}
+                          matchId={matchDetails?.id}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -669,17 +675,6 @@ export default function NextMatchTab({
                         </>
                       )}
                     </Button>
-
-                    {currentUserIsAdmin && (
-                      <Button
-                        onClick={() => setShowManualTeamFormationModal(true)}
-                        variant='outline'
-                        className='flex items-center'
-                      >
-                        <UserGroupIcon className='mr-1 h-5 w-5' />
-                        Formar equipos manualmente
-                      </Button>
-                    )}
                   </div>
                 </div>
               )}
@@ -689,13 +684,13 @@ export default function NextMatchTab({
           {/* Sección de equipos formados */}
           {teamsFormed && (
             <div className='bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200'>
-              <div className='px-4 py-5 sm:px-6 border-b border-gray-200 flex justify-between items-center'>
+              <div className='px-3 py-4 sm:px-4 border-b border-gray-200 flex justify-between items-center'>
                 <div>
-                  <h3 className='text-lg font-medium leading-6 text-gray-900'>
-                    Equipos formados
+                  <h3 className='text-md font-medium leading-6 text-gray-900'>
+                    Equipos
                   </h3>
                   <p className='mt-1 max-w-2xl text-sm text-gray-500'>
-                    Los equipos ya han sido formados para el próximo partido
+                    Equipos para el próximo partido
                   </p>
                 </div>
 
@@ -709,17 +704,7 @@ export default function NextMatchTab({
                       size='sm'
                     >
                       <ArrowPathIcon className='h-4 w-4 mr-1' />
-                      Re-sortear
-                    </Button>
-
-                    <Button
-                      variant='outline'
-                      onClick={() => setShowManualTeamFormationModal(true)}
-                      className='flex items-center text-xs'
-                      size='sm'
-                    >
-                      <UserGroupIcon className='h-4 w-4 mr-1' />
-                      Formar manualmente
+                      Sortear
                     </Button>
 
                     <Button
@@ -746,7 +731,7 @@ export default function NextMatchTab({
                 )}
               </div>
 
-              <div className='px-4 py-5'>
+              <div className='px-3 py-4'>
                 {/* Use our new TeamsList component */}
                 <TeamsList
                   playersA={playersA}

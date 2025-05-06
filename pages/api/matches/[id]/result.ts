@@ -211,25 +211,6 @@ export default async function handler(
       },
     });
 
-    // Separar jugadores por equipo
-    const playersA = matchPlayers
-      .filter((mp: MatchPlayer) => mp.isTeamA)
-      .map((mp: MatchPlayer) => ({
-        id: mp.user.id,
-        name: mp.user.name,
-        avatar: mp.user.image,
-        age: calculateAge(mp.user.birthdate),
-      }));
-
-    const playersB = matchPlayers
-      .filter((mp: MatchPlayer) => !mp.isTeamA)
-      .map((mp: MatchPlayer) => ({
-        id: mp.user.id,
-        name: mp.user.name,
-        avatar: mp.user.image,
-        age: calculateAge(mp.user.birthdate),
-      }));
-
     // Formatear goles
     const formattedGoals = updatedGoals.map((goal: Goal) => ({
       id: goal.id,
@@ -243,8 +224,7 @@ export default async function handler(
     // Combinar todo en una respuesta completa
     const matchWithDetails = {
       ...updatedMatch,
-      playersA,
-      playersB,
+      matchPlayers: matchPlayers,
       goals: formattedGoals,
     };
 

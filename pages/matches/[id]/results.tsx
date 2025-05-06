@@ -29,7 +29,7 @@ interface Player {
 }
 
 interface MatchWithPlayers extends Match {
-  playersA: {
+  matchPlayers: {
     user: {
       id: string;
       name: string | null;
@@ -41,10 +41,6 @@ interface MatchWithPlayers extends Match {
   group?: {
     id: string;
     name: string;
-    members: {
-      userId: string;
-      role: string;
-    }[];
   };
   goals?: {
     id: string;
@@ -93,13 +89,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     const match = await response.json();
 
     // Check if current user is admin
-    const isAdmin =
-      match.isAdmin ||
-      match.group?.members?.some(
-        (member: any) =>
-          member.userId === session.user.id && member.role === 'ADMIN'
-      ) ||
-      false;
+    const isAdmin = match.isAdmin || false;
 
     return {
       props: {
@@ -234,9 +224,9 @@ export default function MatchResults({
       });
 
       // Process Team A goals by player
-      if (match.playersA && match.playersA.length > 0) {
+      if (match.matchPlayers && match.matchPlayers.length > 0) {
         // Process Team A players
-        match.playersA
+        match.matchPlayers
           .filter((p) => p.isTeamA)
           .forEach((player) => {
             const goalCount = teamAGoalsByPlayer[player.user.id] || 0;
@@ -260,7 +250,7 @@ export default function MatchResults({
           });
 
         // Process Team B players
-        match.playersA
+        match.matchPlayers
           .filter((p) => !p.isTeamA)
           .forEach((player) => {
             const goalCount = teamBGoalsByPlayer[player.user.id] || 0;
@@ -349,7 +339,9 @@ export default function MatchResults({
 
     // Only add goal if current total is less than the score
     if (goalsA.length < scoreA) {
-      const player = match.playersA.find((p) => p.user.id === playerId)?.user;
+      const player = match.matchPlayers.find(
+        (p) => p.user.id === playerId
+      )?.user;
 
       if (player) {
         console.log(`Found player for Team A: ${player.name}`);
@@ -386,7 +378,7 @@ export default function MatchResults({
 
     // Only add goal if current total is less than the score
     if (goalsB.length < scoreB) {
-      const player = match.playersA.find(
+      const player = match.matchPlayers.find(
         (p) => p.user.id === playerId && !p.isTeamA
       )?.user;
 
@@ -652,7 +644,7 @@ export default function MatchResults({
             {/* Team A players and goals */}
             <div>
               <ul className='space-y-2'>
-                {match.playersA
+                {match.matchPlayers
                   .filter((p) => p.isTeamA)
                   .map((player) => {
                     const playerGoalCount = getPlayerGoalsA(player.user.id);
@@ -734,7 +726,7 @@ export default function MatchResults({
             {/* Team B players and goals */}
             <div>
               <ul className='space-y-2'>
-                {match.playersA
+                {match.matchPlayers
                   .filter((p) => !p.isTeamA)
                   .map((player) => {
                     const playerGoalCount = getPlayerGoalsB(player.user.id);
