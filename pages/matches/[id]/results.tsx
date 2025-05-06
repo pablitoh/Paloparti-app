@@ -74,8 +74,11 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       };
     }
 
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-    const response = await fetch(`${baseUrl}/api/matches/${id}`, {
+    // En getServerSideProps, usamos el objeto req para obtener el host actual
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    const host = context.req.headers.host || 'localhost:3000';
+
+    const response = await fetch(`${protocol}://${host}/api/matches/${id}`, {
       headers: {
         Cookie: context.req.headers.cookie || '',
       },
