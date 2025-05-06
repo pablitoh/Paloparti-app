@@ -2,7 +2,7 @@ import { useRouter } from 'next/router';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import Layout from '../../components/Layout';
-import SimpleHeaderComponent from '../../components/group/SimpleHeader';
+import GroupHeader from '../../components/group/GroupHeader';
 import ReplaceTbdPlayerModal from '../../components/group/modals/ReplaceTbdPlayerModal';
 import MembersTab from '../../components/group/tabs/MembersTab';
 import NextMatchTab from '../../components/group/tabs/NextMatchTab';
@@ -11,7 +11,11 @@ import GoalsTab from '../../components/group/tabs/GoalsTab';
 import MvpTab from '../../components/group/tabs/MvpTab';
 import MobileDrawer from '../../components/group/MobileDrawer';
 import { Avatar } from '@mui/material';
-import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import {
+  CheckCircleIcon,
+  XCircleIcon,
+  ArrowLeftIcon,
+} from '@heroicons/react/24/outline';
 import { showSuccessToast, showErrorToast } from '../../services/toastService';
 import {
   useGroupBasicInfo,
@@ -32,6 +36,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { Group, ParticipantStatus } from '../../types/group';
 import type { MatchInterface } from '../../types/match';
 import ManualTeamFormationModal from '../../components/group/modals/ManualTeamFormationModal';
+import Link from 'next/link';
 
 // Add AuthUser interface
 interface AuthUser {
@@ -76,6 +81,7 @@ interface LazyMembersTabProps extends LazyTabProps {
     userId: string,
     status: ParticipantStatus
   ) => Promise<void>;
+  handleLeaveGroup: () => Promise<void>;
 }
 
 interface LazyRequestsTabProps extends LazyTabProps {
@@ -307,6 +313,7 @@ const LazyMembersTab = ({
   user,
   currentUserIsAdmin,
   handleAdminAttendanceUpdate,
+  handleLeaveGroup,
 }: LazyMembersTabProps) => {
   const { data: nextMatchData, isLoading: isNextMatchLoading } =
     useGroupNextMatch(groupId, {
@@ -353,6 +360,7 @@ const LazyMembersTab = ({
         handleDeclineAttendance={async (memberId: string, userId: string) => {
           await handleAdminAttendanceUpdate(userId, 'DECLINED');
         }}
+        handleLeaveGroup={handleLeaveGroup}
       />
     </div>
   );
@@ -796,6 +804,7 @@ const GroupContent = ({
             user={user}
             currentUserIsAdmin={currentUserIsAdmin}
             handleAdminAttendanceUpdate={handleAdminAttendanceUpdate}
+            handleLeaveGroup={handleLeaveGroup}
           />
         );
       case 5:
@@ -824,6 +833,7 @@ const GroupContent = ({
     handleDeleteMatch,
     handleMembershipRequest,
     handleAdminAttendanceUpdate,
+    handleLeaveGroup,
     allowFillIn,
     setAllowFillIn,
     setShowReplaceTbdModal,
@@ -849,7 +859,18 @@ const GroupContent = ({
 
   return (
     <div className='space-y-4'>
-      <SimpleHeaderComponent
+      {/* Enlace para volver a grupos */}
+      <div className='mb-2'>
+        <Link
+          href='/groups'
+          className='inline-flex items-center text-sm text-blue-600 hover:text-blue-800 transition-colors'
+        >
+          <ArrowLeftIcon className='h-4 w-4 mr-1' />
+          Volver a grupos
+        </Link>
+      </div>
+
+      <GroupHeader
         group={groupBasicData}
         currentUserIsAdmin={currentUserIsAdmin}
         isUserInGroup={isUserInGroup}

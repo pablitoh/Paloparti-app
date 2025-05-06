@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react';
 import { Avatar } from '@mui/material';
 import type { GroupWithRelations, Member } from '../../../types/group';
 import type { AuthUser } from '../../../types/auth';
-import { CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import {
+  CheckIcon,
+  XMarkIcon,
+  ArrowRightOnRectangleIcon,
+} from '@heroicons/react/24/outline';
 
 interface MembersTabProps {
   group: GroupWithRelations;
@@ -11,6 +15,7 @@ interface MembersTabProps {
   isLoading: boolean;
   handleConfirmAttendance: (memberId: string, userId: string) => Promise<void>;
   handleDeclineAttendance: (memberId: string, userId: string) => Promise<void>;
+  handleLeaveGroup?: () => Promise<void>;
 }
 
 interface ActionButtonsProps {
@@ -26,6 +31,7 @@ export default function MembersTab({
   isLoading,
   handleConfirmAttendance,
   handleDeclineAttendance,
+  handleLeaveGroup,
 }: MembersTabProps) {
   // Estado local para mantener el estado de confirmación de cada miembro
   const [membersConfirmationStatus, setMembersConfirmationStatus] = useState<
@@ -366,6 +372,27 @@ export default function MembersTab({
           );
         })}
       </div>
+
+      {/* Botón de salir del grupo */}
+      {handleLeaveGroup && user && (
+        <div className='pt-6 border-t border-gray-200 mt-6'>
+          <button
+            onClick={() => {
+              if (
+                window.confirm(
+                  '¿Estás seguro de que quieres salir de este grupo?'
+                )
+              ) {
+                handleLeaveGroup();
+              }
+            }}
+            className='w-full sm:w-auto flex items-center justify-center px-4 py-2 border border-red-600 rounded-md shadow-sm text-sm font-medium text-red-600 hover:text-white hover:bg-red-600 transition-all duration-200'
+          >
+            <ArrowRightOnRectangleIcon className='h-5 w-5 mr-2' />
+            Salir del grupo
+          </button>
+        </div>
+      )}
     </div>
   );
 }
