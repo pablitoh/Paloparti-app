@@ -1,27 +1,13 @@
 import jwt from 'jsonwebtoken';
 
-// Check for multiple possible environment variable names
-const getJwtSecret = () => {
-  // Try different environment variable names
-  const possibleEnvVars = [
-    'JWT_SECRET',
-    'SUPABASE_JWT_SECRET',
-    'paloparti_SUPABASE_JWT_SECRET',
-    'palopartiprod_SUPABASE_JWT_SECRET',
-  ];
+console.log('JWT_SECRET is set?', !!process.env.JWT_SECRET);
 
-  for (const envVar of possibleEnvVars) {
-    if (process.env[envVar]) {
-      console.log(`Using JWT secret from ${envVar}`);
-      return process.env[envVar];
-    }
-  }
-
-  console.error('No JWT secret environment variable found');
+if (!process.env.JWT_SECRET) {
+  console.error('JWT_SECRET environment variable is not set');
   throw new Error('JWT_SECRET environment variable is not set');
-};
+}
 
-const JWT_SECRET = getJwtSecret();
+const JWT_SECRET = process.env.JWT_SECRET;
 console.log('JWT_SECRET loaded successfully');
 
 export const signToken = (payload: any) => {
