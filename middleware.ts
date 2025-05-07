@@ -15,6 +15,12 @@ const publicPaths = [
 
 export default withAuth(
   function middleware(request: NextRequest) {
+    console.log(
+      'Middleware processing:',
+      request.method,
+      request.nextUrl.pathname
+    );
+
     const isPublic = publicPaths.some(
       (path) =>
         request.nextUrl.pathname.startsWith(path) ||
@@ -40,6 +46,6 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    '/((?!api/register|api/auth|_next|favicon.ico|auth/signin|register).*)',
+    '/((?!api/register|api/auth|api/healthcheck|_next/static|_next/image|favicon.ico|auth/signin|register).*)',
   ],
 };

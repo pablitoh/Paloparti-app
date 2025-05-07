@@ -12,6 +12,7 @@ export default async function handler(
   res: NextApiResponse
 ) {
   console.log('Request received at /api/register with method:', req.method);
+  console.log('Request headers:', JSON.stringify(req.headers));
 
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
