@@ -2,6 +2,7 @@ import React, { createContext, useContext } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { clearAuthState } from '../lib/authUtils';
 
 interface User {
   id: string;
@@ -14,11 +15,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (
-    email: string,
-    password: string,
-    callbackUrl?: string
-  ) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   register: (
     name: string,
@@ -68,44 +65,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     staleTime: 5 * 60 * 1000, // 5 minutos
   });
 
-  // Mutación para iniciar sesión
+  // Mutación para iniciar sesión - simplificada
   const loginMutation = useMutation({
     mutationFn: async ({
       email,
       password,
-      callbackUrl = '/groups',
     }: {
       email: string;
       password: string;
-      callbackUrl?: string;
     }) => {
-      // Make sure we're not redirecting to the signin page itself
-      const safeCallbackUrl =
-        callbackUrl && callbackUrl !== '/auth/signin' ? callbackUrl : '/groups';
+      // Limpiar estado de autenticación previo
+      clearAuthState();
 
+      // Usar signIn sin callbackUrl para evitar redirecciones no deseadas
       const result = await signIn('credentials', {
         email,
         password,
         redirect: false,
-        callbackUrl: safeCallbackUrl,
       });
 
       if (result?.error) {
         throw new Error(result.error);
       }
 
-      // Wait for session to be available before returning
+      // Esperar un momento para que la sesión esté disponible
       await new Promise((resolve) => setTimeout(resolve, 300));
 
       return result;
     },
     onSuccess: (result) => {
-      // After successful login, manually navigate to the target URL
-      // rather than relying on Next-Auth's built-in redirects
-      if (result?.url) {
-        queryClient.invalidateQueries({ queryKey: ['user'] });
-        router.replace(result.url);
-      }
+      // Después de login exitoso, invalidar consultas y navegar
+      queryClient.invalidateQueries({ queryKey: ['user'] });
+
+      // Navegar a /groups explícitamente después del login exitoso
+      router.replace('/groups');
     },
     onError: (error: Error) => {
       console.error('Error signing in:', error);
@@ -113,19 +106,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
   });
 
-  // Mutación para cerrar sesión
+  // Mutación para cerrar sesión - simplificada
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      // Use redirect: true with a specific callbackUrl to ensure proper redirection
+      // Limpiar estado de autenticación
+      clearAuthState();
+
+      // Cerrar sesión con redirección explícita para evitar problemas de callbackUrl
       return signOut({
-        redirect: true,
-        callbackUrl: '/auth/signin',
+        redirect: false,
       });
     },
-    // No onSuccess needed as we're using redirect: true above
+    onSuccess: () => {
+      // Navegar a la página de inicio de sesión después de cerrar sesión
+      router.replace('/auth/signin');
+    },
   });
 
-  // Mutación para registro
+  // Mutación para registro - simplificada
   const registerMutation = useMutation({
     mutationFn: async ({
       name,
@@ -139,31 +137,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       birthdate: string;
     }) => {
       try {
-        console.log('Iniciando solicitud de registro...');
-
-        // Usar únicamente el endpoint unificado de registro
         const response = await fetch('/api/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, email, password, birthdate }),
         });
 
-        console.log('Respuesta del registro:', response.status);
-
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({
             message: `Error de servidor: ${response.status} ${response.statusText}`,
           }));
-          console.error('Error de registro:', response.status, errorData);
           throw new Error(
             errorData.message ||
               `Error ${response.status}: ${response.statusText}`
           );
         }
 
-        const data = await response.json();
-        console.log('Registro exitoso');
-        return data;
+        return await response.json();
       } catch (error) {
         console.error('Error en el proceso de registro:', error);
         throw error;
@@ -182,18 +172,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
   });
 
-  const login = async (
-    email: string,
-    password: string,
-    callbackUrl?: string
-  ) => {
-    await loginMutation.mutateAsync({ email, password, callbackUrl });
+  // Función simplificada de login
+  const login = async (email: string, password: string) => {
+    await loginMutation.mutateAsync({ email, password });
   };
 
+  // Función simplificada de logout
   const logout = async () => {
     await logoutMutation.mutateAsync();
   };
 
+  // Función simplificada de registro
   const register = async (
     name: string,
     email: string,

@@ -1,41 +1,71 @@
-import { useEffect } from 'react';
-import { useRouter } from 'next/router';
 import { GetServerSideProps } from 'next';
 import { getSession } from 'next-auth/react';
 
+/**
+ * Página principal - Solo redirige a la ruta adecuada
+ * Se implementa únicamente en el servidor para evitar redirecciones en cliente
+ * que podrían causar loops o flashes de contenido
+ */
 export const getServerSideProps: GetServerSideProps = async (context) => {
-  const session = await getSession(context);
+  try {
+    // Verificar si hay sesión activa
+    const session = await getSession(context);
 
-  // If user is already authenticated, redirect to groups page
-  if (session) {
+    // Verificar si estamos en ambiente de preview
+    const isPreview = process.env.VERCEL_ENV === 'preview';
+
+    // Destinos por defecto según ambiente y estado de autenticación
+    const authenticatedDestination = '/groups';
+    const unauthenticatedDestination = '/auth/signin';
+
+    // Determinar la redirección según el estado de autenticación
+    if (session) {
+      console.log(
+        'Usuario autenticado, redirigiendo a',
+        authenticatedDestination
+      );
+      return {
+        redirect: {
+          destination: authenticatedDestination,
+          permanent: false,
+        },
+      };
+    } else {
+      console.log(
+        'Usuario no autenticado, redirigiendo a',
+        unauthenticatedDestination
+      );
+      return {
+        redirect: {
+          destination: unauthenticatedDestination,
+          permanent: false,
+        },
+      };
+    }
+  } catch (error) {
+    console.error('Error en getServerSideProps de index:', error);
+
+    // En caso de error, redirigir a signin para reiniciar el proceso
     return {
       redirect: {
-        destination: '/groups',
+        destination: '/auth/signin',
         permanent: false,
       },
     };
   }
-
-  // Otherwise redirect to signin page
-  return {
-    redirect: {
-      destination: '/auth/signin',
-      permanent: false,
-    },
-  };
 };
 
+/**
+ * Este componente nunca debería renderizarse ya que siempre
+ * redirigimos en el servidor con getServerSideProps
+ */
 export default function HomePage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace('/auth/signin');
-  }, [router]);
-
-  // This will show very briefly during redirect
+  // Página de placeholder que no debería mostrarse nunca
   return (
-    <div className='flex justify-center items-center min-h-screen'>
-      <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500'></div>
+    <div className='flex flex-col items-center justify-center min-h-screen py-2'>
+      <main className='flex flex-col items-center justify-center flex-1 px-20 text-center'>
+        <h1 className='text-6xl font-bold'>Redirigiendo...</h1>
+      </main>
     </div>
   );
 }

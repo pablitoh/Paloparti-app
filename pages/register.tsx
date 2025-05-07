@@ -5,10 +5,14 @@ import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
 import Button from '../components/Button';
 import DatePickerField from '../components/DatePickerField';
+import { clearAuthState } from '../lib/authUtils';
 
+/**
+ * Página de registro simplificada
+ * Sin gestión compleja de redirects para evitar loops
+ */
 export default function Register() {
   const router = useRouter();
-  const { redirect } = router.query;
   const { register, user, loading: authLoading } = useAuth();
 
   const [formData, setFormData] = useState({
@@ -21,16 +25,17 @@ export default function Register() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Limpia estado de autenticación al cargar
   useEffect(() => {
-    // Si el usuario ya está autenticado, redirigir
+    clearAuthState();
+  }, []);
+
+  useEffect(() => {
+    // Si el usuario ya está autenticado, redirigir a /groups
     if (user && !authLoading) {
-      if (typeof redirect === 'string' && redirect) {
-        router.push(redirect);
-      } else {
-        router.push('/groups');
-      }
+      router.push('/groups');
     }
-  }, [user, authLoading, router, redirect]);
+  }, [user, authLoading, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -58,6 +63,7 @@ export default function Register() {
     }
 
     try {
+      // Registrarse y luego redirigir a la página principal
       await register(
         formData.name,
         formData.email,
@@ -65,19 +71,10 @@ export default function Register() {
         formData.birthdate
       );
 
-      // Solo ejecutamos esta parte si el registro fue exitoso
-      if (typeof redirect === 'string' && redirect) {
-        router.push(redirect);
-      } else {
-        router.push('/groups');
-      }
+      // Si el registro fue exitoso, redirigir a /groups
+      router.push('/groups');
     } catch (err) {
-      // Evitamos loggear el error en producción, solo para desarrollo
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('Register error:', err);
-      }
-
-      // Extraemos el mensaje de error de forma segura
+      // Extraer mensaje de error
       let errorMessage =
         'Error al crear la cuenta. Por favor, intenta de nuevo.';
 
@@ -204,7 +201,7 @@ export default function Register() {
                 htmlFor='confirmPassword'
                 className='block text-sm font-medium text-gray-700 mb-1'
               >
-                Confirmar Contraseña
+                Confirmar contraseña
               </label>
               <input
                 id='confirmPassword'
@@ -221,8 +218,8 @@ export default function Register() {
             <Button
               type='submit'
               variant='primary'
-              disabled={loading}
               fullWidth
+              disabled={loading}
             >
               {loading ? 'Creando cuenta...' : 'Crear cuenta'}
             </Button>
@@ -232,13 +229,8 @@ export default function Register() {
             <p className='text-gray-600'>
               ¿Ya tienes una cuenta?{' '}
               <Link
-                href={
-                  redirect
-                    ? `/auth/signin?callbackUrl=${encodeURIComponent(
-                        redirect as string
-                      )}`
-                    : '/auth/signin'
-                }
+                href='/auth/signin'
+                legacyBehavior={false}
                 className='text-blue-600 hover:underline'
               >
                 Inicia sesión

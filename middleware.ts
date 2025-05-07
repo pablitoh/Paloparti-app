@@ -1,71 +1,92 @@
-import { withAuth } from 'next-auth/middleware';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
+// Lista ampliada de rutas públicas
 const publicPaths = [
   '/api/auth',
   '/api/register',
   '/api/healthcheck',
-  '/_next/static',
-  '/_next/image',
-  '/favicon.ico',
-  '/auth/signin',
+  '/_next/',
+  '/static/',
+  '/favicon',
+  '/auth/',
   '/register',
+  '/login',
+  '/s/', // Short URLs
+  '/invite/', // Enlaces de invitación
+  '/', // Página principal
 ];
 
 // Detectar si estamos en ambiente de Vercel Preview
 const isVercelPreview = process.env.VERCEL_ENV === 'preview';
 
-export default withAuth(
-  function middleware(request: NextRequest) {
-    console.log(
-      'Middleware processing:',
-      request.method,
-      request.nextUrl.pathname,
-      isVercelPreview ? '(Preview Environment)' : ''
-    );
+// Contador para evitar loops de middleware
+let requestCounts: Record<string, { count: number; timestamp: number }> = {};
 
-    // En ambiente de preview, permitimos todas las rutas para depuración
-    if (isVercelPreview) {
-      console.log('Preview environment detected - more permissive middleware');
-      // Si está intentando acceder a rutas API de autenticación o públicas, permitir
-      if (
-        request.nextUrl.pathname.startsWith('/api/auth') ||
-        publicPaths.some((path) => request.nextUrl.pathname.startsWith(path))
-      ) {
-        return NextResponse.next();
-      }
+// Función para verificar si una ruta es pública
+function isPublicPath(path: string): boolean {
+  return publicPaths.some(
+    (prefix) => path.startsWith(prefix) || path === prefix
+  );
+}
 
-      // Para otras rutas, continuamos con NextAuth para validar la sesión
-      return NextResponse.next();
+// Middleware personalizado simplificado
+export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+
+  // 1. Registrar cada solicitud para detección de loops
+  const referrer = request.headers.get('referer') || '';
+  const requestKey = `${path}-${referrer.slice(0, 30)}`;
+  const now = Date.now();
+
+  // Limpiar registros antiguos (más de 10 segundos)
+  for (const key in requestCounts) {
+    if (now - requestCounts[key].timestamp > 10000) {
+      delete requestCounts[key];
     }
-
-    // Comportamiento normal para otros ambientes
-    const isPublic = publicPaths.some(
-      (path) =>
-        request.nextUrl.pathname.startsWith(path) ||
-        request.nextUrl.pathname === path
-    );
-
-    if (isPublic) {
-      console.log(
-        'Middleware: ruta pública permitida',
-        request.nextUrl.pathname
-      );
-      return NextResponse.next();
-    }
-
-    return NextResponse.next(); // continuará con la validación de sesión de NextAuth
-  },
-  {
-    pages: {
-      signIn: '/auth/signin',
-    },
   }
-);
 
+  // Incrementar contador
+  if (!requestCounts[requestKey]) {
+    requestCounts[requestKey] = { count: 1, timestamp: now };
+  } else {
+    requestCounts[requestKey].count++;
+    requestCounts[requestKey].timestamp = now;
+  }
+
+  // Detección de posible loop
+  if (requestCounts[requestKey].count > 5) {
+    console.warn('⚠️ Posible loop de middleware detectado para:', path);
+    return NextResponse.next();
+  }
+
+  // 2. Logging
+  console.log(`Middleware: ${request.method} ${path}`);
+
+  // 3. Permitir todas las rutas públicas sin verificación
+  if (isPublicPath(path)) {
+    console.log('Middleware: ruta pública permitida');
+    return NextResponse.next();
+  }
+
+  // 4. Para rutas protegidas, verificar token JWT
+  const token = await getToken({ req: request });
+
+  // Si no hay token, redirigir a la página de inicio de sesión SIN callbackUrl
+  if (!token) {
+    console.log('Middleware: no autenticado, redirigiendo a login');
+    const url = new URL('/auth/signin', request.url);
+    return NextResponse.redirect(url);
+  }
+
+  // Usuario autenticado, permitir acceso
+  return NextResponse.next();
+}
+
+/**
+ * Configuración del matcher para el middleware
+ */
 export const config = {
-  matcher: [
-    '/((?!api/register|api/auth|api/healthcheck|_next/static|_next/image|favicon.ico|auth/signin|register).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/healthcheck).*)'],
 };
