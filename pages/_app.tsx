@@ -50,7 +50,12 @@ function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <SessionProvider session={session}>
+      <SessionProvider
+        session={session}
+        // Add a short refetchInterval to prevent stale sessions
+        refetchInterval={5 * 60} // 5 minutes in seconds
+        refetchOnWindowFocus={true}
+      >
         <AuthProvider>
           <Component {...pageProps} key={router.asPath} />
           <Toaster

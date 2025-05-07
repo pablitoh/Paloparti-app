@@ -14,7 +14,11 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (
+    email: string,
+    password: string,
+    callbackUrl?: string
+  ) => Promise<void>;
   logout: () => Promise<void>;
   register: (
     name: string,
@@ -69,14 +73,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     mutationFn: async ({
       email,
       password,
+      callbackUrl = '/groups',
     }: {
       email: string;
       password: string;
+      callbackUrl?: string;
     }) => {
+      // Make sure we're not redirecting to the signin page itself
+      const safeCallbackUrl =
+        callbackUrl && callbackUrl !== '/auth/signin' ? callbackUrl : '/groups';
+
       const result = await signIn('credentials', {
         email,
         password,
         redirect: false,
+        callbackUrl: safeCallbackUrl,
       });
 
       if (result?.error) {
@@ -162,8 +173,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
   });
 
-  const login = async (email: string, password: string) => {
-    await loginMutation.mutateAsync({ email, password });
+  const login = async (
+    email: string,
+    password: string,
+    callbackUrl?: string
+  ) => {
+    await loginMutation.mutateAsync({ email, password, callbackUrl });
   };
 
   const logout = async () => {

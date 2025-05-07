@@ -37,17 +37,22 @@ export default function SignIn({ callbackUrl }: { callbackUrl: string }) {
     setLoading(true);
 
     try {
+      // Ensure we're using a valid callbackUrl that won't cause loops
+      const safeCallbackUrl =
+        callbackUrl && callbackUrl !== '/auth/signin' ? callbackUrl : '/groups';
+
       const result = await signIn('credentials', {
         email,
         password,
         redirect: false,
-        callbackUrl,
+        callbackUrl: safeCallbackUrl,
       });
 
       if (result?.error) {
         toast.error(result.error);
       } else if (result?.url) {
-        router.push(result.url);
+        // Use router.replace instead of push to avoid adding to history stack
+        router.replace(result.url);
       }
     } catch (error) {
       toast.error('Error al iniciar sesión');
