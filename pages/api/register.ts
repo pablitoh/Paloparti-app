@@ -1,13 +1,18 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { prisma } from '../../lib/prisma';
+import bcrypt from 'bcryptjs';
+import { signToken } from '../../lib/jwt';
 
 /**
- * Este endpoint está deprecado y redirige a /api/auth/register
- * Mantenido por compatibilidad con versiones anteriores
+ * Endpoint unificado para el registro de usuarios
+ * Este es el único endpoint de registro que debe usarse en la aplicación
  */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  console.log('Request received at /api/register with method:', req.method);
+
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -22,6 +27,7 @@ export default async function handler(
 
   // Handle OPTIONS request
   if (req.method === 'OPTIONS') {
+    console.log('Responding to OPTIONS request');
     return res.status(200).end();
   }
 
@@ -34,26 +40,73 @@ export default async function handler(
   }
 
   try {
-    console.log(
-      'Redirecting registration request from /api/register to /api/auth/register'
-    );
+    console.log('Processing registration request at /api/register');
+    const { name, email, password, birthdate } = req.body;
 
-    // Forward the request to the new endpoint
-    const response = await fetch(
-      `${process.env.NEXTAUTH_URL || ''}/api/auth/register`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(req.body),
+    console.log('Request body structure:', {
+      hasName: !!name,
+      hasEmail: !!email,
+      hasPassword: !!password,
+      hasBirthdate: !!birthdate,
+    });
+
+    // Validate input
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      return res.status(400).json({
+        message:
+          'El correo electrónico ya está registrado. Por favor, utiliza otro o inicia sesión.',
+      });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create user with birthdate if provided
+    const userData = {
+      name,
+      email,
+      password: hashedPassword,
+    };
+
+    // Add birthdate if provided (handle as optional)
+    if (birthdate) {
+      try {
+        const birthdateValue = new Date(birthdate);
+        Object.assign(userData, { birthdate: birthdateValue });
+      } catch (err) {
+        console.error('Error parsing birthdate:', err);
+        // Continue without birthdate if there's a parsing error
       }
-    );
+    }
 
-    const data = await response.json();
-    return res.status(response.status).json(data);
+    const user = await prisma.user.create({
+      data: userData,
+    });
+
+    console.log('User created successfully:', user.id);
+
+    // Generate token using the signToken function
+    const token = signToken({ userId: user.id });
+
+    return res.status(201).json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      },
+    });
   } catch (error) {
-    console.error('Error in /api/register redirect:', error);
+    console.error('Error in /api/register:', error);
     return res.status(500).json({ message: 'Internal server error' });
   }
 }

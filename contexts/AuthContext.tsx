@@ -119,37 +119,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       birthdate: string;
     }) => {
       try {
-        console.log('Initiating registration request to /api/auth/register');
-        let response = await fetch('/api/auth/register', {
+        console.log('Iniciando solicitud de registro...');
+
+        // Usar únicamente el endpoint unificado de registro
+        const response = await fetch('/api/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, email, password, birthdate }),
         });
 
-        // Log detailed response information for debugging
-        console.log('Registration response status:', response.status);
-
-        // If primary endpoint fails with 404 or 405, try fallback
-        if (response.status === 404 || response.status === 405) {
-          console.log(
-            'Primary endpoint failed, trying fallback to /api/register'
-          );
-          response = await fetch('/api/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, email, password, birthdate }),
-          });
-          console.log(
-            'Fallback registration response status:',
-            response.status
-          );
-        }
+        console.log('Respuesta del registro:', response.status);
 
         if (!response.ok) {
-          const errorData = await response
-            .json()
-            .catch(() => ({ message: 'Error desconocido' }));
-          console.error('Registration error:', response.status, errorData);
+          const errorData = await response.json().catch(() => ({
+            message: `Error de servidor: ${response.status} ${response.statusText}`,
+          }));
+          console.error('Error de registro:', response.status, errorData);
           throw new Error(
             errorData.message ||
               `Error ${response.status}: ${response.statusText}`
@@ -157,10 +142,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         const data = await response.json();
-        console.log('Registration successful');
+        console.log('Registro exitoso');
         return data;
       } catch (error) {
-        console.error('Error in registration process:', error);
+        console.error('Error en el proceso de registro:', error);
         throw error;
       }
     },

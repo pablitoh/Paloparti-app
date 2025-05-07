@@ -1,17 +1,23 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '../../../../lib/prisma';
-import bcrypt from 'bcryptjs';
-import { signToken } from '../../../../lib/jwt';
 
 /**
- * Endpoint para el registro de nuevos usuarios
- * Este endpoint está diseñado específicamente para funcionar en ambientes desplegados como Vercel
+ * ARCHIVO DEPRECADO - DEBE ELIMINARSE EN FUTURAS VERSIONES
+ *
+ * Este endpoint está deprecado y redirige a /api/register
+ * IMPORTANTE: Se recomienda usar directamente /api/register
+ *
+ * TODO: Eliminar este archivo después de asegurar que todas las referencias
+ * a /api/auth/register han sido actualizadas para usar /api/register
  */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Set CORS headers for all requests
+  console.log(
+    'Request received at deprecated /api/auth/register, redirecting to /api/register'
+  );
+
+  // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader(
@@ -28,87 +34,27 @@ export default async function handler(
     return res.status(200).end();
   }
 
-  // Ensure only POST method is allowed
-  if (req.method !== 'POST') {
-    console.error(`Method ${req.method} not allowed at /api/auth/register`);
-    return res.status(405).json({
-      message: `Method ${req.method} not allowed`,
-    });
-  }
-
   try {
-    console.log('Processing registration request');
-    const { name, email, password, birthdate } = req.body;
-
-    // Log request info in development (not in production)
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('Register request body:', {
-        name,
-        email,
-        hasPassword: !!password,
-        hasBirthdate: !!birthdate,
-      });
-    }
-
-    // Validate input
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: 'Missing required fields' });
-    }
-
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (existingUser) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'El correo electrónico ya está registrado. Por favor, utiliza otro o inicia sesión.',
-        });
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create user with birthdate if provided
-    const userData = {
-      name,
-      email,
-      password: hashedPassword,
-    };
-
-    // Add birthdate if provided (handle as optional)
-    if (birthdate) {
-      try {
-        const birthdateValue = new Date(birthdate);
-        Object.assign(userData, { birthdate: birthdateValue });
-      } catch (err) {
-        console.error('Error parsing birthdate:', err);
-        // Continue without birthdate if there's a parsing error
+    // Redireccionar todas las solicitudes a /api/register
+    const response = await fetch(
+      `${process.env.NEXTAUTH_URL || ''}/api/register`,
+      {
+        method: req.method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body:
+          typeof req.body === 'string' ? req.body : JSON.stringify(req.body),
       }
-    }
+    );
 
-    const user = await prisma.user.create({
-      data: userData,
-    });
-
-    console.log('User created successfully:', user.id);
-
-    // Generate token using the signToken function
-    const token = signToken({ userId: user.id });
-
-    return res.status(201).json({
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-      },
-    });
+    const data = await response.json();
+    return res.status(response.status).json(data);
   } catch (error) {
-    console.error('Error in /api/auth/register/index.ts:', error);
-    return res.status(500).json({ message: 'Internal server error' });
+    console.error('Error in /api/auth/register redirect:', error);
+    return res.status(500).json({
+      message:
+        'Error al redireccionar. Por favor, use /api/register directamente.',
+    });
   }
 }

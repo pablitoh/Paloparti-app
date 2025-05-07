@@ -5,25 +5,42 @@ import type { NextRequest } from 'next/server';
 // Define una función más simple que solo verifica rutas específicas
 // en lugar de bloquear todo por defecto
 export function middleware(request: NextRequest) {
-  // Permitir todas las rutas de API de autenticación y registro
-  if (
-    request.nextUrl.pathname.startsWith('/api/auth') ||
-    request.nextUrl.pathname === '/api/register'
-  ) {
+  // Rutas públicas que no requieren autenticación
+  const publicPaths = [
+    '/api/auth',
+    '/api/register',
+    '/api/healthcheck',
+    '/_next/static',
+    '/_next/image',
+    '/favicon.ico',
+    '/auth/signin',
+    '/register',
+  ];
+
+  // Verificar si es una ruta pública
+  const isPublicPath = publicPaths.some(
+    (path) =>
+      request.nextUrl.pathname.startsWith(path) ||
+      request.nextUrl.pathname === path
+  );
+
+  if (isPublicPath) {
+    console.log(
+      'Middleware: permitiendo acceso a ruta pública:',
+      request.nextUrl.pathname
+    );
     return NextResponse.next();
   }
 
-  // Permitir todas las rutas por defecto
+  // Para todas las demás rutas, permitimos el acceso por defecto
+  // y dejamos que NextAuth se encargue de verificar la autenticación
   return NextResponse.next();
 }
 
 // Configurar las rutas que requieren autenticación
 export const config = {
   matcher: [
-    // Excluir específicamente las rutas de autenticación y registro
-    '/((?!api/auth|api/register|_next/static|_next/image|favicon.ico).*)',
-
-    // Incluir específicamente las rutas protegidas
+    // Rutas protegidas que requieren autenticación
     '/api/groups/:path*',
     '/api/groups/:id*/invite',
     '/api/groups/:id*/leave',
