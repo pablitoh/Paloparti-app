@@ -64,7 +64,10 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.VERCEL_URL
+          ? true
+          : process.env.NODE_ENV === 'production',
+        domain: undefined,
       },
     },
   },
@@ -88,8 +91,6 @@ export const authOptions: NextAuthOptions = {
     signIn: '/auth/signin',
   },
   debug: process.env.NODE_ENV === 'development',
-  // Permite que las cookies funcionen a través de subdominios en producción
-  useSecureCookies: process.env.NODE_ENV === 'production',
 };
 
 export default NextAuth(authOptions);
