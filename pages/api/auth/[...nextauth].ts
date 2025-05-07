@@ -4,6 +4,30 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { prisma } from '../../../lib/prisma';
 import bcrypt from 'bcryptjs';
 
+// Find the appropriate secret from environment variables
+const getAuthSecret = () => {
+  const possibleSecrets = [
+    'NEXTAUTH_SECRET',
+    'paloparti_NEXTAUTH_SECRET',
+    'palopartiprod_NEXTAUTH_SECRET',
+  ];
+
+  for (const secretName of possibleSecrets) {
+    if (process.env[secretName]) {
+      console.log(`Using auth secret from ${secretName}`);
+      return process.env[secretName];
+    }
+  }
+
+  console.warn(
+    'No NEXTAUTH_SECRET found, using a fallback for development only'
+  );
+  // Fallback for development - NOT recommended for production
+  return (
+    process.env.JWT_SECRET || 'INSECURE_AUTH_SECRET_FALLBACK_NOT_FOR_PRODUCTION'
+  );
+};
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -52,7 +76,7 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: getAuthSecret(),
   session: {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 días

@@ -8,6 +8,7 @@ const publicPaths = [
   '/api/healthcheck',
   '/_next/static',
   '/_next/image',
+  '/_next/data',
   '/favicon.ico',
   '/auth/signin',
   '/register',
@@ -46,6 +47,6 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    '/((?!api/register|api/auth|api/healthcheck|_next/static|_next/image|favicon.ico|auth/signin|register).*)',
+    '/((?!api/register|api/auth|api/healthcheck|_next/static|_next/image|_next/data|favicon.ico|auth/signin|register).*)',
   ],
 };

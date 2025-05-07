@@ -96,16 +96,30 @@ export default async function handler(
     console.log('User created successfully:', user.id);
 
     // Generate token using the signToken function
-    const token = signToken({ userId: user.id });
+    try {
+      const token = signToken({ userId: user.id });
 
-    return res.status(201).json({
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-      },
-    });
+      return res.status(201).json({
+        token,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+        },
+      });
+    } catch (jwtError) {
+      console.error('JWT error during signToken:', jwtError);
+      // Still return user data even if token generation fails
+      return res.status(201).json({
+        tokenError:
+          'Error generating authentication token. Please login separately.',
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+        },
+      });
+    }
   } catch (error) {
     console.error('Error in /api/register:', error);
     return res.status(500).json({ message: 'Internal server error' });
