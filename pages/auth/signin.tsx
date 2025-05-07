@@ -9,32 +9,58 @@ import Link from 'next/link';
 // Detectar si estamos en ambiente de Vercel Preview
 const isVercelPreview = process.env.VERCEL_ENV === 'preview';
 
+// Función para limpiar URLs de parámetros de toolbar de Vercel
+function cleanCallbackUrl(url: string): string {
+  try {
+    // Si la URL contiene parámetros de Vercel toolbar, eliminarlos
+    if (url.includes('__vercel_')) {
+      const urlObj = new URL(url, 'https://example.com');
+      // Remover todos los parámetros que empiezan con __vercel_
+      [...urlObj.searchParams.keys()].forEach((key) => {
+        if (key.startsWith('__vercel_')) {
+          urlObj.searchParams.delete(key);
+        }
+      });
+
+      // Retornar solo el pathname y search limpio
+      return urlObj.pathname + (urlObj.search !== '?' ? urlObj.search : '');
+    }
+    return url;
+  } catch (e) {
+    // Si hay algún error, devolver /groups por seguridad
+    return '/groups';
+  }
+}
+
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const session = await getSession(context);
 
-  // En ambientes de preview, forzar callbackUrl a '/groups'
-  const forcedCallbackUrl = isVercelPreview ? '/groups' : undefined;
+  // En ambientes de preview, siempre redirigir a /groups después de login
+  const defaultCallbackUrl = isVercelPreview ? '/groups' : '/groups';
 
-  // Extract the callback URL, con prioridad al forzado para preview
-  const callbackUrl =
-    forcedCallbackUrl ||
-    (context.query.callbackUrl ? String(context.query.callbackUrl) : '/groups');
+  // Obtener y limpiar callbackUrl
+  let rawCallbackUrl = context.query.callbackUrl
+    ? String(context.query.callbackUrl)
+    : defaultCallbackUrl;
 
-  // If requesting /auth/signin with callbackUrl=/auth/signin, break the loop
+  // Limpiar parámetros Vercel toolbar del callbackUrl
+  const callbackUrl = cleanCallbackUrl(rawCallbackUrl);
+
+  // Si es la página de signin, redireccionar a /groups para evitar loops
   if (callbackUrl.includes('/auth/signin')) {
     return {
       props: {
-        callbackUrl: '/groups',
+        callbackUrl: defaultCallbackUrl,
       },
     };
   }
 
-  // Si ya está autenticado, redirigir a la página principal
+  // Si ya está autenticado, redirigir
   if (session) {
     console.log('Session found, redirecting to:', callbackUrl);
     return {
       redirect: {
-        destination: callbackUrl,
+        destination: callbackUrl || defaultCallbackUrl,
         permanent: false,
       },
     };
@@ -42,7 +68,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 
   return {
     props: {
-      callbackUrl,
+      callbackUrl: callbackUrl || defaultCallbackUrl,
       isPreview:
         !!process.env.VERCEL_ENV && process.env.VERCEL_ENV === 'preview',
     },
@@ -64,12 +90,21 @@ export default function SignIn({
   // Al cargar, limpiar cualquier dato de sesión local corrupto
   useEffect(() => {
     if (isPreview) {
-      // En ambientes de preview, podemos intentar limpiar el localStorage
+      // En ambientes de preview, limpiar localStorage y cookies
       try {
+        // Limpiar localStorage
         localStorage.removeItem('next-auth.session-token');
         localStorage.removeItem('next-auth.callback-url');
         localStorage.removeItem('next-auth.csrf-token');
         sessionStorage.clear();
+
+        // Limpiar cookies (estableciéndolas con fecha expirada)
+        document.cookie =
+          'next-auth.session-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        document.cookie =
+          'next-auth.csrf-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        document.cookie =
+          'next-auth.callback-url=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
       } catch (e) {
         // Si hay errores al limpiar, ignoramos
       }
@@ -81,12 +116,14 @@ export default function SignIn({
     setLoading(true);
 
     try {
-      // Ensure we're using a valid callbackUrl that won't cause loops
+      // En preview, siempre usar /groups como callbackUrl
       const safeCallbackUrl = isPreview
-        ? '/groups' // Siempre usar /groups en preview
+        ? '/groups'
         : callbackUrl && callbackUrl !== '/auth/signin'
         ? callbackUrl
         : '/groups';
+
+      console.log('Iniciando sesión con callbackUrl:', safeCallbackUrl);
 
       const result = await signIn('credentials', {
         email,
@@ -98,12 +135,18 @@ export default function SignIn({
       if (result?.error) {
         toast.error(result.error);
       } else if (result?.url) {
-        // En preview, ir directamente a /groups sin importar el resultado
+        console.log(
+          'Redirección después de login a:',
+          isPreview ? '/groups' : result.url
+        );
+
+        // En preview, siempre ir a /groups
         if (isPreview) {
           router.replace('/groups');
         } else {
-          // Use router.replace instead of push to avoid adding to history stack
-          router.replace(result.url);
+          // Limpiar la URL antes de redireccionar
+          const cleanUrl = cleanCallbackUrl(result.url);
+          router.replace(cleanUrl);
         }
       }
     } catch (error) {
@@ -124,7 +167,7 @@ export default function SignIn({
             </h2>
             {isPreview && (
               <p className='mt-2 text-center text-sm text-orange-600'>
-                Ambiente de Preview - Credenciales de prueba habilitadas
+                Ambiente de Preview - Autenticación simplificada
               </p>
             )}
           </div>

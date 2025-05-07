@@ -7,6 +7,29 @@ import bcrypt from 'bcryptjs';
 // Detectar si estamos en un ambiente de preview de Vercel
 const isVercelPreview = process.env.VERCEL_ENV === 'preview';
 
+// Función para limpiar URLs de Vercel toolbar
+function cleanVercelParams(url: string) {
+  try {
+    if (url.includes('__vercel_')) {
+      const urlObj = new URL(
+        url.startsWith('http') ? url : `https://example.com${url}`
+      );
+      [...urlObj.searchParams.keys()].forEach((key) => {
+        if (key.startsWith('__vercel_')) {
+          urlObj.searchParams.delete(key);
+        }
+      });
+
+      return url.startsWith('http')
+        ? urlObj.toString()
+        : urlObj.pathname + (urlObj.search !== '?' ? urlObj.search : '');
+    }
+    return url;
+  } catch (e) {
+    return url;
+  }
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -102,14 +125,21 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
-    // Forzar a que el callback siempre vaya a /groups en preview
+    // Limpiar URLs de parámetros del Vercel toolbar
     async redirect({ url, baseUrl }) {
-      // En ambientes de preview, siempre redirigir a /groups
+      // Limpiar parámetros del Vercel toolbar
+      const cleanedUrl = cleanVercelParams(url);
+
+      // En preview, siempre ir a /groups
       if (isVercelPreview) {
+        console.log('Preview environment - redirecting to /groups');
         return `${baseUrl}/groups`;
       }
-      // Para otros ambientes, mantener el comportamiento normal
-      return url.startsWith(baseUrl) ? url : baseUrl;
+
+      // Para otros ambientes, usar la URL limpia
+      if (cleanedUrl.startsWith(baseUrl)) return cleanedUrl;
+      if (cleanedUrl.startsWith('/')) return `${baseUrl}${cleanedUrl}`;
+      return baseUrl;
     },
   },
   pages: {
