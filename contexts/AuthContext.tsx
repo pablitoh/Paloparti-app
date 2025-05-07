@@ -93,10 +93,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result?.error) {
         throw new Error(result.error);
       }
+
+      // Wait for session to be available before returning
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
       return result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user'] });
+    onSuccess: (result) => {
+      // After successful login, manually navigate to the target URL
+      // rather than relying on Next-Auth's built-in redirects
+      if (result?.url) {
+        queryClient.invalidateQueries({ queryKey: ['user'] });
+        router.replace(result.url);
+      }
     },
     onError: (error: Error) => {
       console.error('Error signing in:', error);

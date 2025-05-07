@@ -32,6 +32,12 @@ function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
   // Forzar invalidación de todas las consultas en cambios de ruta
   useEffect(() => {
     const handleRouteChange = (url: string) => {
+      // Skip invalidation for auth-related redirects to prevent loop
+      if (url.includes('/auth/signin') || url.includes('/register')) {
+        console.log('Skipping invalidation for auth route:', url);
+        return;
+      }
+
       console.log('Invalidando consultas relevantes en cambio de ruta a:', url);
       // Solo invalidar las consultas activas en lugar de limpiar toda la caché
       queryClient.invalidateQueries({
@@ -52,9 +58,10 @@ function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
     <QueryClientProvider client={queryClient}>
       <SessionProvider
         session={session}
-        // Add a short refetchInterval to prevent stale sessions
-        refetchInterval={5 * 60} // 5 minutes in seconds
+        // Set a very short refetchInterval to handle auth state changes quickly
+        refetchInterval={30} // 30 seconds - more aggressive session polling
         refetchOnWindowFocus={true}
+        refetchWhenOffline={false} // Don't attempt to refetch when offline
       >
         <AuthProvider>
           <Component {...pageProps} key={router.asPath} />

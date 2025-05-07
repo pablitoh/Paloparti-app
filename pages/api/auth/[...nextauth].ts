@@ -89,7 +89,22 @@ export const authOptions: NextAuthOptions = {
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
+        domain:
+          process.env.NODE_ENV === 'production'
+            ? '.vercel.app' // This enables cookies across subdomains in production
+            : undefined,
       },
+    },
+  },
+  logger: {
+    error(code, metadata) {
+      console.error(`Auth error: ${code}`, metadata);
+    },
+    warn(code) {
+      console.warn(`Auth warning: ${code}`);
+    },
+    debug(code, metadata) {
+      console.log(`Auth debug: ${code}`, metadata);
     },
   },
   callbacks: {

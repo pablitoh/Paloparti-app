@@ -9,11 +9,26 @@ import Link from 'next/link';
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const session = await getSession(context);
 
+  // Extract the callback URL, ensure it's not the signin page itself
+  const callbackUrl = context.query.callbackUrl
+    ? String(context.query.callbackUrl)
+    : '/groups';
+
+  // If requesting /auth/signin with callbackUrl=/auth/signin, break the loop
+  if (callbackUrl.includes('/auth/signin')) {
+    return {
+      props: {
+        callbackUrl: '/groups',
+      },
+    };
+  }
+
   // Si ya está autenticado, redirigir a la página principal
   if (session) {
+    console.log('Session found, redirecting to:', callbackUrl);
     return {
       redirect: {
-        destination: '/groups',
+        destination: callbackUrl,
         permanent: false,
       },
     };
@@ -21,7 +36,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 
   return {
     props: {
-      callbackUrl: context.query.callbackUrl || '/groups',
+      callbackUrl,
     },
   };
 };
