@@ -129,10 +129,10 @@ export default async function handler(
       console.log('Found groups count:', groups.length);
       console.log('First group (if any):', groups[0] ? groups[0].id : 'None');
 
-      const formattedGroups = groups.map((group) => {
+      const formattedGroups = groups.map((group: (typeof groups)[0]) => {
         // Buscar el miembro actual para obtener su estado
         const currentUserMember = group.members.find(
-          (member) => member.userId === userId
+          (member: (typeof group.members)[0]) => member.userId === userId
         );
 
         return {
@@ -141,7 +141,7 @@ export default async function handler(
           description: group.description,
           sport: group.sport,
           location: group.location,
-          members: group.members.map((member) => ({
+          members: group.members.map((member: (typeof group.members)[0]) => ({
             id: member.user.id,
             name: member.user.name,
             avatar: member.user.image,

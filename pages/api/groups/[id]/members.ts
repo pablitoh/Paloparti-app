@@ -70,9 +70,10 @@ export default async function handler(
     // Separar miembros activos y pendientes
     const activeMembers = members
       .filter(
-        (member) => member.status === 'ACTIVE' || member.status === 'CONFIRMED'
+        (member: (typeof members)[0]) =>
+          member.status === 'ACTIVE' || member.status === 'CONFIRMED'
       )
-      .map((member) => ({
+      .map((member: (typeof members)[0]) => ({
         id: member.id,
         userId: member.userId,
         name: member.user.name,
@@ -85,8 +86,8 @@ export default async function handler(
 
     const pendingMembers = isAdmin
       ? members
-          .filter((member) => member.status === 'PENDING')
-          .map((member) => ({
+          .filter((member: (typeof members)[0]) => member.status === 'PENDING')
+          .map((member: (typeof members)[0]) => ({
             id: member.id,
             userId: member.userId,
             name: member.user.name,

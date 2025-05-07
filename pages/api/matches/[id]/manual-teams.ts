@@ -59,7 +59,7 @@ export default async function handler(
 
     // Prepare teams with TBD players if needed
     const prepareTeam = (team: any[], isTeamA: boolean) => {
-      const currentPlayers = team.map((player) => ({
+      const currentPlayers = team.map((player: any) => ({
         id: player.id,
         name: player.name,
         avatar: player.avatar,
@@ -93,18 +93,22 @@ export default async function handler(
     });
 
     // Create new match players for non-TBD players
-    const realPlayersA = finalTeamA.filter((p) => !p.id.startsWith('tbd-'));
-    const realPlayersB = finalTeamB.filter((p) => !p.id.startsWith('tbd-'));
+    const realPlayersA = finalTeamA.filter(
+      (p: any) => !p.id.startsWith('tbd-')
+    );
+    const realPlayersB = finalTeamB.filter(
+      (p: any) => !p.id.startsWith('tbd-')
+    );
 
     // Create matchPlayer records for each real player
     await prisma.matchPlayer.createMany({
       data: [
-        ...realPlayersA.map((player) => ({
+        ...realPlayersA.map((player: any) => ({
           userId: player.id,
           matchId: matchId as string,
           isTeamA: true,
         })),
-        ...realPlayersB.map((player) => ({
+        ...realPlayersB.map((player: any) => ({
           userId: player.id,
           matchId: matchId as string,
           isTeamA: false,
@@ -116,8 +120,8 @@ export default async function handler(
     // This format is consistent with what the frontend expects
     const tbdPlayersArray = [
       ...finalTeamA
-        .filter((p) => p.id.startsWith('tbd-'))
-        .map((p) => ({
+        .filter((p: any) => p.id.startsWith('tbd-'))
+        .map((p: any) => ({
           id: p.id,
           name: p.name || 'A determinar',
           avatar: p.avatar || null,
@@ -125,8 +129,8 @@ export default async function handler(
           isTeamA: true,
         })),
       ...finalTeamB
-        .filter((p) => p.id.startsWith('tbd-'))
-        .map((p) => ({
+        .filter((p: any) => p.id.startsWith('tbd-'))
+        .map((p: any) => ({
           id: p.id,
           name: p.name || 'A determinar',
           avatar: p.avatar || null,
@@ -169,25 +173,33 @@ export default async function handler(
     });
 
     // Format the player data for team A and B
-    const formattedTeamA = teamAPlayersWithDetails.map((player) => ({
-      id: player.user.id,
-      name: player.user.name,
-      avatar: player.user.image,
-      playerType: 'TEAM',
-      isTeamA: true,
-    }));
+    const formattedTeamA = teamAPlayersWithDetails.map(
+      (player: (typeof teamAPlayersWithDetails)[0]) => ({
+        id: player.user.id,
+        name: player.user.name,
+        avatar: player.user.image,
+        playerType: 'TEAM',
+        isTeamA: true,
+      })
+    );
 
-    const formattedTeamB = teamBPlayersWithDetails.map((player) => ({
-      id: player.user.id,
-      name: player.user.name,
-      avatar: player.user.image,
-      playerType: 'TEAM',
-      isTeamA: false,
-    }));
+    const formattedTeamB = teamBPlayersWithDetails.map(
+      (player: (typeof teamBPlayersWithDetails)[0]) => ({
+        id: player.user.id,
+        name: player.user.name,
+        avatar: player.user.image,
+        playerType: 'TEAM',
+        isTeamA: false,
+      })
+    );
 
     // Get the TBD players for each team from the array
-    const tbdPlayersTeamA = tbdPlayersArray.filter((p) => p.isTeamA === true);
-    const tbdPlayersTeamB = tbdPlayersArray.filter((p) => p.isTeamA === false);
+    const tbdPlayersTeamA = tbdPlayersArray.filter(
+      (p: any) => p.isTeamA === true
+    );
+    const tbdPlayersTeamB = tbdPlayersArray.filter(
+      (p: any) => p.isTeamA === false
+    );
 
     // Update the match with all the data
     const updatedMatch = await prisma.match.update({

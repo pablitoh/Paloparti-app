@@ -122,8 +122,11 @@ export default async function handler(
 
     // Procesar los datos del partido
     const confirmedPlayers = match.attendance
-      .filter((attendance) => attendance.status === 'CONFIRMED')
-      .map((attendance) => ({
+      .filter(
+        (attendance: (typeof match.attendance)[0]) =>
+          attendance.status === 'CONFIRMED'
+      )
+      .map((attendance: (typeof match.attendance)[0]) => ({
         id: attendance.userId,
         name: attendance.user?.name || null,
         avatar: attendance.user?.image || null,
@@ -131,14 +134,15 @@ export default async function handler(
 
     // Obtener la asistencia del usuario actual
     const userAttendance = match.attendance.find(
-      (attendance) => attendance.userId === session.user.id
+      (attendance: (typeof match.attendance)[0]) =>
+        attendance.userId === session.user.id
     );
 
     // Formatear la respuesta
     // Usar matchPlayers para obtener los jugadores de cada equipo
     const teamAPlayers = (match.matchPlayers as any[])
-      .filter((player) => player.isTeamA)
-      .map((player) => ({
+      .filter((player: any) => player.isTeamA)
+      .map((player: any) => ({
         id: player.userId,
         name: player.user?.name || null,
         avatar: player.user?.image || null,
@@ -146,8 +150,8 @@ export default async function handler(
       }));
 
     const teamBPlayers = (match.matchPlayers as any[])
-      .filter((player) => !player.isTeamA)
-      .map((player) => ({
+      .filter((player: any) => !player.isTeamA)
+      .map((player: any) => ({
         id: player.userId,
         name: player.user?.name || null,
         avatar: player.user?.image || null,

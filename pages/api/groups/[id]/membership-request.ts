@@ -48,7 +48,8 @@ export default async function handler(
 
     // Verificar si el usuario actual es administrador del grupo
     const adminMembership = group.members.find(
-      (member) => member.userId === user.id && member.role === 'ADMIN'
+      (member: (typeof group.members)[0]) =>
+        member.userId === user.id && member.role === 'ADMIN'
     );
     const isCreator = group.createdBy === user.id;
 

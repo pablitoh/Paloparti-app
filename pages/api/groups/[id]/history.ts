@@ -89,21 +89,23 @@ export default async function handler(
     });
 
     // Procesar los datos para el formato requerido por el frontend
-    const formattedMatches = matches.map((match) => {
+    const formattedMatches = matches.map((match: (typeof matches)[0]) => {
       // Procesar los goles para incluir información del jugador
-      const processedGoals = match.goals.map((goal) => ({
-        id: goal.id,
-        isTeamA: goal.isTeamA,
-        scorerId: goal.scorer.id,
-        scorerName: goal.scorer.name,
-        scorerAvatar: goal.scorer.image,
-        minute: goal.minute || undefined,
-      }));
+      const processedGoals = match.goals.map(
+        (goal: (typeof match.goals)[0]) => ({
+          id: goal.id,
+          isTeamA: goal.isTeamA,
+          scorerId: goal.scorer.id,
+          scorerName: goal.scorer.name,
+          scorerAvatar: goal.scorer.image,
+          minute: goal.minute || undefined,
+        })
+      );
 
       // Separar jugadores en equipos A y B basados en isTeamA
       const teamAPlayers = (match.matchPlayers as any[])
-        .filter((player) => player.isTeamA)
-        .map((player) => ({
+        .filter((player: any) => player.isTeamA)
+        .map((player: any) => ({
           id: player.userId,
           name: player.user?.name || null,
           avatar: player.user?.image || null,
@@ -112,8 +114,8 @@ export default async function handler(
         }));
 
       const teamBPlayers = (match.matchPlayers as any[])
-        .filter((player) => !player.isTeamA)
-        .map((player) => ({
+        .filter((player: any) => !player.isTeamA)
+        .map((player: any) => ({
           id: player.userId,
           name: player.user?.name || null,
           avatar: player.user?.image || null,

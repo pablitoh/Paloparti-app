@@ -66,7 +66,7 @@ export default async function handler(
 
       // Filtrar manualmente para encontrar partidos pendientes
       const pendingMatches = existingMatches.filter(
-        (m) => m.status === 'PENDING'
+        (m: (typeof existingMatches)[0]) => m.status === 'PENDING'
       );
 
       if (pendingMatches.length > 0) {
@@ -119,12 +119,12 @@ export default async function handler(
 
     // Extraer solo los IDs de usuarios que han confirmado asistencia
     const confirmedUserIds = confirmedAttendees.map(
-      (attendee) => attendee.userId
+      (attendee: (typeof confirmedAttendees)[0]) => attendee.userId
     );
 
     // Filtrar miembros que han confirmado asistencia
-    const membersWithConfirmedAttendance = members.filter((member) =>
-      confirmedUserIds.includes(member.user.id)
+    const membersWithConfirmedAttendance = members.filter(
+      (member: (typeof members)[0]) => confirmedUserIds.includes(member.user.id)
     );
 
     if (membersWithConfirmedAttendance.length < 2) {
@@ -142,7 +142,7 @@ export default async function handler(
 
     // Mapear miembros con sus datos
     const mappedMembers: Member[] = membersWithConfirmedAttendance.map(
-      (member) => ({
+      (member: (typeof membersWithConfirmedAttendance)[0]) => ({
         id: member.user.id,
         name: member.user.name,
         birthdate: member.user.birthdate,
@@ -203,7 +203,7 @@ export default async function handler(
 
     // Calcular edad promedio por equipo
     const calculateAverageAge = (team: Member[]): number => {
-      const membersWithAge = team.filter((m) => m.age !== null);
+      const membersWithAge = team.filter((m: Member) => m.age !== null);
       if (membersWithAge.length === 0) return 0;
 
       const sum = membersWithAge.reduce(

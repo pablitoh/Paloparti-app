@@ -99,7 +99,8 @@ export default async function handler(
 
       // Check if the current user is an admin
       const isAdmin = match.group.members.some(
-        (member) => member.userId === userId && member.role === 'ADMIN'
+        (member: (typeof match.group.members)[0]) =>
+          member.userId === userId && member.role === 'ADMIN'
       );
 
       // Solo devolver matchPlayers y no separar en playersA y playersB
@@ -246,24 +247,26 @@ export default async function handler(
       // Log match completion
       if (isCompletingMatch) {
         // Obtener los goles para el log
-        const goalsList = updatedMatch.goals.map((goal) => ({
-          scorerId: goal.scorer.id,
-          scorerName: goal.scorer.name || 'Jugador',
-          minute: goal.minute,
-          isTeamA: goal.isTeamA,
-        }));
+        const goalsList = updatedMatch.goals.map(
+          (goal: (typeof updatedMatch.goals)[0]) => ({
+            scorerId: goal.scorer.id,
+            scorerName: goal.scorer.name || 'Jugador',
+            minute: goal.minute,
+            isTeamA: goal.isTeamA,
+          })
+        );
 
         // Obtener información de los equipos
         const teamAPlayers = updatedMatch.matchPlayers
-          .filter((p: any) => p.isTeamA)
-          .map((p: any) => ({
+          .filter((p: (typeof updatedMatch.matchPlayers)[0]) => p.isTeamA)
+          .map((p: (typeof updatedMatch.matchPlayers)[0]) => ({
             id: p.userId,
             name: p.user.name,
           }));
 
         const teamBPlayers = updatedMatch.matchPlayers
-          .filter((p: any) => !p.isTeamA)
-          .map((p: any) => ({
+          .filter((p: (typeof updatedMatch.matchPlayers)[0]) => !p.isTeamA)
+          .map((p: (typeof updatedMatch.matchPlayers)[0]) => ({
             id: p.userId,
             name: p.user.name,
           }));
@@ -331,7 +334,8 @@ export default async function handler(
 
       // Verificar si el usuario es admin
       const isAdmin = match.group.members.some(
-        (member) => member.userId === userId && member.role === 'ADMIN'
+        (member: (typeof match.group.members)[0]) =>
+          member.userId === userId && member.role === 'ADMIN'
       );
 
       if (!isAdmin) {
@@ -354,15 +358,15 @@ export default async function handler(
       });
 
       const teamAPlayers = matchPlayers
-        .filter((p) => p.isTeamA)
-        .map((p) => ({
+        .filter((p: (typeof matchPlayers)[0]) => p.isTeamA)
+        .map((p: (typeof matchPlayers)[0]) => ({
           id: p.userId,
           name: p.user.name,
         }));
 
       const teamBPlayers = matchPlayers
-        .filter((p) => !p.isTeamA)
-        .map((p) => ({
+        .filter((p: (typeof matchPlayers)[0]) => !p.isTeamA)
+        .map((p: (typeof matchPlayers)[0]) => ({
           id: p.userId,
           name: p.user.name,
         }));

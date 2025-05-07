@@ -358,17 +358,21 @@ export default async function handler(
           });
 
           // Map the players to the expected format
-          const mappedPlayersA = teamAPlayers.map((player) => ({
-            id: player.userId,
-            name: player.user?.name || 'Unknown',
-            avatar: player.user?.image,
-          }));
+          const mappedPlayersA = teamAPlayers.map(
+            (player: (typeof teamAPlayers)[0]) => ({
+              id: player.userId,
+              name: player.user?.name || 'Unknown',
+              avatar: player.user?.image,
+            })
+          );
 
-          const mappedPlayersB = teamBPlayers.map((player) => ({
-            id: player.userId,
-            name: player.user?.name || 'Unknown',
-            avatar: player.user?.image,
-          }));
+          const mappedPlayersB = teamBPlayers.map(
+            (player: (typeof teamBPlayers)[0]) => ({
+              id: player.userId,
+              name: player.user?.name || 'Unknown',
+              avatar: player.user?.image,
+            })
+          );
 
           // Include the updated team data in the response
           return res.status(200).json({

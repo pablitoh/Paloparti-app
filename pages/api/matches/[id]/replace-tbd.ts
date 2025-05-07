@@ -64,7 +64,8 @@ export default async function handler(
     // Verificar que el usuario es admin del grupo o el usuario que está reemplazando
     const isAdminOrSelf =
       match.group.members.some(
-        (member) => member.userId === user.id && member.role === 'ADMIN'
+        (member: (typeof match.group.members)[0]) =>
+          member.userId === user.id && member.role === 'ADMIN'
       ) || user.id === userId;
 
     if (!isAdminOrSelf) {
@@ -112,7 +113,7 @@ export default async function handler(
 
     // Find the TBD player in the appropriate team
     const tbdPlayerIndex = tbdPlayers[tbdTeam].findIndex(
-      (player) => player.id === tbdPlayerId
+      (player: TbdPlayer) => player.id === tbdPlayerId
     );
 
     if (tbdPlayerIndex === -1) {
@@ -121,7 +122,7 @@ export default async function handler(
 
     // Verify the user is a member of the group
     const isMember = match.group.members.some(
-      (member) => member.userId === userId
+      (member: (typeof match.group.members)[0]) => member.userId === userId
     );
 
     if (!isMember) {
@@ -148,7 +149,7 @@ export default async function handler(
     const updatedTbdPlayers = {
       ...tbdPlayers,
       [tbdTeam]: tbdPlayers[tbdTeam].filter(
-        (player) => player.id !== tbdPlayerId
+        (player: TbdPlayer) => player.id !== tbdPlayerId
       ),
     };
 

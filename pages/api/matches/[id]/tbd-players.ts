@@ -83,7 +83,7 @@ export default async function handler(
 
     // Verificar permisos
     const isGroupMember = match.group.members.some(
-      (member) => member.userId === user.id
+      (member: (typeof match.group.members)[0]) => member.userId === user.id
     );
 
     if (!isGroupMember) {
@@ -108,10 +108,10 @@ export default async function handler(
             // If it's an array, separate by team
             existingTbdPlayers = {
               teamA: tbdData
-                .filter((p) => p.isTeamA)
+                .filter((p: TbdPlayer) => p.isTeamA)
                 .map((p: TbdPlayer) => ({ ...p, playerType: 'TBD' })),
               teamB: tbdData
-                .filter((p) => !p.isTeamA)
+                .filter((p: TbdPlayer) => !p.isTeamA)
                 .map((p: TbdPlayer) => ({ ...p, playerType: 'TBD' })),
             };
           } else if (tbdData.teamA || tbdData.teamB) {
@@ -148,7 +148,8 @@ export default async function handler(
 
     // Para solicitudes POST - Verificar que el usuario es admin del grupo
     const isAdmin = match.group.members.some(
-      (member) => member.userId === user.id && member.role === 'ADMIN'
+      (member: (typeof match.group.members)[0]) =>
+        member.userId === user.id && member.role === 'ADMIN'
     );
 
     if (!isAdmin) {
@@ -224,10 +225,10 @@ export default async function handler(
           // If it's an array, separate by team
           existingTbdPlayers = {
             teamA: tbdData
-              .filter((p) => p.isTeamA)
+              .filter((p: TbdPlayer) => p.isTeamA)
               .map((p: TbdPlayer) => ({ ...p, playerType: 'TBD' })),
             teamB: tbdData
-              .filter((p) => !p.isTeamA)
+              .filter((p: TbdPlayer) => !p.isTeamA)
               .map((p: TbdPlayer) => ({ ...p, playerType: 'TBD' })),
           };
         } else if (tbdData.teamA || tbdData.teamB) {
@@ -259,9 +260,11 @@ export default async function handler(
     }
 
     // Separar los nuevos TBD players por equipo
-    const teamATbdPlayers = parsedTbdPlayers.filter((player) => player.isTeamA);
+    const teamATbdPlayers = parsedTbdPlayers.filter(
+      (player: TbdPlayer) => player.isTeamA
+    );
     const teamBTbdPlayers = parsedTbdPlayers.filter(
-      (player) => !player.isTeamA
+      (player: TbdPlayer) => !player.isTeamA
     );
 
     // Actualizar los TBD players en la base de datos
@@ -317,11 +320,13 @@ export default async function handler(
     const enhancedMatch = updatedMatch
       ? {
           ...updatedMatch,
-          playersB: teamBPlayersQuery.map((player) => ({
-            id: player.userId,
-            matchId: player.matchId,
-            user: player.user,
-          })),
+          playersB: teamBPlayersQuery.map(
+            (player: (typeof teamBPlayersQuery)[0]) => ({
+              id: player.userId,
+              matchId: player.matchId,
+              user: player.user,
+            })
+          ),
         }
       : null;
 

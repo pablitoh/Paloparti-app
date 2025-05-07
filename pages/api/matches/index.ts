@@ -26,7 +26,9 @@ export default async function handler(
         },
       });
 
-      const userGroupIds = userGroups.map((ug) => ug.groupId);
+      const userGroupIds = userGroups.map(
+        (ug: (typeof userGroups)[0]) => ug.groupId
+      );
 
       if (groupId && typeof groupId === 'string') {
         if (!userGroupIds.includes(groupId)) {
@@ -119,11 +121,13 @@ export default async function handler(
       // Create MatchPlayer records if players array is provided
       if (players && Array.isArray(players)) {
         // Filter out placeholder players that shouldn't be created in the database
-        const realPlayers = players.filter((player) => !player.isPlaceholder);
+        const realPlayers = players.filter(
+          (player: any) => !player.isPlaceholder
+        );
 
         if (realPlayers.length > 0) {
           await Promise.all(
-            realPlayers.map((player) =>
+            realPlayers.map((player: any) =>
               prisma.matchPlayer.create({
                 data: {
                   matchId: match.id,

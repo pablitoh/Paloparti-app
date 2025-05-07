@@ -55,7 +55,7 @@ export default async function handler(
 
     // Verify user is a member with appropriate access
     const userMembership = match.group.members.find(
-      (member) => member.userId === user.id
+      (member: (typeof match.group.members)[0]) => member.userId === user.id
     );
 
     if (!userMembership) {

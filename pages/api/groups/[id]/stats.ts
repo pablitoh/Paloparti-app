@@ -82,10 +82,10 @@ export default async function handler(
     > = {};
 
     // Para cada partido completado
-    completedMatches.forEach((match) => {
+    completedMatches.forEach((match: (typeof completedMatches)[0]) => {
       // Registrar goles
       if (match.goals && match.goals.length > 0) {
-        match.goals.forEach((goal) => {
+        match.goals.forEach((goal: (typeof match.goals)[0]) => {
           const scorerId = goal.scorer.id;
 
           if (!goalsCount[scorerId]) {
@@ -108,8 +108,8 @@ export default async function handler(
       // const teamBPlayers = match.playersA.filter((player) => !player.isTeamA);
 
       const teamAPlayers = (match.matchPlayers as any[])
-        .filter((player) => player.isTeamA)
-        .map((player) => ({
+        .filter((player: any) => player.isTeamA)
+        .map((player: any) => ({
           id: player.userId,
           name: player.user?.name || null,
           avatar: player.user?.image || null,
@@ -117,8 +117,8 @@ export default async function handler(
         }));
 
       const teamBPlayers = (match.matchPlayers as any[])
-        .filter((player) => !player.isTeamA)
-        .map((player) => ({
+        .filter((player: any) => !player.isTeamA)
+        .map((player: any) => ({
           id: player.userId,
           name: player.user?.name || null,
           avatar: player.user?.image || null,
@@ -127,7 +127,7 @@ export default async function handler(
 
       // Registrar victorias y partidos para jugadores del Equipo A
       if (teamAPlayers) {
-        teamAPlayers.forEach((player) => {
+        teamAPlayers.forEach((player: (typeof teamAPlayers)[0]) => {
           const playerId = player.id;
           if (!playerStats[playerId]) {
             playerStats[playerId] = {
@@ -145,7 +145,7 @@ export default async function handler(
 
       // Registrar victorias y partidos para jugadores del Equipo B
       if (teamBPlayers) {
-        teamBPlayers.forEach((player) => {
+        teamBPlayers.forEach((player: (typeof teamBPlayers)[0]) => {
           const playerId = player.id;
           if (!playerStats[playerId]) {
             playerStats[playerId] = {
@@ -180,7 +180,15 @@ export default async function handler(
         matchesPlayed: data.matches,
         avatar: data.avatar,
       }))
-      .filter((player) => player.matchesPlayed >= 3) // Solo jugadores con al menos 3 partidos
+      .filter(
+        (player: {
+          id: string;
+          name: string;
+          winRate: number;
+          matchesPlayed: number;
+          avatar: string | null;
+        }) => player.matchesPlayed >= 3
+      ) // Solo jugadores con al menos 3 partidos
       .sort((a, b) => b.winRate - a.winRate);
 
     return res.status(200).json({

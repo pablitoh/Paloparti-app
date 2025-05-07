@@ -55,7 +55,9 @@ export default async function handler(
         where: { id: groupId },
         select: { createdBy: true },
       })
-      .then((group) => group?.createdBy === user.id);
+      .then(
+        (group: { createdBy: string } | null) => group?.createdBy === user.id
+      );
 
     if (!adminMembership && !isCreator) {
       return res.status(403).json({
