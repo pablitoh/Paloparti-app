@@ -118,18 +118,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password: string;
       birthdate: string;
     }) => {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, birthdate }),
-      });
+      try {
+        console.log('Initiating registration request to /api/auth/register');
+        let response = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password, birthdate }),
+        });
 
-      if (!response.ok) {
+        // Log detailed response information for debugging
+        console.log('Registration response status:', response.status);
+
+        // If primary endpoint fails with 404 or 405, try fallback
+        if (response.status === 404 || response.status === 405) {
+          console.log(
+            'Primary endpoint failed, trying fallback to /api/register'
+          );
+          response = await fetch('/api/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, password, birthdate }),
+          });
+          console.log(
+            'Fallback registration response status:',
+            response.status
+          );
+        }
+
+        if (!response.ok) {
+          const errorData = await response
+            .json()
+            .catch(() => ({ message: 'Error desconocido' }));
+          console.error('Registration error:', response.status, errorData);
+          throw new Error(
+            errorData.message ||
+              `Error ${response.status}: ${response.statusText}`
+          );
+        }
+
         const data = await response.json();
-        throw new Error(data.message || 'Error creating account');
+        console.log('Registration successful');
+        return data;
+      } catch (error) {
+        console.error('Error in registration process:', error);
+        throw error;
       }
-
-      return response.json();
     },
     onSuccess: async (_, variables) => {
       // Auto-login después del registro

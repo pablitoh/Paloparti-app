@@ -9,7 +9,9 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const { data: session } = useSession();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const mobileDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -18,6 +20,12 @@ export default function Layout({ children }: LayoutProps) {
         !dropdownRef.current.contains(event.target as Node)
       ) {
         setDropdownOpen(false);
+      }
+      if (
+        mobileDropdownRef.current &&
+        !mobileDropdownRef.current.contains(event.target as Node)
+      ) {
+        setMobileMenuOpen(false);
       }
     };
 
@@ -47,6 +55,74 @@ export default function Layout({ children }: LayoutProps) {
                 </Link>
               </div>
             </div>
+
+            {/* Mobile menu - visible on small screens only */}
+            <div className='sm:hidden flex items-center'>
+              {session?.user ? (
+                <div className='relative' ref={mobileDropdownRef}>
+                  <button
+                    className='flex items-center space-x-1 focus:outline-none'
+                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  >
+                    <img
+                      src={
+                        session.user.image ||
+                        getAvatarUrl(session.user.name || '')
+                      }
+                      alt={session.user.name || ''}
+                      className='h-8 w-8 rounded-full'
+                    />
+                    <svg
+                      className='w-4 h-4 text-gray-500'
+                      fill='none'
+                      stroke='currentColor'
+                      viewBox='0 0 24 24'
+                      xmlns='http://www.w3.org/2000/svg'
+                    >
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        strokeWidth='2'
+                        d={mobileMenuOpen ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'}
+                      />
+                    </svg>
+                  </button>
+
+                  {mobileMenuOpen && (
+                    <div className='absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10'>
+                      <div className='px-4 py-2 text-sm font-medium text-gray-800 border-b border-gray-100'>
+                        {session.user.name}
+                      </div>
+                      <Link
+                        href='/profile'
+                        className='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100'
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Perfil
+                      </Link>
+                      <button
+                        onClick={() => {
+                          signOut();
+                          setMobileMenuOpen(false);
+                        }}
+                        className='block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100'
+                      >
+                        Cerrar sesión
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link
+                  href='/auth/signin'
+                  className='bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700'
+                >
+                  Iniciar sesión
+                </Link>
+              )}
+            </div>
+
+            {/* Desktop menu - hidden on small screens */}
             <div className='hidden sm:ml-6 sm:flex sm:items-center'>
               {session?.user ? (
                 <div className='relative' ref={dropdownRef}>

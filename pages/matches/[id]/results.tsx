@@ -340,36 +340,36 @@ export default function MatchResults({
 
     console.log(`Adding goal for Team A player ${playerId}`);
 
-    // Only add goal if current total is less than the score
-    if (goalsA.length < scoreA) {
-      const player = match.matchPlayers.find(
-        (p) => p.user.id === playerId
-      )?.user;
+    // Verificar que no se excedan los goles permitidos por el contador global
+    if (goalsA.length >= scoreA) {
+      toast.error('No puedes asignar más goles que el total del marcador');
+      return;
+    }
 
-      if (player) {
-        console.log(`Found player for Team A: ${player.name}`);
+    const player = match.matchPlayers.find((p) => p.user.id === playerId)?.user;
 
-        const newGoal: Goal = {
-          id: `temp-${Date.now()}-${playerId}`,
-          userId: playerId,
-          scorerId: playerId,
-          isTeamA: true,
-          minute: null,
-          scorerName: player.name || null,
-          scorerAvatar: player.image || null,
-          scorer: player,
-        };
+    if (player) {
+      console.log(`Found player for Team A: ${player.name}`);
 
-        const updatedGoals = [...goalsA, newGoal];
-        console.log(`Team A goals updated: ${updatedGoals.length} goals`);
-        setGoalsA(updatedGoals);
-      } else {
-        console.warn(`Player not found for Team A with ID: ${playerId}`);
-      }
+      const newGoal: Goal = {
+        id: `temp-${Date.now()}-${playerId}`,
+        userId: playerId,
+        scorerId: playerId,
+        isTeamA: true,
+        minute: null,
+        scorerName: player.name || null,
+        scorerAvatar: player.image || null,
+        scorer: player,
+      };
+
+      const updatedGoals = [...goalsA, newGoal];
+      console.log(`Team A goals updated: ${updatedGoals.length} goals`);
+      setGoalsA(updatedGoals);
+
+      // Ya no incrementamos el contador global aquí, porque solo estamos
+      // asignando goles que ya están contabilizados en el marcador
     } else {
-      console.warn(
-        `Cannot add more goals: scoreA (${scoreA}) <= goalsA.length (${goalsA.length})`
-      );
+      console.warn(`Player not found for Team A with ID: ${playerId}`);
     }
   };
 
@@ -379,36 +379,38 @@ export default function MatchResults({
 
     console.log(`Adding goal for Team B player ${playerId}`);
 
-    // Only add goal if current total is less than the score
-    if (goalsB.length < scoreB) {
-      const player = match.matchPlayers.find(
-        (p) => p.user.id === playerId && !p.isTeamA
-      )?.user;
+    // Verificar que no se excedan los goles permitidos por el contador global
+    if (goalsB.length >= scoreB) {
+      toast.error('No puedes asignar más goles que el total del marcador');
+      return;
+    }
 
-      if (player) {
-        console.log(`Found player for Team B: ${player.name}`);
+    const player = match.matchPlayers.find(
+      (p) => p.user.id === playerId && !p.isTeamA
+    )?.user;
 
-        const newGoal: Goal = {
-          id: `temp-${Date.now()}-${playerId}`,
-          userId: playerId,
-          scorerId: playerId,
-          isTeamA: false,
-          minute: null,
-          scorerName: player.name || null,
-          scorerAvatar: player.image || null,
-          scorer: player,
-        };
+    if (player) {
+      console.log(`Found player for Team B: ${player.name}`);
 
-        const updatedGoals = [...goalsB, newGoal];
-        console.log(`Team B goals updated: ${updatedGoals.length} goals`);
-        setGoalsB(updatedGoals);
-      } else {
-        console.warn(`Player not found for Team B with ID: ${playerId}`);
-      }
+      const newGoal: Goal = {
+        id: `temp-${Date.now()}-${playerId}`,
+        userId: playerId,
+        scorerId: playerId,
+        isTeamA: false,
+        minute: null,
+        scorerName: player.name || null,
+        scorerAvatar: player.image || null,
+        scorer: player,
+      };
+
+      const updatedGoals = [...goalsB, newGoal];
+      console.log(`Team B goals updated: ${updatedGoals.length} goals`);
+      setGoalsB(updatedGoals);
+
+      // Ya no incrementamos el contador global aquí, porque solo estamos
+      // asignando goles que ya están contabilizados en el marcador
     } else {
-      console.warn(
-        `Cannot add more goals: scoreB (${scoreB}) <= goalsB.length (${goalsB.length})`
-      );
+      console.warn(`Player not found for Team B with ID: ${playerId}`);
     }
   };
 
@@ -425,6 +427,9 @@ export default function MatchResults({
       updatedGoals.splice(goalIndex, 1);
       console.log(`Team A goals updated: ${updatedGoals.length} goals`);
       setGoalsA(updatedGoals);
+
+      // Ya no decrementamos el contador global aquí, mantener
+      // la separación entre el contador y la asignación de goles
     } else {
       console.warn(`No goals found to remove for Team A player ${playerId}`);
     }
@@ -443,6 +448,9 @@ export default function MatchResults({
       updatedGoals.splice(goalIndex, 1);
       console.log(`Team B goals updated: ${updatedGoals.length} goals`);
       setGoalsB(updatedGoals);
+
+      // Ya no decrementamos el contador global aquí, mantener
+      // la separación entre el contador y la asignación de goles
     } else {
       console.warn(`No goals found to remove for Team B player ${playerId}`);
     }
@@ -453,15 +461,30 @@ export default function MatchResults({
     try {
       setSaving(true);
 
-      // Calculate total goals for each team
-      const totalGoalsA = goalsA.length;
-      const totalGoalsB = goalsB.length;
+      if (!match) {
+        toast.error('No hay información del partido');
+        setSaving(false);
+        return;
+      }
 
-      // Validate that score matches the number of goals
-      if (totalGoalsA !== scoreA || totalGoalsB !== scoreB) {
+      // Verificar que todos los goles estén asignados
+      if (goalsA.length < scoreA) {
         toast.error(
-          'El número de goles asignados debe coincidir con el marcador'
+          `Faltan ${scoreA - goalsA.length} goles por asignar al equipo ${
+            match.teamA
+          }`
         );
+        setSaving(false);
+        return;
+      }
+
+      if (goalsB.length < scoreB) {
+        toast.error(
+          `Faltan ${scoreB - goalsB.length} goles por asignar al equipo ${
+            match.teamB
+          }`
+        );
+        setSaving(false);
         return;
       }
 
@@ -569,7 +592,7 @@ export default function MatchResults({
       <div className='container mx-auto px-4 py-8'>
         <h1 className='text-3xl font-bold mb-6'>Resultados del Partido</h1>
 
-        <div className='bg-white shadow-lg rounded-lg p-6 mb-6'>
+        <div className='bg-white shadow-lg rounded-lg p-4 sm:p-6 mb-6'>
           {/* Match info */}
           <div className='text-center mb-6'>
             <p className='text-gray-600'>{match.group?.name || 'Grupo'}</p>
@@ -583,69 +606,114 @@ export default function MatchResults({
             <p className='text-sm text-gray-600 mt-1'>{match.location}</p>
           </div>
 
-          {/* Header with score */}
-          <div className='flex justify-between items-center mb-4'>
-            <div className='text-xl font-semibold'>{match.teamA}</div>
-            {editMode ? (
-              <div className='flex items-center space-x-2'>
-                <button
-                  onClick={() => {
-                    if (scoreA > 0) {
-                      setScoreA(scoreA - 1);
-                      if (scoreA <= goalsA.length) {
-                        const updatedGoals = [...goalsA];
-                        updatedGoals.pop();
-                        setGoalsA(updatedGoals);
-                      }
-                    }
-                  }}
-                  className='px-2 py-1 bg-gray-200 rounded'
-                >
-                  -
-                </button>
-                <span className='text-2xl font-bold'>{scoreA}</span>
-                <button
-                  onClick={() => setScoreA(scoreA + 1)}
-                  className='px-2 py-1 bg-gray-200 rounded'
-                >
-                  +
-                </button>
-                <span className='mx-2'>-</span>
-                <button
-                  onClick={() => {
-                    if (scoreB > 0) {
-                      setScoreB(scoreB - 1);
-                      if (scoreB <= goalsB.length) {
-                        const updatedGoals = [...goalsB];
-                        updatedGoals.pop();
-                        setGoalsB(updatedGoals);
-                      }
-                    }
-                  }}
-                  className='px-2 py-1 bg-gray-200 rounded'
-                >
-                  -
-                </button>
-                <span className='text-2xl font-bold'>{scoreB}</span>
-                <button
-                  onClick={() => setScoreB(scoreB + 1)}
-                  className='px-2 py-1 bg-gray-200 rounded'
-                >
-                  +
-                </button>
+          {/* Marcador de TV style */}
+          <div className='bg-green-800 text-white p-4 rounded-lg mb-6'>
+            <div className='grid grid-cols-2 gap-8 items-center'>
+              {/* Equipo A */}
+              <div className='text-center'>
+                <div className='font-bold text-xl sm:text-2xl mb-3'>
+                  {match.teamA}
+                </div>
+                {editMode ? (
+                  <div className='flex justify-center items-center gap-1'>
+                    <button
+                      onClick={() => {
+                        if (scoreA > 0) {
+                          // No permitir reducir el marcador por debajo del número de goles ya asignados
+                          if (goalsA.length >= scoreA) {
+                            toast.error(
+                              'Primero debes quitar los goles asignados a los jugadores'
+                            );
+                            return;
+                          }
+                          setScoreA(scoreA - 1);
+                        }
+                      }}
+                      className='w-10 h-10 flex items-center justify-center bg-green-700 hover:bg-green-600 rounded text-xl'
+                      disabled={scoreA <= 0 || goalsA.length >= scoreA}
+                    >
+                      -
+                    </button>
+                    <div className='bg-white text-black text-3xl sm:text-5xl font-bold px-4 py-2 rounded mx-2 min-w-16 text-center'>
+                      {scoreA}
+                    </div>
+                    <button
+                      onClick={() => setScoreA(scoreA + 1)}
+                      className='w-10 h-10 flex items-center justify-center bg-green-700 hover:bg-green-600 rounded text-xl'
+                      disabled={scoreA >= 99}
+                    >
+                      +
+                    </button>
+                  </div>
+                ) : (
+                  <div className='flex justify-center items-center'>
+                    <div className='bg-white text-black text-3xl sm:text-5xl font-bold px-4 py-2 rounded'>
+                      {match.scoreA}
+                    </div>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className='text-2xl font-bold'>
-                {match.scoreA} - {match.scoreB}
+
+              {/* Equipo B */}
+              <div className='text-center'>
+                <div className='font-bold text-xl sm:text-2xl mb-3'>
+                  {match.teamB}
+                </div>
+                {editMode ? (
+                  <div className='flex justify-center items-center gap-1'>
+                    <button
+                      onClick={() => {
+                        if (scoreB > 0) {
+                          // No permitir reducir el marcador por debajo del número de goles ya asignados
+                          if (goalsB.length >= scoreB) {
+                            toast.error(
+                              'Primero debes quitar los goles asignados a los jugadores'
+                            );
+                            return;
+                          }
+                          setScoreB(scoreB - 1);
+                        }
+                      }}
+                      className='w-10 h-10 flex items-center justify-center bg-green-700 hover:bg-green-600 rounded text-xl'
+                      disabled={scoreB <= 0 || goalsB.length >= scoreB}
+                    >
+                      -
+                    </button>
+                    <div className='bg-white text-black text-3xl sm:text-5xl font-bold px-4 py-2 rounded mx-2 min-w-16 text-center'>
+                      {scoreB}
+                    </div>
+                    <button
+                      onClick={() => setScoreB(scoreB + 1)}
+                      className='w-10 h-10 flex items-center justify-center bg-green-700 hover:bg-green-600 rounded text-xl'
+                      disabled={scoreB >= 99}
+                    >
+                      +
+                    </button>
+                  </div>
+                ) : (
+                  <div className='flex justify-center items-center'>
+                    <div className='bg-white text-black text-3xl sm:text-5xl font-bold px-4 py-2 rounded'>
+                      {match.scoreB}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {!editMode && (
+              <div className='flex justify-center items-center mt-4'>
+                <div className='text-xl sm:text-2xl'>-</div>
               </div>
             )}
-            <div className='text-xl font-semibold'>{match.teamB}</div>
           </div>
 
           {/* Grid for teams and goals */}
-          <div className='grid grid-cols-2 gap-8 mb-6'>
+          <div className='grid grid-cols-1 sm:grid-cols-2 gap-8 mb-6'>
             {/* Team A players and goals */}
-            <div>
+            <div className='border-r-0 sm:border-r border-gray-200 pr-0 sm:pr-4'>
+              <h3 className='text-lg font-semibold mb-4 text-center'>
+                {match.teamA}
+              </h3>
               <ul className='space-y-2'>
                 {match.matchPlayers
                   .filter((p) => p.isTeamA)
@@ -660,15 +728,15 @@ export default function MatchResults({
                         key={player.user.id}
                         className='flex justify-between items-center space-x-2 border-b border-gray-100 pb-2'
                       >
-                        <div className='flex items-center space-x-2'>
+                        <div className='flex items-center space-x-2 min-w-0'>
                           {player.user.image && (
                             <img
                               src={player.user.image}
                               alt={player.user.name || ''}
-                              className='w-8 h-8 rounded-full'
+                              className='w-8 h-8 rounded-full flex-shrink-0'
                             />
                           )}
-                          <span>{player.user.name}</span>
+                          <span className='truncate'>{player.user.name}</span>
                         </div>
 
                         {/* Goals display or controls */}
@@ -687,7 +755,7 @@ export default function MatchResults({
                             <button
                               onClick={() => addGoalA(player.user.id)}
                               className='w-8 h-8 flex items-center justify-center bg-green-100 hover:bg-green-200 text-green-600 rounded'
-                              disabled={scoreA <= goalsA.length}
+                              disabled={goalsA.length >= scoreA}
                             >
                               +
                             </button>
@@ -727,7 +795,10 @@ export default function MatchResults({
             </div>
 
             {/* Team B players and goals */}
-            <div>
+            <div className='pl-0 sm:pl-4'>
+              <h3 className='text-lg font-semibold mb-4 text-center'>
+                {match.teamB}
+              </h3>
               <ul className='space-y-2'>
                 {match.matchPlayers
                   .filter((p) => !p.isTeamA)
@@ -742,15 +813,15 @@ export default function MatchResults({
                         key={player.user.id}
                         className='flex justify-between items-center space-x-2 border-b border-gray-100 pb-2'
                       >
-                        <div className='flex items-center space-x-2'>
+                        <div className='flex items-center space-x-2 min-w-0'>
                           {player.user.image && (
                             <img
                               src={player.user.image}
                               alt={player.user.name || ''}
-                              className='w-8 h-8 rounded-full'
+                              className='w-8 h-8 rounded-full flex-shrink-0'
                             />
                           )}
-                          <span>{player.user.name}</span>
+                          <span className='truncate'>{player.user.name}</span>
                         </div>
 
                         {/* Goals display or controls */}
@@ -769,7 +840,7 @@ export default function MatchResults({
                             <button
                               onClick={() => addGoalB(player.user.id)}
                               className='w-8 h-8 flex items-center justify-center bg-green-100 hover:bg-green-200 text-green-600 rounded'
-                              disabled={scoreB <= goalsB.length}
+                              disabled={goalsB.length >= scoreB}
                             >
                               +
                             </button>
@@ -809,39 +880,30 @@ export default function MatchResults({
             </div>
           </div>
 
-          <div className='mt-6 flex justify-between'>
+          <div className='mt-6 flex flex-col sm:flex-row justify-between gap-4'>
             <button
               onClick={() => router.back()}
-              className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded'
+              className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full sm:w-auto'
             >
-              Volver al Grupo
+              {editMode ? 'Cancelar' : 'Volver al Grupo'}
             </button>
-
-            {isAdmin &&
-              (editMode ? (
-                <div className='space-x-2'>
-                  <button
-                    onClick={() => setEditMode(false)}
-                    className='bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded'
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className='bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50'
-                  >
-                    {saving ? 'Guardando...' : 'Guardar Resultado'}
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setEditMode(true)}
-                  className='bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded'
-                >
-                  Editar Resultado
-                </button>
-              ))}
+            {isAdmin && editMode && (
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className='bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded w-full sm:w-auto'
+              >
+                {saving ? 'Guardando...' : 'Guardar Resultado'}
+              </button>
+            )}
+            {isAdmin && !editMode && (
+              <button
+                onClick={() => setEditMode(true)}
+                className='bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded w-full sm:w-auto'
+              >
+                Editar Resultado
+              </button>
+            )}
           </div>
         </div>
       </div>

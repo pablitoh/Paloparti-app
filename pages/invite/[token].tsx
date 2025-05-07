@@ -105,20 +105,11 @@ export default function Invitation() {
       setError(null);
 
       console.log('Starting join process with token:', token);
-      const authToken = localStorage.getItem('token');
-
-      if (!authToken) {
-        console.error('No authentication token found in localStorage');
-        throw new Error(
-          'Error de autenticación. Por favor inicia sesión nuevamente.'
-        );
-      }
 
       const response = await fetch('/api/invitations/join', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
         },
         body: JSON.stringify({ token }),
       });

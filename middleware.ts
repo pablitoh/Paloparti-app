@@ -5,8 +5,11 @@ import type { NextRequest } from 'next/server';
 // Define una función más simple que solo verifica rutas específicas
 // en lugar de bloquear todo por defecto
 export function middleware(request: NextRequest) {
-  // Specifically exclude the register endpoint
-  if (request.nextUrl.pathname === '/api/auth/register') {
+  // Permitir todas las rutas de API de autenticación y registro
+  if (
+    request.nextUrl.pathname.startsWith('/api/auth') ||
+    request.nextUrl.pathname === '/api/register'
+  ) {
     return NextResponse.next();
   }
 
@@ -17,6 +20,10 @@ export function middleware(request: NextRequest) {
 // Configurar las rutas que requieren autenticación
 export const config = {
   matcher: [
+    // Excluir específicamente las rutas de autenticación y registro
+    '/((?!api/auth|api/register|_next/static|_next/image|favicon.ico).*)',
+
+    // Incluir específicamente las rutas protegidas
     '/api/groups/:path*',
     '/api/groups/:id*/invite',
     '/api/groups/:id*/leave',
