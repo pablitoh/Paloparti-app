@@ -9,6 +9,7 @@ import NextMatchTab from '../../components/group/tabs/NextMatchTab';
 import HistoryTab from '../../components/group/tabs/HistoryTab';
 import GoalsTab from '../../components/group/tabs/GoalsTab';
 import MvpTab from '../../components/group/tabs/MvpTab';
+import LogsTab from '../../components/group/tabs/LogsTab';
 import MobileDrawer from '../../components/group/MobileDrawer';
 import { Avatar } from '@mui/material';
 import {
@@ -91,6 +92,8 @@ interface LazyRequestsTabProps extends LazyTabProps {
     action: 'APPROVE' | 'REJECT'
   ) => Promise<void>;
 }
+
+interface LazyLogsTabProps extends LazyTabProps {}
 
 interface TabConfig {
   label: string;
@@ -487,6 +490,10 @@ const LazyRequestsTab = ({
   );
 };
 
+const LazyLogsTab = ({ groupId }: LazyLogsTabProps) => {
+  return <LogsTab groupId={groupId} />;
+};
+
 export default function GroupDetails() {
   const router = useRouter();
   const { id } = router.query;
@@ -593,8 +600,9 @@ const GroupContent = ({
   showManualTeamFormationModal: boolean;
   setShowManualTeamFormationModal: (value: boolean) => void;
 }) => {
-  // Get the React Query client instance
   const queryClient = useQueryClient();
+  const isUserInGroup = !!groupBasicData?.userStatus;
+  const currentUserIsAdmin = !!groupBasicData?.isAdmin;
 
   // Estado para controlar el drawer de navegación móvil
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -620,25 +628,9 @@ const GroupContent = ({
   });
 
   // Estados calculados
-  const isUserInGroup = useMemo(() => {
-    if (!user || !groupBasicData) return false;
-    return (
-      groupBasicData.userStatus === 'ACTIVE' ||
-      groupBasicData.userStatus === 'CONFIRMED'
-    );
-  }, [groupBasicData, user]);
-
   const isUserPendingInGroup = useMemo(() => {
     if (!user || !groupBasicData) return false;
     return groupBasicData.userStatus === 'PENDING';
-  }, [groupBasicData, user]);
-
-  const currentUserIsAdmin = useMemo(() => {
-    if (!user || !groupBasicData) return false;
-    if (groupBasicData.isAdmin === true) {
-      return true;
-    }
-    return groupBasicData.createdBy === user.id;
   }, [groupBasicData, user]);
 
   // Efecto para procesar datos del grupo
@@ -695,31 +687,6 @@ const GroupContent = ({
       });
   };
 
-  // Simple tab change handler that only updates state and URL
-  const handleTabChange = useCallback(
-    (index: number) => {
-      if (
-        index >= 0 &&
-        index < (currentUserIsAdmin ? 6 : 5) &&
-        index !== selectedTab
-      ) {
-        // Just update local state first for responsive UI
-        setSelectedTab(index);
-
-        // Then update URL with shallow routing to minimize network activity
-        router.replace(
-          {
-            pathname: router.pathname,
-            query: { ...router.query, tab: index.toString() },
-          },
-          undefined,
-          { shallow: true, scroll: false }
-        );
-      }
-    },
-    [router, selectedTab, currentUserIsAdmin]
-  );
-
   // Configuración de pestañas
   const tabs: TabConfig[] = useMemo(() => {
     const baseTabs: TabConfig[] = [
@@ -728,6 +695,7 @@ const GroupContent = ({
       { label: 'Goleadores' },
       { label: 'MVPs' },
       { label: 'Miembros' },
+      { label: 'Logs' },
     ];
 
     if (currentUserIsAdmin) {
@@ -740,6 +708,37 @@ const GroupContent = ({
 
     return baseTabs;
   }, [currentUserIsAdmin, groupBasicData?.pendingRequestsCount]);
+
+  // Simple tab change handler that only updates state and URL
+  const handleTabChange = useCallback(
+    (index: number) => {
+      // Verificar que la pestaña a la que intentamos ir existe
+      const maxTabIndex = tabs.length;
+
+      if (index >= 0 && index < maxTabIndex) {
+        // Just update local state first for responsive UI
+        setSelectedTab(index);
+
+        // Invalidate next match query when the user selects the "Próximo Partido" tab
+        if (index === 0 && groupId) {
+          queryClient.invalidateQueries({
+            queryKey: ['group', 'nextMatch', groupId],
+          });
+        }
+
+        // Then update URL with shallow routing to minimize network activity
+        router.replace(
+          {
+            pathname: router.pathname,
+            query: { ...router.query, tab: index.toString() },
+          },
+          undefined,
+          { shallow: true, scroll: false }
+        );
+      }
+    },
+    [router, tabs.length, groupId, queryClient]
+  );
 
   // Renderizar las pestañas disponibles según el rol del usuario
   const renderTabs = useMemo(() => {
@@ -808,6 +807,8 @@ const GroupContent = ({
           />
         );
       case 5:
+        return <LazyLogsTab groupId={groupId} />;
+      case 6:
         if (currentUserIsAdmin) {
           return (
             <LazyRequestsTab

@@ -4,6 +4,10 @@ import { getCurrentUser } from '../../../lib/auth';
 import { calculateAge } from '../../../lib/utils';
 import { createNextMatch } from '../../../lib/matches';
 import { Prisma, Match, MatchPlayer, User } from '@prisma/client';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../auth/[...nextauth]';
+import { logGroupEvent } from '../../../utils/serverLogEvents';
+import { LogAction } from '../../../utils/logTypes';
 
 type MatchWithRelations = Match & {
   group: {
@@ -121,6 +125,7 @@ export default async function handler(
         scoreB,
         teamAPlayers,
         teamBPlayers,
+        goals,
       } = req.body;
 
       // Verify match exists and user has admin permissions
@@ -185,6 +190,10 @@ export default async function handler(
         );
       }
 
+      // Log match completion if status changes to COMPLETED
+      const isCompletingMatch =
+        status === 'COMPLETED' && match.status !== 'COMPLETED';
+
       // Update match details
       const updatedMatch = (await prisma.match.update({
         where: { id: matchId },
@@ -234,6 +243,50 @@ export default async function handler(
         },
       })) as MatchWithRelations;
 
+      // Log match completion
+      if (isCompletingMatch) {
+        // Obtener los goles para el log
+        const goalsList = updatedMatch.goals.map((goal) => ({
+          scorerId: goal.scorer.id,
+          scorerName: goal.scorer.name || 'Jugador',
+          minute: goal.minute,
+          isTeamA: goal.isTeamA,
+        }));
+
+        // Obtener información de los equipos
+        const teamAPlayers = updatedMatch.matchPlayers
+          .filter((p: any) => p.isTeamA)
+          .map((p: any) => ({
+            id: p.userId,
+            name: p.user.name,
+          }));
+
+        const teamBPlayers = updatedMatch.matchPlayers
+          .filter((p: any) => !p.isTeamA)
+          .map((p: any) => ({
+            id: p.userId,
+            name: p.user.name,
+          }));
+
+        // Registrar en el log
+        await logGroupEvent(
+          updatedMatch.group.id,
+          userId,
+          LogAction.MATCH_COMPLETED,
+          {
+            matchId: updatedMatch.id,
+            scoreA: updatedMatch.scoreA,
+            scoreB: updatedMatch.scoreB,
+            teamAName: updatedMatch.teamA,
+            teamBName: updatedMatch.teamB,
+            teamAPlayers,
+            teamBPlayers,
+            goals: goalsList,
+            date: updatedMatch.date,
+          }
+        );
+      }
+
       const updatedMatchWithDetails = {
         ...updatedMatch,
       };
@@ -255,6 +308,10 @@ export default async function handler(
         select: {
           id: true,
           groupId: true,
+          date: true,
+          location: true,
+          teamA: true,
+          teamB: true,
           group: {
             select: {
               members: {
@@ -282,6 +339,33 @@ export default async function handler(
           .status(403)
           .json({ message: 'No tienes permisos para eliminar este partido' });
       }
+
+      // Obtener los jugadores del partido para guardar en el log
+      const matchPlayers = await prisma.matchPlayer.findMany({
+        where: { matchId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      const teamAPlayers = matchPlayers
+        .filter((p) => p.isTeamA)
+        .map((p) => ({
+          id: p.userId,
+          name: p.user.name,
+        }));
+
+      const teamBPlayers = matchPlayers
+        .filter((p) => !p.isTeamA)
+        .map((p) => ({
+          id: p.userId,
+          name: p.user.name,
+        }));
 
       // Ejecutar todas las operaciones en una sola transacción
       await prisma.$transaction([
@@ -316,11 +400,29 @@ export default async function handler(
         }),
       ]);
 
+      // Registrar la eliminación en el log
+      await logGroupEvent(match.groupId, userId, LogAction.MATCH_DELETED, {
+        matchId,
+        matchDate: match.date,
+        location: match.location,
+        teamA: match.teamA,
+        teamB: match.teamB,
+        teamAPlayers,
+        teamBPlayers,
+      });
+
       // Crear un nuevo partido automáticamente después de la transacción principal
       try {
         const newMatch = await createNextMatch(match.groupId);
         if (newMatch) {
           console.log(`Nuevo partido creado automáticamente: ${newMatch.id}`);
+
+          // Registrar la creación del nuevo partido en el log
+          await logGroupEvent(match.groupId, userId, LogAction.MATCH_CREATED, {
+            matchId: newMatch.id,
+            matchDate: newMatch.date,
+            location: newMatch.location,
+          });
         }
       } catch (error) {
         console.error('Error al crear nuevo partido:', error);

@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import { showSuccessToast, showErrorToast } from './toastService';
 import { parseTbdPlayers } from './reactQueryHooks';
+import { GroupLogsResponse } from '../utils/logTypes';
+import { fetchGroupLogs } from '../lib/client';
 
 // Default query options to prevent duplicate requests and unnecessary fetching
 const defaultQueryOptions = {
@@ -502,7 +504,15 @@ export const useAdminAttendanceMutation = () => {
         });
       }
 
-      showSuccessToast('Asistencia actualizada correctamente');
+      // Mensaje personalizado según el estado
+      const statusMessage =
+        variables.status === 'CONFIRMED'
+          ? 'confirmada'
+          : variables.status === 'DECLINED'
+          ? 'cancelada'
+          : 'actualizada a pendiente';
+
+      showSuccessToast(`Asistencia de jugador ${statusMessage} correctamente`);
     },
     onError: (error: Error) => {
       showErrorToast(error.message || 'Error al actualizar asistencia');
@@ -575,3 +585,22 @@ export const useMembershipRequestMutation = () => {
     },
   });
 };
+
+/**
+ * Hook para obtener los logs del grupo
+ */
+export function useGroupLogs(
+  groupId: string,
+  page: number = 1,
+  pageSize: number = 20,
+  options = {}
+) {
+  return useQuery({
+    queryKey: ['group', 'logs', groupId, page, pageSize],
+    queryFn: async () => {
+      if (!groupId) return null;
+      return await fetchGroupLogs(groupId, page, pageSize);
+    },
+    ...options,
+  });
+}

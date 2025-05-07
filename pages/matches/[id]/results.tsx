@@ -488,28 +488,54 @@ export default function MatchResults({
         return;
       }
 
+      // Prepare request data
+      const requestData = {
+        scoreA,
+        scoreB,
+        goals: [...goalsA, ...goalsB]
+          .filter((goal) => {
+            // Verify the goal has a valid userId
+            const hasValidId = !!(goal.userId || goal.scorerId);
+            if (!hasValidId) {
+              console.warn('Filtering out goal with no valid ID:', goal);
+            }
+            return hasValidId;
+          })
+          .map((goal) => ({
+            userId: goal.userId || goal.scorerId,
+            isTeamA: goal.isTeamA,
+            minute: goal.minute,
+          })),
+        status: 'COMPLETED',
+      };
+
+      console.log('Sending data to API:', JSON.stringify(requestData, null, 2));
+
       const response = await fetch(`/api/matches/${id}/result`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          scoreA,
-          scoreB,
-          goals: [...goalsA, ...goalsB].map((goal) => ({
-            userId: goal.userId || goal.scorerId,
-            isTeamA: goal.isTeamA,
-            minute: goal.minute,
-          })),
-          status: 'COMPLETED',
-        }),
+        body: JSON.stringify(requestData),
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Error al guardar los resultados');
+        // Try to parse as JSON first
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.message || 'Error al guardar los resultados'
+          );
+        } else {
+          // If not JSON, get the text
+          const errorText = await response.text();
+          console.error('Server error response:', errorText);
+          throw new Error(`Error del servidor (${response.status})`);
+        }
       }
 
+      const data = await response.json();
       toast.success('Resultados guardados exitosamente');
 
       // Get the group ID to redirect back to

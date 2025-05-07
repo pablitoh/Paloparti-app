@@ -22,6 +22,7 @@ import { useUserAttendanceMutation } from '../../../services/groupHooks';
 import {
   showSuccessToast,
   showErrorToast,
+  showLoadingToast,
 } from '../../../services/toastService';
 import type { ParticipantStatus } from '../../../types/group';
 
@@ -215,6 +216,7 @@ export default function NextMatchTab({
   const playersB = matchDetails?.playersB || [];
   const requiredPlayers = group?.requiredPlayers || 10;
   const confirmedCount = confirmedPlayers.length;
+  const teamsHavePlayers = playersA.length > 0 || playersB.length > 0;
 
   // Normalize participant status string to uppercase
   const normalizeStatus = (
@@ -435,13 +437,36 @@ export default function NextMatchTab({
         await handleSortTeams();
         // The parent component handles invalidation/refetch
       } else {
+        // Mostrar un estado de carga para mejorar la experiencia de usuario
+        showLoadingToast('Sorteando equipos...');
+
+        // Añadir timestamp aleatorio para evitar caché
+        const timestamp = Date.now() + Math.random();
+
         // Si no, usamos la mutación directamente
         // This mutation internally handles cache updates
         await randomizeTeamsMutation.mutateAsync({
           groupId: id,
           matchId: matchDetails.id,
         });
-        // No need to invalidate queries here as the mutation already does that
+
+        // Invalidar todas las consultas relacionadas con este grupo y partido
+        queryClient.invalidateQueries({
+          queryKey: ['group', id],
+          exact: false,
+        });
+
+        // Esperar un breve momento para permitir que la API procese los cambios
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        // Forzar una recarga explícita de los datos del partido
+        await queryClient.refetchQueries({
+          queryKey: ['group', 'nextMatch', id],
+          exact: true,
+        });
+
+        // Notificar al usuario que los equipos han sido sorteados
+        showSuccessToast('Equipos sorteados exitosamente');
       }
     } catch (error) {
       console.error('Error sorting teams:', error);
@@ -700,8 +725,13 @@ export default function NextMatchTab({
                     <Button
                       variant='outline'
                       onClick={handleSortTeamsClick}
-                      className='flex items-center text-xs'
+                      className={`flex items-center text-xs ${
+                        sortTeamsLoading || confirmedCount < 1
+                          ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                          : ''
+                      }`}
                       size='sm'
+                      disabled={sortTeamsLoading || confirmedCount < 1}
                     >
                       <ArrowPathIcon className='h-4 w-4 mr-1' />
                       Sortear
@@ -710,8 +740,13 @@ export default function NextMatchTab({
                     <Button
                       variant='primary'
                       onClick={handleAddResults}
-                      className='flex items-center text-xs'
+                      className={`flex items-center text-xs ${
+                        !teamsHavePlayers
+                          ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                          : ''
+                      }`}
                       size='sm'
+                      disabled={!teamsHavePlayers}
                     >
                       Terminar partido
                     </Button>

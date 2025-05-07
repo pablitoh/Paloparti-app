@@ -39,6 +39,19 @@ const errorOptions: ToastOptions = {
   },
 };
 
+const loadingOptions: ToastOptions = {
+  ...defaultOptions,
+  duration: 5000,
+  style: {
+    background: '#3B82F6',
+    color: 'white',
+    padding: '12px',
+    borderRadius: '8px',
+    fontWeight: '500',
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+  },
+};
+
 /**
  * Muestra un toast de éxito controlado
  */
@@ -109,6 +122,44 @@ export function showErrorToast(message: string): string | null {
   setTimeout(() => {
     delete activeToasts[id];
   }, errorOptions.duration || 4000);
+
+  return id;
+}
+
+/**
+ * Muestra un toast de carga controlado
+ */
+export function showLoadingToast(message: string): string | null {
+  const now = Date.now();
+
+  // Si hay demasiados toasts activos o ha pasado poco tiempo, ignorar
+  if (
+    Object.keys(activeToasts).length > 2 ||
+    now - lastToastTime < MIN_TOAST_INTERVAL
+  ) {
+    console.log(
+      'Toast de carga ignorado (demasiados activos o muy frecuente):',
+      message
+    );
+    return null;
+  }
+
+  // Generar ID único para este toast
+  const id = `loading-${now}`;
+  activeToasts[id] = true;
+  lastToastTime = now;
+
+  // Mostrar toast de carga
+  toast.loading(message, {
+    ...loadingOptions,
+    id,
+  });
+
+  // Programar la eliminación del registro cuando expire el toast
+  setTimeout(() => {
+    delete activeToasts[id];
+    toast.dismiss(id);
+  }, loadingOptions.duration || 5000);
 
   return id;
 }

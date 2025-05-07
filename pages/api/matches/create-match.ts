@@ -2,6 +2,8 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../lib/prisma';
 import { getCurrentUser } from '../../../lib/auth';
 import { calculateAge } from '../../../lib/utils';
+import { logGroupEvent } from '../../../utils/serverLogEvents';
+import { LogAction } from '../../../utils/logTypes';
 
 type Member = {
   id: string;
@@ -224,7 +226,7 @@ export default async function handler(
 
         // Extraer solo los IDs de usuarios que han confirmado asistencia
         const confirmedUserIds = confirmedAttendees.map(
-          (attendee) => attendee.userId
+          (attendee: { userId: string }) => attendee.userId
         );
 
         // Obtener los datos básicos de esos usuarios
@@ -242,14 +244,21 @@ export default async function handler(
         });
 
         // Mapear los datos de usuarios
-        mappedMembers = usersData.map((user) => ({
-          id: user.id,
-          name: user.name,
-          birthdate: user.birthdate,
-          age:
-            calculateAge(user.birthdate) || Math.floor(Math.random() * 40) + 18,
-          role: 'MEMBER',
-        }));
+        mappedMembers = usersData.map(
+          (user: {
+            id: string;
+            name: string | null;
+            birthdate: Date | null;
+          }) => ({
+            id: user.id,
+            name: user.name,
+            birthdate: user.birthdate,
+            age:
+              calculateAge(user.birthdate) ||
+              Math.floor(Math.random() * 40) + 18,
+            role: 'MEMBER',
+          })
+        );
       }
 
       // Función para balancear equipos por edad
@@ -278,8 +287,29 @@ export default async function handler(
 
       // Crear equipos aleatorios si no se requiere balanceo por edad
       const createRandomTeams = (members: Member[]): [Member[], Member[]] => {
-        // Mezclar aleatoriamente
-        const shuffledMembers = [...members].sort(() => Math.random() - 0.5);
+        // Implementación del algoritmo Fisher-Yates para mezcla más robusta
+        const shuffleArray = (array: Member[]): Member[] => {
+          const shuffled = [...array];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          return shuffled;
+        };
+
+        // Realizar varias pasadas de mezcla con diferentes semillas
+        let shuffledMembers = [...members];
+
+        // Usar tiempo actual + número aleatorio como semilla
+        const seed = Date.now() + Math.random() * 10000;
+
+        // Primera pasada de mezcla
+        shuffledMembers = shuffleArray(shuffledMembers);
+
+        // Añadir una semilla diferente y volver a mezclar
+        Math.random();
+        Math.random(); // Descartar algunos números aleatorios
+        shuffledMembers = shuffleArray(shuffledMembers);
 
         // Dividir en dos equipos
         const halfIndex = Math.ceil(shuffledMembers.length / 2);
@@ -289,10 +319,82 @@ export default async function handler(
         return [teamA, teamB];
       };
 
+      // Si es un resorteo, obtener los equipos actuales para comparar después
+      let existingTeamA: string[] = [];
+      let existingTeamB: string[] = [];
+
+      if (isResort && matchId) {
+        try {
+          const currentMatchPlayers = await prisma.matchPlayer.findMany({
+            where: { matchId },
+            select: {
+              userId: true,
+              isTeamA: true,
+            },
+          });
+
+          existingTeamA = currentMatchPlayers
+            .filter((p: { isTeamA: boolean }) => p.isTeamA)
+            .map((p: { userId: string }) => p.userId);
+
+          existingTeamB = currentMatchPlayers
+            .filter((p: { isTeamA: boolean }) => !p.isTeamA)
+            .map((p: { userId: string }) => p.userId);
+
+          console.log('Equipos actuales antes del resorteo:', {
+            teamA: existingTeamA,
+            teamB: existingTeamB,
+          });
+        } catch (error) {
+          console.error('Error al obtener equipos actuales:', error);
+        }
+      }
+
       // Determinar el método de creación de equipos según el parámetro
-      const [autoTeamA, autoTeamB] = balanceByAge
-        ? createBalancedTeams(mappedMembers)
-        : createRandomTeams(mappedMembers);
+      let autoTeamA: Member[] = [];
+      let autoTeamB: Member[] = [];
+
+      // Realizar hasta 3 intentos para asegurar que los equipos cambien en un resorteo
+      let maxAttempts = 5;
+      let teamsChanged = !isResort; // Si no es resorteo, no necesitamos verificar cambios
+
+      while (!teamsChanged && maxAttempts > 0) {
+        [autoTeamA, autoTeamB] = balanceByAge
+          ? createBalancedTeams(mappedMembers)
+          : createRandomTeams(mappedMembers);
+
+        // Verificar si los equipos han cambiado (solo para resorteo)
+        if (isResort) {
+          const newTeamAIds = autoTeamA.map((p) => p.id);
+          const newTeamBIds = autoTeamB.map((p) => p.id);
+
+          // Calcular cuántos jugadores cambiaron de equipo
+          const teamAChanges = newTeamAIds.filter((id) =>
+            existingTeamB.includes(id)
+          ).length;
+          const teamBChanges = newTeamBIds.filter((id) =>
+            existingTeamA.includes(id)
+          ).length;
+
+          // Consideramos que los equipos cambiaron si al menos un 25% de jugadores cambió de equipo
+          const minChangeRequired = Math.max(
+            1,
+            Math.floor(mappedMembers.length * 0.25)
+          );
+          teamsChanged = teamAChanges + teamBChanges >= minChangeRequired;
+
+          console.log(`Intento ${6 - maxAttempts} de resorteo:`, {
+            teamAChanges,
+            teamBChanges,
+            minChangeRequired,
+            teamsChanged,
+          });
+        } else {
+          teamsChanged = true; // No es un resorteo, no verificamos cambios
+        }
+
+        maxAttempts--;
+      }
 
       // Calcular edad promedio por equipo
       const calculateAverageAge = (team: Member[]): number => {
@@ -435,6 +537,65 @@ export default async function handler(
       teamA: tbdPlayersTeamA,
       teamB: tbdPlayersTeamB,
     };
+
+    // Registrar acción en el log
+    const logAction = isResort
+      ? LogAction.TEAM_RESORTED
+      : LogAction.TEAM_SORTED;
+
+    // Obtener información anterior de equipos si es un resort
+    let previousTeams = null;
+    if (isResort && matchId) {
+      const previousMatchPlayers = await prisma.matchPlayer.findMany({
+        where: { matchId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      previousTeams = {
+        teamA: previousMatchPlayers
+          .filter((p: { isTeamA: boolean }) => p.isTeamA)
+          .map((p: { userId: string; user: { name: string | null } }) => ({
+            id: p.userId,
+            name: p.user.name,
+          })),
+        teamB: previousMatchPlayers
+          .filter((p: { isTeamA: boolean }) => !p.isTeamA)
+          .map((p: { userId: string; user: { name: string | null } }) => ({
+            id: p.userId,
+            name: p.user.name,
+          })),
+      };
+    }
+
+    // Preparar los datos para el log
+    const logData: any = {
+      matchId,
+      newTeams: {
+        teamA: finalTeamA.map((p: any) => ({
+          id: p.userId || p.id,
+          name: p.name,
+        })),
+        teamB: finalTeamB.map((p: any) => ({
+          id: p.userId || p.id,
+          name: p.name,
+        })),
+      },
+    };
+
+    // Solo incluir equipos anteriores si es un resort
+    if (isResort && previousTeams) {
+      logData.previousTeams = previousTeams;
+    }
+
+    // Registrar en logs
+    await logGroupEvent(groupId, user.id, logAction, logData);
 
     // Retornar los equipos formados y el partido creado
     return res.status(200).json({

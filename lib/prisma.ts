@@ -6,71 +6,82 @@ import { PrismaClient } from '@prisma/client';
 // Learn more:
 // https://pris.ly/d/help/next-js-best-practices
 
-const globalForPrisma = global as unknown as {
-  prisma: PrismaClient | undefined;
-};
+// Esta comprobación asegura que el código solo se ejecute en el servidor
+// y no en el navegador
+const isServer = typeof window === 'undefined';
 
-// Create singleton PrismaClient for better connection handling
-function createPrismaClient() {
-  // Create Prisma client without type issues
-  const client = new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query'] : [],
-  });
+let prisma: any;
 
-  // Add retry logic for connection pooling issues
-  const clientWithRetry = client.$extends({
-    query: {
-      $allModels: {
-        async $allOperations({ operation, model, args, query }) {
-          // Maximum number of retries
-          const MAX_RETRIES = 3;
-          let lastError;
+// Solo creamos la instancia de PrismaClient si estamos en el servidor
+if (isServer) {
+  const globalForPrisma = global as unknown as {
+    prisma: PrismaClient | undefined;
+  };
 
-          // Try multiple times with backoff
-          for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-            try {
-              return await query(args);
-            } catch (error: any) {
-              lastError = error;
+  // Create singleton PrismaClient for better connection handling
+  function createPrismaClient() {
+    // Create Prisma client without type issues
+    const client = new PrismaClient({
+      log: process.env.NODE_ENV === 'development' ? ['query'] : [],
+    });
 
-              // Check for connection pool errors related to prepared statements
-              if (
-                error.message?.includes('prepared statement') &&
-                error.message?.includes('already exists')
-              ) {
-                console.error(
-                  `Connection pool error (attempt ${attempt}/${MAX_RETRIES}): ${error.message}`
-                );
+    // Add retry logic for connection pooling issues
+    const clientWithRetry = client.$extends({
+      query: {
+        $allModels: {
+          async $allOperations({ operation, model, args, query }) {
+            // Maximum number of retries
+            const MAX_RETRIES = 3;
+            let lastError;
 
-                // Exponential backoff with jitter
-                const delay =
-                  Math.min(100 * Math.pow(2, attempt - 1), 1000) +
-                  Math.floor(Math.random() * 100);
-                await new Promise((resolve) => setTimeout(resolve, delay));
+            // Try multiple times with backoff
+            for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+              try {
+                return await query(args);
+              } catch (error: any) {
+                lastError = error;
 
-                // Continue to next retry
-                continue;
+                // Check for connection pool errors related to prepared statements
+                if (
+                  error.message?.includes('prepared statement') &&
+                  error.message?.includes('already exists')
+                ) {
+                  console.error(
+                    `Connection pool error (attempt ${attempt}/${MAX_RETRIES}): ${error.message}`
+                  );
+
+                  // Exponential backoff with jitter
+                  const delay =
+                    Math.min(100 * Math.pow(2, attempt - 1), 1000) +
+                    Math.floor(Math.random() * 100);
+                  await new Promise((resolve) => setTimeout(resolve, delay));
+
+                  // Continue to next retry
+                  continue;
+                }
+
+                // For other errors, throw immediately
+                throw error;
               }
-
-              // For other errors, throw immediately
-              throw error;
             }
-          }
 
-          // If we've exhausted all retries
-          throw lastError;
+            // If we've exhausted all retries
+            throw lastError;
+          },
         },
       },
-    },
-  });
+    });
 
-  return clientWithRetry;
+    return clientWithRetry;
+  }
+
+  // Use existing instance if available (development) or create new one
+  prisma = globalForPrisma.prisma ?? createPrismaClient();
+
+  // If not in production, attach to global for connection reuse
+  if (process.env.NODE_ENV !== 'production') {
+    globalForPrisma.prisma = prisma as unknown as PrismaClient;
+  }
 }
 
-// Use existing instance if available (development) or create new one
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
-
-// If not in production, attach to global for connection reuse
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma as unknown as PrismaClient;
-}
+export { prisma };

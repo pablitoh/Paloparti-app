@@ -1,6 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../../lib/prisma';
 import { getCurrentUser } from '../../../../lib/auth';
+import { logGroupEvent } from '../../../../utils/serverLogEvents';
+import { LogAction } from '../../../../utils/logTypes';
 
 // Define types for TBD players
 interface TbdPlayer {
@@ -61,7 +63,8 @@ export default async function handler(
 
     // Verificar que el usuario es admin del grupo
     const isAdmin = match.group.members.some(
-      (member) => member.userId === user.id && member.role === 'ADMIN'
+      (member: { userId: string; role: string }) =>
+        member.userId === user.id && member.role === 'ADMIN'
     );
 
     if (!isAdmin) {
@@ -88,6 +91,25 @@ export default async function handler(
           updateData.location = location;
           responseData.location = updateData.location;
         }
+
+        // Actualizar el partido
+        const updatedMatch = await prisma.match.update({
+          where: { id },
+          data: updateData,
+        });
+
+        // Registrar en el log
+        await logGroupEvent(match.groupId, user.id, LogAction.MATCH_EDITED, {
+          matchId: id,
+          previousData: {
+            date: match.date,
+            location: match.location,
+          },
+          newData: {
+            date: date ? new Date(date) : match.date,
+            location: location || match.location,
+          },
+        });
 
         break;
 
@@ -136,8 +158,12 @@ export default async function handler(
         });
 
         // Separar por equipos
-        const teamAPlayers = existingPlayers.filter((p) => p.isTeamA);
-        const teamBPlayers = existingPlayers.filter((p) => !p.isTeamA);
+        const teamAPlayers = existingPlayers.filter(
+          (p: { isTeamA: boolean }) => p.isTeamA
+        );
+        const teamBPlayers = existingPlayers.filter(
+          (p: { isTeamA: boolean }) => !p.isTeamA
+        );
 
         console.log('Existing players:', {
           teamA: teamAPlayers.length,
@@ -177,7 +203,7 @@ export default async function handler(
 
         // Verify the user is a member of the group
         const isMember = match.group.members.some(
-          (member) => member.userId === userId
+          (member: { userId: string }) => member.userId === userId
         );
 
         if (!isMember) {
@@ -286,14 +312,49 @@ export default async function handler(
           },
         });
 
-        // Get the new user information
-        const newUser = await prisma.user.findUnique({
+        // Actualizar o crear el registro de asistencia para el usuario
+        await prisma.matchAttendance.upsert({
+          where: {
+            userId_matchId: {
+              userId,
+              matchId: id,
+            },
+          },
+          update: {
+            status: 'CONFIRMED',
+          },
+          create: {
+            userId,
+            matchId: id,
+            groupId: match.groupId,
+            matchDate: match.date,
+            status: 'CONFIRMED',
+          },
+        });
+
+        // Obtener información del usuario real
+        const replacementUser = await prisma.user.findUnique({
           where: { id: userId },
           select: {
             id: true,
             name: true,
             image: true,
           },
+        });
+
+        // Registrar en el log
+        await logGroupEvent(match.groupId, user.id, LogAction.PLAYER_REPLACED, {
+          matchId: id,
+          tbdPlayerId,
+          oldPlayer: {
+            id: tbdPlayerId,
+            name: `Jugador TBD (${playerIsTeamA ? 'Equipo A' : 'Equipo B'})`,
+          },
+          newPlayer: {
+            id: userId,
+            name: replacementUser?.name,
+          },
+          isTeamA: playerIsTeamA,
         });
 
         // Actualizar los TBD players - filtrar el jugador reemplazado
@@ -311,8 +372,8 @@ export default async function handler(
         responseData.tbdPlayers = updatedTbdPlayers;
         responseData.replacedPlayer = {
           id: userId,
-          name: newUser?.name,
-          avatar: newUser?.image,
+          name: replacementUser?.name,
+          avatar: replacementUser?.image,
           isTeamA: playerIsTeamA,
           playerType: 'CONFIRMED',
         };

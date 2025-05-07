@@ -1,15 +1,196 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { getSession } from 'next-auth/react';
 import { prisma } from '../../lib/prisma';
-import { getCurrentUser } from '../../lib/auth';
+import { logGroupEvent } from '../../utils/serverLogEvents';
+import { LogAction } from '../../utils/logTypes';
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   // Verificar autenticación
-  const user = await getCurrentUser(req);
-  if (!user) {
+  const session = await getSession({ req });
+  if (!session || !session.user || !session.user.id) {
     return res.status(401).json({ message: 'No autenticado' });
+  }
+
+  const currentUserId = session.user.id;
+
+  // Obtener el método y params
+  const { method } = req;
+
+  // Manejar reemplazo de jugador TBD por un usuario real
+  if (method === 'POST' && req.body.action === 'replaceTbdPlayer') {
+    const { tbdPlayerId, userId, matchId, isTeamA } = req.body;
+
+    if (!tbdPlayerId || !userId || !matchId) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Faltan parámetros requeridos' });
+    }
+
+    try {
+      // Obtener información del partido y grupo para validación
+      const match = await prisma.match.findUnique({
+        where: { id: matchId },
+        select: {
+          id: true,
+          groupId: true,
+          tbdPlayers: true,
+          group: {
+            select: {
+              members: {
+                where: {
+                  userId: currentUserId,
+                  role: 'ADMIN',
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!match) {
+        return res
+          .status(404)
+          .json({ success: false, message: 'Partido no encontrado' });
+      }
+
+      if (match.group.members.length === 0) {
+        return res.status(403).json({
+          success: false,
+          message: 'No tienes permisos de administrador para este grupo',
+        });
+      }
+
+      // Verificar que el jugador TBD existe en el partido
+      const tbdPlayers = match.tbdPlayers as any;
+      if (!tbdPlayers) {
+        return res.status(404).json({
+          success: false,
+          message: 'No hay jugadores TBD en este partido',
+        });
+      }
+
+      // Buscar el jugador TBD
+      const tbdPlayersArray = [
+        ...(tbdPlayers.teamA || []),
+        ...(tbdPlayers.teamB || []),
+      ];
+      const tbdPlayer = tbdPlayersArray.find((p) => p.id === tbdPlayerId);
+
+      if (!tbdPlayer) {
+        return res.status(404).json({
+          success: false,
+          message: 'Jugador TBD no encontrado',
+        });
+      }
+
+      // Obtener información del usuario real
+      const userToReplace = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          name: true,
+          image: true,
+        },
+      });
+
+      if (!userToReplace) {
+        return res
+          .status(404)
+          .json({ success: false, message: 'Usuario no encontrado' });
+      }
+
+      // Eliminar el jugador TBD del arreglo correspondiente
+      if (isTeamA) {
+        tbdPlayers.teamA = tbdPlayers.teamA.filter(
+          (p: any) => p.id !== tbdPlayerId
+        );
+      } else {
+        tbdPlayers.teamB = tbdPlayers.teamB.filter(
+          (p: any) => p.id !== tbdPlayerId
+        );
+      }
+
+      // Actualizar el partido con el nuevo arreglo de TBD
+      await prisma.match.update({
+        where: { id: matchId },
+        data: {
+          tbdPlayers,
+        },
+      });
+
+      // Crear el registro de MatchPlayer para el usuario real
+      await prisma.matchPlayer.create({
+        data: {
+          userId: userId,
+          matchId: matchId,
+          isTeamA: isTeamA,
+        },
+      });
+
+      // Crear asistencia confirmada para el usuario
+      await prisma.matchAttendance.upsert({
+        where: {
+          userId_matchId: {
+            userId: userId,
+            matchId: matchId,
+          },
+        },
+        update: {
+          status: 'CONFIRMED',
+        },
+        create: {
+          userId: userId,
+          matchId: matchId,
+          groupId: match.groupId,
+          matchDate: new Date(), // Esto debería ser la fecha real del partido
+          status: 'CONFIRMED',
+        },
+      });
+
+      // Registrar la acción en el log
+      await logGroupEvent(
+        match.groupId,
+        currentUserId,
+        LogAction.PLAYER_REPLACED,
+        {
+          matchId,
+          tbdPlayerId,
+          tbdPlayerName: tbdPlayer.name,
+          newPlayerId: userId,
+          newPlayerName: userToReplace.name,
+          isTeamA,
+          oldPlayer: {
+            id: tbdPlayerId,
+            name: tbdPlayer.name,
+          },
+          newPlayer: {
+            id: userId,
+            name: userToReplace.name,
+          },
+        }
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: 'Jugador reemplazado exitosamente',
+        data: {
+          tbdPlayerId,
+          userId,
+          matchId,
+          isTeamA,
+          user: userToReplace,
+        },
+      });
+    } catch (error) {
+      console.error('Error al reemplazar jugador:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error al reemplazar jugador',
+      });
+    }
   }
 
   // Solo permitir POST
@@ -17,85 +198,5 @@ export default async function handler(
     return res.status(405).json({ message: 'Método no permitido' });
   }
 
-  try {
-    const { matchId, teamAPlayers, teamBPlayers } = req.body;
-
-    if (!matchId) {
-      return res.status(400).json({ message: 'ID del partido requerido' });
-    }
-
-    if (!Array.isArray(teamAPlayers) || !Array.isArray(teamBPlayers)) {
-      return res.status(400).json({
-        message: 'Se requieren arrays de jugadores para ambos equipos',
-      });
-    }
-
-    // Verificar que el partido existe
-    const match = await prisma.match.findUnique({
-      where: { id: matchId },
-      include: {
-        group: {
-          include: {
-            members: {
-              where: {
-                userId: user.id,
-                role: 'ADMIN', // Verificar que el usuario sea admin
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!match) {
-      return res.status(404).json({ message: 'Partido no encontrado' });
-    }
-
-    // Verificar que el usuario tiene permisos de administrador
-    if (match.group.members.length === 0) {
-      return res.status(403).json({
-        message: 'No tienes permisos de administrador para este grupo',
-      });
-    }
-
-    // Eliminar jugadores existentes (si hay)
-    await prisma.matchPlayer.deleteMany({
-      where: { matchId },
-    });
-
-    // Registrar jugadores del equipo A
-    const teamAPromises = teamAPlayers.map((playerId: string) => {
-      return prisma.matchPlayer.create({
-        data: {
-          matchId,
-          userId: playerId,
-          isTeamA: true,
-        },
-      });
-    });
-
-    // Registrar jugadores del equipo B
-    const teamBPromises = teamBPlayers.map((playerId: string) => {
-      return prisma.matchPlayer.create({
-        data: {
-          matchId,
-          userId: playerId,
-          isTeamA: false,
-        },
-      });
-    });
-
-    // Ejecutar todas las operaciones
-    await Promise.all([...teamAPromises, ...teamBPromises]);
-
-    return res.status(200).json({
-      message: 'Jugadores registrados correctamente',
-    });
-  } catch (error) {
-    console.error('Error registrando jugadores:', error);
-    return res.status(500).json({
-      message: 'Error al registrar los jugadores',
-      error: error instanceof Error ? error.message : 'Error desconocido',
-    });
-  }
+  return res.status(400).json({ message: 'Acción no soportada' });
 }

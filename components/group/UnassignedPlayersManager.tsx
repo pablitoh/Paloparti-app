@@ -49,7 +49,7 @@ const UnassignedPlayersManager = ({
   }, [confirmedPlayers, playersA, playersB]);
 
   // Only render notification if needed
-  if (!teamsFormed || unassignedCount <= 0 || !currentUserIsAdmin) {
+  if (!teamsFormed || !currentUserIsAdmin || unassignedCount <= 0) {
     return null;
   }
 

@@ -3,6 +3,8 @@ import { prisma } from '../../../../lib/prisma';
 import { getCurrentUser } from '../../../../lib/auth';
 import { calculateAge } from '../../../../lib/utils';
 import { createNextMatch } from '../../../../lib/matches';
+import { logGroupEvent } from '../../../../utils/serverLogEvents';
+import { LogAction } from '../../../../utils/logTypes';
 
 interface MatchPlayer {
   isTeamA: boolean;
@@ -80,6 +82,8 @@ export default async function handler(
   try {
     const { scoreA, scoreB, goals } = req.body;
 
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+
     // Validar campos
     if (
       (scoreA !== undefined && (isNaN(scoreA) || scoreA < 0)) ||
@@ -87,6 +91,13 @@ export default async function handler(
     ) {
       return res.status(400).json({
         message: 'Los valores de puntuación deben ser números no negativos',
+      });
+    }
+
+    // Validar estructura de goles
+    if (goals !== undefined && !Array.isArray(goals)) {
+      return res.status(400).json({
+        message: 'El formato de los goles es inválido, debe ser un array',
       });
     }
 
@@ -99,17 +110,27 @@ export default async function handler(
 
     // Crear nuevos goles
     if (goals && Array.isArray(goals) && goals.length > 0) {
-      for (const goal of goals) {
-        if (!goal.userId) continue; // Ignorar goles sin jugador asignado
+      console.log('Processing goals:', JSON.stringify(goals, null, 2));
 
-        await prisma.goal.create({
-          data: {
-            matchId: id,
-            userId: goal.userId,
-            isTeamA: goal.isTeamA,
-            minute: goal.minute || null,
-          },
-        });
+      for (const goal of goals) {
+        if (!goal || !goal.userId) {
+          console.log('Skipping invalid goal:', goal);
+          continue; // Ignorar goles sin jugador asignado
+        }
+
+        try {
+          await prisma.goal.create({
+            data: {
+              matchId: id,
+              userId: goal.userId,
+              isTeamA: !!goal.isTeamA, // Ensure boolean value
+              minute: goal.minute != null ? Number(goal.minute) : null,
+            },
+          });
+        } catch (goalError) {
+          console.error('Error creating goal:', goalError, 'Goal data:', goal);
+          // Continue processing other goals even if one fails
+        }
       }
     }
 
@@ -122,6 +143,71 @@ export default async function handler(
         status: 'COMPLETED', // Marcar como completado
       },
     });
+
+    // Get team names from the group
+    const groupDetails = await prisma.group.findUnique({
+      where: { id: match.groupId },
+      select: {
+        teamAName: true,
+        teamBName: true,
+      },
+    });
+
+    // Format goals data for logging
+    const formattedGoalsForLog = [];
+    if (goals && Array.isArray(goals) && goals.length > 0) {
+      // Get player details for each goal scorer
+      const playerIds = [...new Set(goals.map((g) => g.userId))];
+      const players = await prisma.user.findMany({
+        where: {
+          id: {
+            in: playerIds,
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          image: true,
+        },
+      });
+
+      // Create a map for quick lookup
+      const playerMap = new Map();
+      players.forEach((p: { id: string; name: string | null }) =>
+        playerMap.set(p.id, p.name || 'Desconocido')
+      );
+
+      // Format goals with player names for better log display
+      formattedGoalsForLog.push(
+        ...goals.map((g) => ({
+          userId: g.userId,
+          name: playerMap.get(g.userId) || 'Desconocido',
+          team: g.isTeamA
+            ? groupDetails?.teamAName || 'Equipo A'
+            : groupDetails?.teamBName || 'Equipo B',
+          isTeamA: g.isTeamA,
+          minute: g.minute,
+        }))
+      );
+    }
+
+    // Registrar en el log si el partido cambió de estado a COMPLETED
+    if (match.status === 'PENDING' && updatedMatch.status === 'COMPLETED') {
+      await logGroupEvent(match.groupId, user.id, LogAction.MATCH_COMPLETED, {
+        matchId: id,
+        date: match.date,
+        location: match.location,
+        scoreA,
+        scoreB,
+        teamAName: groupDetails?.teamAName || 'Equipo A',
+        teamBName: groupDetails?.teamBName || 'Equipo B',
+        goals: formattedGoalsForLog,
+        scorers: formattedGoalsForLog.map((g) => ({
+          name: g.name,
+          team: g.team,
+        })),
+      });
+    }
 
     // Resetear los estados de asistencia para futuros partidos si es necesario
     try {

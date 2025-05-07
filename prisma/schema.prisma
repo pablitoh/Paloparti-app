@@ -22,6 +22,7 @@ model User {
   attendance    MatchAttendance[]
   matchPlayers  MatchPlayer[]
   sessions      Session[]
+  logs          GroupLog[]
 }
 
 model Account {
@@ -75,6 +76,7 @@ model Group {
   members             GroupMember[]
   matches             Match[]
   attendanceRecords   MatchAttendance[]
+  logs                GroupLog[]
 }
 
 model GroupMember {
@@ -160,4 +162,18 @@ model ShortUrl {
   originalUrl String
   createdAt   DateTime @default(now())
   accessCount Int      @default(0)
+}
+
+model GroupLog {
+  id          String   @id @default(cuid())
+  groupId     String
+  userId      String
+  action      String
+  details     Json?
+  createdAt   DateTime @default(now())
+  group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([groupId])
+  @@index([userId])
 }

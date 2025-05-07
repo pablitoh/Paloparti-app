@@ -3,6 +3,8 @@ import { prisma } from '../../../lib/prisma';
 import jwt from 'jsonwebtoken';
 import { getCurrentUser } from '../../../lib/auth';
 import { calculateAge } from '../../../lib/utils';
+import { logGroupEvent } from '../../../utils/serverLogEvents';
+import { LogAction } from '../../../utils/logTypes';
 
 // Tipos para formatear los datos
 interface FormattedMember {
@@ -302,6 +304,34 @@ export default async function handler(
           requiredPlayers,
           // Actualizar nextMatch si se proporciona
           ...(nextMatch && { nextMatch: new Date(nextMatch) }),
+        },
+      });
+
+      // Registrar en el log
+      await logGroupEvent(id, user.id, LogAction.GROUP_EDITED, {
+        previousData: {
+          name: group.name,
+          sport: group.sport,
+          description: group.description,
+          location: group.location,
+          teamAName: group.teamAName,
+          teamBName: group.teamBName,
+          requiredPlayers: group.requiredPlayers,
+          recurrenceType: group.recurrenceType,
+          recurrenceDays: group.recurrenceDays,
+          recurrenceTime: group.recurrenceTime,
+        },
+        newData: {
+          name,
+          sport,
+          description,
+          location,
+          teamAName,
+          teamBName,
+          requiredPlayers,
+          recurrenceType,
+          recurrenceDays,
+          recurrenceTime,
         },
       });
 

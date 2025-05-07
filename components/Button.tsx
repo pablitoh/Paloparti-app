@@ -12,6 +12,7 @@ const Button: React.FC<ButtonProps> = ({
   size = 'md',
   fullWidth = false,
   className = '',
+  disabled = false,
   ...props
 }) => {
   const baseStyles = 'rounded-lg font-medium transition-colors';
@@ -32,9 +33,15 @@ const Button: React.FC<ButtonProps> = ({
 
   const widthStyle = fullWidth ? 'w-full' : '';
 
+  // Estilos para botones deshabilitados
+  const disabledStyles = disabled
+    ? 'opacity-60 cursor-not-allowed bg-gray-300 text-gray-500 border-gray-300 hover:bg-gray-300 hover:text-gray-500 hover:border-gray-300'
+    : '';
+
   return (
     <button
-      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${widthStyle} ${className}`}
+      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${widthStyle} ${disabledStyles} ${className}`}
+      disabled={disabled}
       {...props}
     >
       {children}

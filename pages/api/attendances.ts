@@ -2,6 +2,8 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth';
 import { authOptions } from './auth/[...nextauth]';
 import { prisma } from '../../lib/prisma';
+import { logGroupEvent } from '../../utils/serverLogEvents';
+import { LogAction } from '../../utils/logTypes';
 
 interface ConfirmedPlayer {
   id: string;
@@ -85,10 +87,15 @@ export default async function handler(
     const members = match.group.members;
 
     // Check if user is a member and if requester is admin (if updating other's attendance)
-    const targetMember = members.find((m) => m.userId === targetUserId);
+    const targetMember = members.find(
+      (m: { userId: string }) => m.userId === targetUserId
+    );
     const isAdmin =
       session.user.id === targetUserId ||
-      members.some((m) => m.userId === session.user.id && m.role === 'ADMIN');
+      members.some(
+        (m: { userId: string; role: string }) =>
+          m.userId === session.user.id && m.role === 'ADMIN'
+      );
 
     if (!targetMember) {
       return res
@@ -122,6 +129,43 @@ export default async function handler(
         status: status,
       },
     });
+
+    // Registrar la acción en el log
+    try {
+      // Si el usuario está actualizando su propia asistencia
+      if (session.user.id === targetUserId) {
+        await logGroupEvent(
+          targetGroupId,
+          session.user.id,
+          LogAction.USER_ATTENDANCE_UPDATED,
+          {
+            matchId,
+            status,
+          }
+        );
+      } else {
+        // Si un administrador está actualizando la asistencia de otro usuario
+        const targetUser = await prisma.user.findUnique({
+          where: { id: targetUserId },
+          select: { id: true, name: true },
+        });
+
+        await logGroupEvent(
+          targetGroupId,
+          session.user.id,
+          LogAction.ADMIN_ATTENDANCE_UPDATED,
+          {
+            matchId,
+            userId: targetUserId,
+            userName: targetUser?.name,
+            status,
+          }
+        );
+      }
+    } catch (logError) {
+      console.error('Error logging attendance update:', logError);
+      // No interrumpimos el flujo principal si falla el log
+    }
 
     return res.status(200).json({
       success: true,

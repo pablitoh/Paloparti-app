@@ -501,7 +501,9 @@ export const useRandomizeTeamsMutation = () => {
 
   return useMutation({
     mutationFn: async (params: RandomizeTeamsParams) => {
-      const response = await fetch(`/api/matches/create-match`, {
+      // Añadir un timestamp aleatorio para evitar que se use una respuesta en caché
+      const timestamp = Date.now() + Math.random();
+      const response = await fetch(`/api/matches/create-match?t=${timestamp}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -511,6 +513,7 @@ export const useRandomizeTeamsMutation = () => {
           matchId: params.matchId,
           mode: 'auto',
           isResort: true,
+          forceNewShuffle: true, // Añadir parámetro para forzar un nuevo sorteo aleatorio
         }),
       });
       if (!response.ok) {
