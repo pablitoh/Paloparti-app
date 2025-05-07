@@ -36,17 +36,13 @@ export default async function handler(
 
   try {
     // Redireccionar todas las solicitudes a /api/register
-    const response = await fetch(
-      `${process.env.NEXTAUTH_URL || ''}/api/register`,
-      {
-        method: req.method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body:
-          typeof req.body === 'string' ? req.body : JSON.stringify(req.body),
-      }
-    );
+    const response = await fetch(`/api/register`, {
+      method: req.method,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: typeof req.body === 'string' ? req.body : JSON.stringify(req.body),
+    });
 
     const data = await response.json();
     return res.status(response.status).json(data);
