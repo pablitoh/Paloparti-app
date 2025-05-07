@@ -13,14 +13,34 @@ const publicPaths = [
   '/register',
 ];
 
+// Detectar si estamos en ambiente de Vercel Preview
+const isVercelPreview = process.env.VERCEL_ENV === 'preview';
+
 export default withAuth(
   function middleware(request: NextRequest) {
     console.log(
       'Middleware processing:',
       request.method,
-      request.nextUrl.pathname
+      request.nextUrl.pathname,
+      isVercelPreview ? '(Preview Environment)' : ''
     );
 
+    // En ambiente de preview, permitimos todas las rutas para depuración
+    if (isVercelPreview) {
+      console.log('Preview environment detected - more permissive middleware');
+      // Si está intentando acceder a rutas API de autenticación o públicas, permitir
+      if (
+        request.nextUrl.pathname.startsWith('/api/auth') ||
+        publicPaths.some((path) => request.nextUrl.pathname.startsWith(path))
+      ) {
+        return NextResponse.next();
+      }
+
+      // Para otras rutas, continuamos con NextAuth para validar la sesión
+      return NextResponse.next();
+    }
+
+    // Comportamiento normal para otros ambientes
     const isPublic = publicPaths.some(
       (path) =>
         request.nextUrl.pathname.startsWith(path) ||

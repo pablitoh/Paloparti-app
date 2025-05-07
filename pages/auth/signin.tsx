@@ -1,18 +1,24 @@
 import { GetServerSideProps } from 'next';
 import { signIn, getSession } from 'next-auth/react';
 import Layout from '../../components/Layout';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 
+// Detectar si estamos en ambiente de Vercel Preview
+const isVercelPreview = process.env.VERCEL_ENV === 'preview';
+
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const session = await getSession(context);
 
-  // Extract the callback URL, ensure it's not the signin page itself
-  const callbackUrl = context.query.callbackUrl
-    ? String(context.query.callbackUrl)
-    : '/groups';
+  // En ambientes de preview, forzar callbackUrl a '/groups'
+  const forcedCallbackUrl = isVercelPreview ? '/groups' : undefined;
+
+  // Extract the callback URL, con prioridad al forzado para preview
+  const callbackUrl =
+    forcedCallbackUrl ||
+    (context.query.callbackUrl ? String(context.query.callbackUrl) : '/groups');
 
   // If requesting /auth/signin with callbackUrl=/auth/signin, break the loop
   if (callbackUrl.includes('/auth/signin')) {
@@ -37,15 +43,38 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   return {
     props: {
       callbackUrl,
+      isPreview:
+        !!process.env.VERCEL_ENV && process.env.VERCEL_ENV === 'preview',
     },
   };
 };
 
-export default function SignIn({ callbackUrl }: { callbackUrl: string }) {
+export default function SignIn({
+  callbackUrl,
+  isPreview,
+}: {
+  callbackUrl: string;
+  isPreview?: boolean;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Al cargar, limpiar cualquier dato de sesión local corrupto
+  useEffect(() => {
+    if (isPreview) {
+      // En ambientes de preview, podemos intentar limpiar el localStorage
+      try {
+        localStorage.removeItem('next-auth.session-token');
+        localStorage.removeItem('next-auth.callback-url');
+        localStorage.removeItem('next-auth.csrf-token');
+        sessionStorage.clear();
+      } catch (e) {
+        // Si hay errores al limpiar, ignoramos
+      }
+    }
+  }, [isPreview]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,8 +82,11 @@ export default function SignIn({ callbackUrl }: { callbackUrl: string }) {
 
     try {
       // Ensure we're using a valid callbackUrl that won't cause loops
-      const safeCallbackUrl =
-        callbackUrl && callbackUrl !== '/auth/signin' ? callbackUrl : '/groups';
+      const safeCallbackUrl = isPreview
+        ? '/groups' // Siempre usar /groups en preview
+        : callbackUrl && callbackUrl !== '/auth/signin'
+        ? callbackUrl
+        : '/groups';
 
       const result = await signIn('credentials', {
         email,
@@ -66,8 +98,13 @@ export default function SignIn({ callbackUrl }: { callbackUrl: string }) {
       if (result?.error) {
         toast.error(result.error);
       } else if (result?.url) {
-        // Use router.replace instead of push to avoid adding to history stack
-        router.replace(result.url);
+        // En preview, ir directamente a /groups sin importar el resultado
+        if (isPreview) {
+          router.replace('/groups');
+        } else {
+          // Use router.replace instead of push to avoid adding to history stack
+          router.replace(result.url);
+        }
       }
     } catch (error) {
       toast.error('Error al iniciar sesión');
@@ -85,6 +122,11 @@ export default function SignIn({ callbackUrl }: { callbackUrl: string }) {
             <h2 className='mt-6 text-center text-3xl font-extrabold text-gray-900'>
               Iniciar Sesión
             </h2>
+            {isPreview && (
+              <p className='mt-2 text-center text-sm text-orange-600'>
+                Ambiente de Preview - Credenciales de prueba habilitadas
+              </p>
+            )}
           </div>
           <form className='mt-8 space-y-6' onSubmit={handleSubmit}>
             <div className='rounded-md shadow-sm -space-y-px'>

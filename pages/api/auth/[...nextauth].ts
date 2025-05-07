@@ -4,6 +4,9 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { prisma } from '../../../lib/prisma';
 import bcrypt from 'bcryptjs';
 
+// Detectar si estamos en un ambiente de preview de Vercel
+const isVercelPreview = process.env.VERCEL_ENV === 'preview';
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -64,10 +67,23 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: process.env.VERCEL_URL
-          ? true
-          : process.env.NODE_ENV === 'production',
-        domain: undefined,
+        secure: false, // Usar false en todos los ambientes para pruebas
+      },
+    },
+    callbackUrl: {
+      name: `next-auth.callback-url`,
+      options: {
+        sameSite: 'lax',
+        path: '/',
+        secure: false,
+      },
+    },
+    csrfToken: {
+      name: `next-auth.csrf-token`,
+      options: {
+        sameSite: 'lax',
+        path: '/',
+        secure: false,
       },
     },
   },
@@ -85,6 +101,15 @@ export const authOptions: NextAuthOptions = {
         session.user.birthdate = token.birthdate as Date | null;
       }
       return session;
+    },
+    // Forzar a que el callback siempre vaya a /groups en preview
+    async redirect({ url, baseUrl }) {
+      // En ambientes de preview, siempre redirigir a /groups
+      if (isVercelPreview) {
+        return `${baseUrl}/groups`;
+      }
+      // Para otros ambientes, mantener el comportamiento normal
+      return url.startsWith(baseUrl) ? url : baseUrl;
     },
   },
   pages: {
