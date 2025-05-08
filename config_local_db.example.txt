@@ -1,0 +1,21 @@
+# Instrucciones para usar la base de datos local en Docker
+
+# 1. Asegúrate de que Docker está en ejecución y el contenedor de postgres está activo
+# El comando 'docker ps' muestra que postgres está corriendo en el puerto 5432
+
+# 2. Modifica el archivo .env.local para usar la base de datos local
+# Reemplaza la línea actual de DATABASE_URL con:
+DATABASE_URL="postgresql://usuario:contraseña@localhost:5432/nombredb"
+
+# 3. Si quieres hacerlo de forma rápida desde la terminal, puedes usar:
+# Opción 1 - Crear nuevo archivo .env.local:
+echo 'DATABASE_URL="postgresql://usuario:contraseña@localhost:5432/nombredb"' > .env.local
+
+# Opción 2 - Modificar solo la línea de DATABASE_URL en el archivo existente:
+# Primero, hacer una copia de seguridad:
+cp .env.local .env.local.bak
+# Luego reemplazar la línea:
+sed -i '' 's|DATABASE_URL=.*|DATABASE_URL="postgresql://usuario:contraseña@localhost:5432/nombredb"|' .env.local
+
+# 4. Iniciar la aplicación:
+# npm run dev 
