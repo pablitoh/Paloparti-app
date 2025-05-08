@@ -113,7 +113,7 @@ export default function MembersTab({
 
     if (isCurrentUser) {
       return (
-        <span className='text-sm text-gray-500 italic block mt-1 md:mt-0'>
+        <span className='text-sm text-gray-500 italic block mt-1 md:mt-0 bg-gray-50 px-3 py-1.5 rounded-md border border-gray-100'>
           Confirmar desde pestaña "Próximo Partido"
         </span>
       );
@@ -128,11 +128,11 @@ export default function MembersTab({
     const isProcessing = processingButton?.id === member.id;
 
     return (
-      <div className='flex gap-2 mt-2 md:mt-0'>
+      <div className='flex gap-2 mt-2 md:mt-0 flex-wrap justify-end'>
         {!isConfirmed && (
           <button
             onClick={handleConfirm}
-            className='text-green-600 hover:text-green-900 bg-green-100 hover:bg-green-200 px-3 py-1 rounded-md text-xs md:text-sm flex items-center'
+            className='text-green-600 hover:text-green-900 bg-green-100 hover:bg-green-200 px-3 py-1.5 md:py-1 rounded-md text-xs md:text-sm flex items-center min-w-[90px] justify-center'
             disabled={
               isLoading ||
               (isMaxPlayersReached && !isConfirmed) ||
@@ -162,7 +162,7 @@ export default function MembersTab({
                     d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
                   ></path>
                 </svg>
-                Procesando...
+                <span className='whitespace-nowrap'>Procesando...</span>
               </span>
             ) : !group?.nextMatchId ? (
               'Sin partido'
@@ -179,7 +179,7 @@ export default function MembersTab({
         {isConfirmed && (
           <button
             onClick={handleDecline}
-            className='text-red-600 hover:text-red-900 bg-red-100 hover:bg-red-200 px-3 py-1 rounded-md text-xs md:text-sm flex items-center'
+            className='text-red-600 hover:text-red-900 bg-red-100 hover:bg-red-200 px-3 py-1.5 md:py-1 rounded-md text-xs md:text-sm flex items-center min-w-[90px] justify-center'
             disabled={
               isLoading || !group?.nextMatchId || processingButton !== null
             }
@@ -206,7 +206,7 @@ export default function MembersTab({
                     d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
                   ></path>
                 </svg>
-                Procesando...
+                <span className='whitespace-nowrap'>Procesando...</span>
               </span>
             ) : (
               <>
@@ -222,7 +222,7 @@ export default function MembersTab({
 
   return (
     <div className='space-y-4'>
-      <div className='flex justify-between items-center'>
+      <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2'>
         <h3 className='text-lg font-semibold'>
           Miembros ({localConfirmedCount} confirmados para el próximo partido)
         </h3>
@@ -318,8 +318,20 @@ export default function MembersTab({
         </div>
       </div>
 
-      {/* Vista móvil */}
-      <div className='md:hidden space-y-4'>
+      {/* Vista móvil mejorada */}
+      <div className='md:hidden space-y-3'>
+        {/* Sección de estadísticas móvil */}
+        <div className='sticky top-0 z-10 bg-white pb-2'>
+          <div className='flex justify-between items-center mb-2 bg-gray-50 p-3 rounded-md shadow-sm'>
+            <span className='text-sm font-medium text-gray-600'>
+              Total: {group?.members?.length || 0}
+            </span>
+            <span className='text-sm font-medium text-green-600'>
+              {localConfirmedCount} confirmados
+            </span>
+          </div>
+        </div>
+
         {group?.members?.map((member: Member) => {
           const isConfirmedForNextMatch =
             membersConfirmationStatus[member.userId] ??
@@ -329,27 +341,29 @@ export default function MembersTab({
           return (
             <div
               key={member.id}
-              className='bg-white shadow rounded-lg p-4 flex flex-col'
+              className='bg-white shadow rounded-lg p-3 flex flex-col border border-gray-100'
             >
               <div className='flex items-center justify-between'>
-                <div className='flex items-center'>
+                <div className='flex items-center flex-1'>
                   <Avatar
                     alt={member.name || 'Usuario sin nombre'}
                     src={member.avatar || ''}
                     className='h-10 w-10 rounded-full'
                   />
-                  <div className='ml-3'>
-                    <div className='text-sm font-medium text-gray-900'>
-                      {member.name || 'Usuario sin nombre'}
+                  <div className='ml-3 min-w-0 flex-1'>
+                    <div className='flex items-center flex-wrap gap-1'>
+                      <span className='text-sm font-medium text-gray-900 truncate'>
+                        {member.name || 'Usuario sin nombre'}
+                      </span>
                       {member.role === 'ADMIN' && (
-                        <span className='ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800'>
+                        <span className='inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800'>
                           Admin
                         </span>
                       )}
                     </div>
                     <div className='mt-1'>
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                           isConfirmedForNextMatch
                             ? 'bg-green-100 text-green-800'
                             : 'bg-gray-100 text-gray-800'
@@ -361,13 +375,15 @@ export default function MembersTab({
                   </div>
                 </div>
               </div>
-              <div className='mt-3'>
-                <ActionButtons
-                  member={member}
-                  isConfirmedForNextMatch={isConfirmedForNextMatch}
-                  isCurrentUser={isCurrentUser}
-                />
-              </div>
+              {(currentUserIsAdmin || isCurrentUser) && (
+                <div className='mt-2 flex justify-end'>
+                  <ActionButtons
+                    member={member}
+                    isConfirmedForNextMatch={isConfirmedForNextMatch}
+                    isCurrentUser={isCurrentUser}
+                  />
+                </div>
+              )}
             </div>
           );
         })}
@@ -375,7 +391,7 @@ export default function MembersTab({
 
       {/* Botón de salir del grupo */}
       {handleLeaveGroup && user && (
-        <div className='pt-6 border-t border-gray-200 mt-6'>
+        <div className='pt-4 border-t border-gray-200 mt-6'>
           <button
             onClick={() => {
               if (
@@ -386,7 +402,7 @@ export default function MembersTab({
                 handleLeaveGroup();
               }
             }}
-            className='w-full sm:w-auto flex items-center justify-center px-4 py-2 border border-red-600 rounded-md shadow-sm text-sm font-medium text-red-600 hover:text-white hover:bg-red-600 transition-all duration-200'
+            className='w-full flex items-center justify-center px-4 py-3 border border-red-600 rounded-md shadow-sm text-sm font-medium text-red-600 hover:text-white hover:bg-red-600 transition-all duration-200 md:py-2 md:w-auto'
           >
             <ArrowRightOnRectangleIcon className='h-5 w-5 mr-2' />
             Salir del grupo
