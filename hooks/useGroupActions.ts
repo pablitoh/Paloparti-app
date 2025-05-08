@@ -13,7 +13,7 @@ import {
   useResetAttendanceMutation,
 } from '../services/reactQueryHooks';
 
-interface UseGroupActionsProps {
+export interface UseGroupActionsProps {
   groupId: string;
   nextMatchId?: string;
   onSuccess?: () => void;
@@ -26,7 +26,7 @@ export const useGroupActions = ({
   nextMatchId,
   onSuccess,
   group,
-  allowFillIn = true,
+  allowFillIn = false,
 }: UseGroupActionsProps) => {
   const router = useRouter();
   const queryClient = useQueryClient();

@@ -41,7 +41,7 @@ export default async function handler(
       groupId,
       date,
       location,
-      balanceByAge = true,
+      balanceByAge = false,
       teamA = null,
       teamB = null,
       mode = 'auto', // 'auto' para sorteo automático, 'manual' para equipos manuales
@@ -124,9 +124,23 @@ export default async function handler(
           })),
       };
 
-      // Verify match players separately
-      const matchPlayers = await prisma.matchPlayer.findMany({
-        where: { matchId },
+      // Obtener todos los usuarios con asistencia CONFIRMED para este partido
+      const attendancesWithUser = await prisma.matchAttendance.findMany({
+        where: {
+          matchId: existingMatch ? existingMatch.id : 'new-match',
+          status: 'CONFIRMED',
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+              birthdate: true, // Asegurarse de incluir birthdate
+            },
+          },
+        },
       });
     } else if (!isResort) {
       // Si no es un re-sorteo, verificar que no existe un partido pendiente
@@ -462,12 +476,13 @@ export default async function handler(
       teamAAvgAge = calculateAverageAge(autoTeamA);
       teamBAvgAge = calculateAverageAge(autoTeamB);
 
-      // Convertir a formato esperado
+      // Convertir a formato esperado con edad calculada correctamente
       finalTeamA = autoTeamA.map((player) => ({
         id: player.id,
         name: player.name,
         avatar: null,
         playerType: 'TEAM',
+        age: player.age,
       }));
 
       finalTeamB = autoTeamB.map((player) => ({
@@ -475,7 +490,27 @@ export default async function handler(
         name: player.name,
         avatar: null,
         playerType: 'TEAM',
+        age: player.age,
       }));
+
+      // Asegurar que todos los jugadores tengan una edad definida y calcular promedios
+      teamAAvgAge = calculateAverageAge(autoTeamA);
+      teamBAvgAge = calculateAverageAge(autoTeamB);
+
+      console.log('Equipos formados:', {
+        teamAAvgAge,
+        teamBAvgAge,
+        teamAPlayers: finalTeamA.map((p) => ({
+          id: p.id,
+          name: p.name,
+          age: p.age,
+        })),
+        teamBPlayers: finalTeamB.map((p) => ({
+          id: p.id,
+          name: p.name,
+          age: p.age,
+        })),
+      });
     }
 
     // Añadir jugadores TBD si es necesario

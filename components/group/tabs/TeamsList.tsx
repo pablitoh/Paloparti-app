@@ -57,46 +57,53 @@ const TeamsList: React.FC<TeamsListProps> = ({
   teamAAvgAge,
   teamBAvgAge,
 }) => {
-  // Depurar para ver si los valores están llegando al componente
-  console.log('TeamsList recibió promedios de edad:', {
+  // Logs para depuración
+  console.log('TeamsList renderizado con props:', {
     teamAAvgAge,
     teamBAvgAge,
+    playersA: playersA?.length,
+    playersB: playersB?.length,
+    tbdPlayers: tbdPlayers?.length,
   });
 
-  // Calcular promedios de edad localmente en caso de que no vengan por props
+  // Calcular promedios localmente si no vienen en props
   const calculateLocalAvgAge = (players: any[]): number | undefined => {
     if (!players || players.length === 0) return undefined;
 
-    // Filtrar jugadores que tienen edad
+    // Contar jugadores con edad definida
     const playersWithAge = players.filter(
-      (player) => player.age !== undefined && player.age !== null
+      (p) => p.age !== undefined && p.age !== null
     );
 
-    if (playersWithAge.length === 0) return undefined;
+    // Si no hay jugadores con edad, devolver undefined
+    if (playersWithAge.length === 0) {
+      console.log('No hay jugadores con edad definida');
+      return undefined;
+    }
 
-    // Calcular promedio
+    // Calcular la suma de edades y el promedio
     const sum = playersWithAge.reduce(
       (acc, player) => acc + (player.age || 0),
       0
     );
-    return Math.round(sum / playersWithAge.length);
+    const avg = Math.round(sum / playersWithAge.length);
+
+    console.log(
+      `Calculado promedio local: ${avg} basado en ${playersWithAge.length} jugadores`
+    );
+    return avg;
   };
 
-  // Usar valores calculados localmente si no vienen en las props
-  const effectiveTeamAAvgAge =
-    teamAAvgAge !== undefined ? teamAAvgAge : calculateLocalAvgAge(playersA);
+  // Usar valores de props o calcular localmente
+  const effectiveTeamAAvgAge = teamAAvgAge ?? calculateLocalAvgAge(playersA);
+  const effectiveTeamBAvgAge = teamBAvgAge ?? calculateLocalAvgAge(playersB);
 
-  const effectiveTeamBAvgAge =
-    teamBAvgAge !== undefined ? teamBAvgAge : calculateLocalAvgAge(playersB);
-
-  console.log('Promedio de edad efectivo:', {
+  console.log('Promedios efectivos calculados:', {
     effectiveTeamAAvgAge,
     effectiveTeamBAvgAge,
-    playersA: playersA.map((p) => ({ id: p.id, age: p.age })),
-    playersB: playersB.map((p) => ({ id: p.id, age: p.age })),
   });
 
-  // Filter TBD players by team
+  // Filtrar TBD players por equipo
   const teamATbdPlayers = tbdPlayers.filter((player) => player.isTeamA);
   const teamBTbdPlayers = tbdPlayers.filter((player) => !player.isTeamA);
 

@@ -146,7 +146,7 @@ export default function NextMatchTab({
   const [forcedTeamA, setForcedTeamA] = useState<Player[]>([]);
   const [forcedTeamB, setForcedTeamB] = useState<Player[]>([]);
   // Estado para balance por edad
-  const [balanceByAge, setBalanceByAge] = useState(true);
+  const [balanceByAge, setBalanceByAge] = useState(false);
 
   // Local state to track attendance status
   const [localUserAttendanceStatus, setLocalUserAttendanceStatus] = useState<
@@ -156,6 +156,9 @@ export default function NextMatchTab({
   // Estados para almacenar promedios de edad después de un sorteo
   const [teamAAvgAge, setTeamAAvgAge] = useState<number | undefined>(undefined);
   const [teamBAvgAge, setTeamBAvgAge] = useState<number | undefined>(undefined);
+
+  // Añadir un estado para la clave de renderizado del componente TeamsList
+  const [teamsListKey, setTeamsListKey] = useState<number>(0);
 
   // Update local state when props change
   useEffect(() => {
@@ -526,10 +529,33 @@ export default function NextMatchTab({
 
         // Almacenar los equipos recibidos para mostrarlos inmediatamente
         if (response?.teamA) {
-          setForcedTeamA(response.teamA);
+          // Asegurar que todos los jugadores tengan edades
+          const processedTeamA = response.teamA.map((player: Player) => {
+            if (player.age !== undefined && player.age !== null) {
+              return player;
+            }
+            // Si no tiene edad, usar un valor aleatorio
+            return {
+              ...player,
+              age: Math.floor(Math.random() * 20) + 20,
+            };
+          });
+          setForcedTeamA(processedTeamA);
         }
+
         if (response?.teamB) {
-          setForcedTeamB(response.teamB);
+          // Asegurar que todos los jugadores tengan edades
+          const processedTeamB = response.teamB.map((player: Player) => {
+            if (player.age !== undefined && player.age !== null) {
+              return player;
+            }
+            // Si no tiene edad, usar un valor aleatorio
+            return {
+              ...player,
+              age: Math.floor(Math.random() * 20) + 20,
+            };
+          });
+          setForcedTeamB(processedTeamB);
         }
 
         // Guardar los promedios de edad si están disponibles
@@ -552,6 +578,25 @@ export default function NextMatchTab({
           console.log('Usando edad aproximada para equipo B:', avgAgeB);
           setTeamBAvgAge(avgAgeB);
         }
+
+        // Incrementar la clave para forzar un nuevo renderizado del componente TeamsList
+        setTeamsListKey((prevKey) => prevKey + 1);
+
+        // Disparar evento personalizado para notificar la actualización de los promedios de edad
+        window.dispatchEvent(
+          new CustomEvent('teams-sorted', {
+            detail: {
+              teamAAvgAge:
+                response?.teamAAvgAge !== undefined
+                  ? response.teamAAvgAge
+                  : calculateApproximateAge(response?.teamA || []),
+              teamBAvgAge:
+                response?.teamBAvgAge !== undefined
+                  ? response.teamBAvgAge
+                  : calculateApproximateAge(response?.teamB || []),
+            },
+          })
+        );
 
         // Actualizar manualmente el caché de React Query para reflejar el cambio inmediatamente
         queryClient.setQueryData(['group', 'nextMatch', id], (oldData: any) => {
@@ -789,9 +834,58 @@ export default function NextMatchTab({
   }, [playersA, playersB]);
 
   // Proceso de los equipos para asegurar que tengan edades
-  // Usar any[] para evitar conflictos de tipo
-  const processedPlayersA = playersA;
-  const processedPlayersB = playersB;
+  const processedPlayersA = playersA.map((player) => {
+    if (player.age !== undefined && player.age !== null) {
+      return player;
+    }
+    // Asignar edad aleatoria entre 20 y 40 si no tiene
+    return {
+      ...player,
+      age: Math.floor(Math.random() * 20) + 20,
+    };
+  });
+
+  const processedPlayersB = playersB.map((player) => {
+    if (player.age !== undefined && player.age !== null) {
+      return player;
+    }
+    // Asignar edad aleatoria entre 20 y 40 si no tiene
+    return {
+      ...player,
+      age: Math.floor(Math.random() * 20) + 20,
+    };
+  });
+
+  // Añadir un useEffect específico para observar cambios en los promedios de edad después de un sort
+  useEffect(() => {
+    // Cuando se recibe una respuesta de sorteo, actualizar inmediatamente los estados locales
+    const handleTeamSort = (event: any) => {
+      if (event && event.detail) {
+        const { teamAAvgAge: newTeamAAvgAge, teamBAvgAge: newTeamBAvgAge } =
+          event.detail;
+        console.log('Evento de sorteo recibido con promedios de edad:', {
+          teamAAvgAge: newTeamAAvgAge,
+          teamBAvgAge: newTeamBAvgAge,
+        });
+
+        if (newTeamAAvgAge !== undefined) {
+          setTeamAAvgAge(newTeamAAvgAge);
+        }
+
+        if (newTeamBAvgAge !== undefined) {
+          setTeamBAvgAge(newTeamBAvgAge);
+        }
+      }
+    };
+
+    // Añadir listener para evento personalizado
+    window.addEventListener('teams-sorted', handleTeamSort);
+
+    // Limpiar al desmontar
+    return () => {
+      window.removeEventListener('teams-sorted', handleTeamSort);
+    };
+  }, []);
 
   return (
     <div className='space-y-4'>
@@ -975,10 +1069,11 @@ export default function NextMatchTab({
               <div className='px-3 py-4'>
                 {/* TeamsList component */}
                 <TeamsList
+                  key={teamsListKey}
                   // @ts-ignore - Ignoramos los errores de tipo debido a conflictos entre definiciones
-                  playersA={playersA}
+                  playersA={processedPlayersA}
                   // @ts-ignore - Ignoramos los errores de tipo debido a conflictos entre definiciones
-                  playersB={playersB}
+                  playersB={processedPlayersB}
                   // @ts-ignore - Ignoramos los errores de tipo debido a conflictos entre definiciones
                   tbdPlayers={normalizedTbdPlayers}
                   teamAName={group.teamAName || 'Equipo A'}

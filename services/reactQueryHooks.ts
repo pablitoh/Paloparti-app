@@ -516,7 +516,7 @@ export const useRandomizeTeamsMutation = () => {
           isResort: true,
           forceNewShuffle: true, // Añadir parámetro para forzar un nuevo sorteo aleatorio
           balanceByAge:
-            params.balanceByAge !== undefined ? params.balanceByAge : true, // Pasar el parámetro con valor por defecto true
+            params.balanceByAge !== undefined ? params.balanceByAge : false, // Pasar el parámetro con valor por defecto false
         }),
       });
       if (!response.ok) {
@@ -531,6 +531,23 @@ export const useRandomizeTeamsMutation = () => {
       const queryKey = ['group', 'nextMatch', variables.groupId];
       queryClient.setQueryData(queryKey, (oldData: any) => {
         if (!oldData) return oldData;
+
+        // Añadir log para depuración de promedios de edad
+        console.log('Actualizando caché con promedios de edad:', {
+          teamAAvgAge: data.teamAAvgAge,
+          teamBAvgAge: data.teamBAvgAge,
+          teamA: data.teamA?.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            age: p.age,
+          })),
+          teamB: data.teamB?.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            age: p.age,
+          })),
+        });
+
         return {
           ...oldData,
           nextMatchDetails: {
@@ -538,6 +555,9 @@ export const useRandomizeTeamsMutation = () => {
             playersA: data.teamA,
             playersB: data.teamB,
             tbdPlayers: data.tbdPlayers,
+            teamAAvgAge: data.teamAAvgAge, // Añadir promedios de edad al caché
+            teamBAvgAge: data.teamBAvgAge, // Añadir promedios de edad al caché
+            sortCount: 1, // Asegurar que el sortCount sea 1 después del sorteo
           },
         };
       });

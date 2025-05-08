@@ -29,7 +29,7 @@ export default async function handler(
   try {
     const {
       groupId,
-      balanceByAge = true, // Si se debe balancear por edad
+      balanceByAge = false, // Si se debe balancear por edad
       location,
       date,
     } = req.body;

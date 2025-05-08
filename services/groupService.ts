@@ -210,7 +210,7 @@ export const leaveGroup = async (groupId: string): Promise<Response> => {
 export const randomizeTeams = async (
   groupId: string,
   matchId: string,
-  balanceByAge: boolean = true
+  balanceByAge: boolean = false
 ): Promise<{ success: boolean; groupId: string }> => {
   const response = await fetch(`/api/matches/create-match`, {
     method: 'POST',

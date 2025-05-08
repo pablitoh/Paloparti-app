@@ -25,7 +25,7 @@ const TeamFormationNotification = ({
   currentUserIsAdmin,
   allowFillIn = false,
   setAllowFillIn,
-  balanceByAge = true,
+  balanceByAge = false,
   setBalanceByAge,
 }: TeamFormationNotificationProps) => {
   // Si no es admin, no mostrar nada

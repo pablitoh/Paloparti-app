@@ -507,7 +507,7 @@ export default function GroupDetails() {
   const [showReplaceTbdModal, setShowReplaceTbdModal] = useState<string>('');
   const [isCopying, setIsCopying] = useState(false);
   const [inviteUrl, setInviteUrl] = useState('');
-  const [allowFillIn, setAllowFillIn] = useState(true);
+  const [allowFillIn, setAllowFillIn] = useState(false);
   const [showManualTeamFormationModal, setShowManualTeamFormationModal] =
     useState(false);
 

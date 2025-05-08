@@ -3,16 +3,17 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
 import { prisma } from '../../../../lib/prisma';
 import { Match, MatchPlayer, User } from '@prisma/client';
+import { calculateAge } from '../../../../lib/utils';
 
 // Interfaces for type safety
 interface MatchWithRelations extends Match {
   matchPlayers: (MatchPlayer & {
-    user: Pick<User, 'id' | 'name' | 'image'> | null;
+    user: Pick<User, 'id' | 'name' | 'image' | 'birthdate'> | null;
   })[];
   attendance: Array<{
     userId: string;
     status: string;
-    user: Pick<User, 'id' | 'name' | 'image'> | null;
+    user: Pick<User, 'id' | 'name' | 'image' | 'birthdate'> | null;
   }>;
 }
 
@@ -99,6 +100,7 @@ export default async function handler(
                 id: true,
                 name: true,
                 image: true,
+                birthdate: true,
               },
             },
           },
@@ -110,6 +112,7 @@ export default async function handler(
                 id: true,
                 name: true,
                 image: true,
+                birthdate: true,
               },
             },
           },
@@ -131,6 +134,7 @@ export default async function handler(
         id: attendance.userId,
         name: attendance.user?.name || null,
         avatar: attendance.user?.image || null,
+        age: calculateAge(attendance.user?.birthdate || null),
       }));
 
     // Obtener la asistencia del usuario actual
@@ -148,6 +152,7 @@ export default async function handler(
         name: player.user?.name || null,
         avatar: player.user?.image || null,
         isTeamA: true,
+        age: calculateAge(player.user?.birthdate || null),
       }));
 
     const teamBPlayers = (match.matchPlayers as any[])
@@ -157,6 +162,7 @@ export default async function handler(
         name: player.user?.name || null,
         avatar: player.user?.image || null,
         isTeamA: false,
+        age: calculateAge(player.user?.birthdate || null),
       }));
 
     // Procesar los TBD players
@@ -244,6 +250,36 @@ export default async function handler(
       }
     }
 
+    // Calcular promedios de edad para cada equipo
+    const calculateAverageAge = (players: any[]): number | undefined => {
+      const playersWithAge = players.filter(
+        (p) => p.age !== null && p.age !== undefined
+      );
+      if (playersWithAge.length === 0) return undefined;
+
+      const sum = playersWithAge.reduce((acc, player) => acc + player.age, 0);
+      return Math.round(sum / playersWithAge.length);
+    };
+
+    const teamAAvgAge = calculateAverageAge(teamAPlayers);
+    const teamBAvgAge = calculateAverageAge(teamBPlayers);
+
+    // Opcional: Añadir log para depuración
+    console.log('Calculado promedios de edad:', {
+      teamAAvgAge,
+      teamBAvgAge,
+      teamAPlayers: teamAPlayers.map((p) => ({
+        id: p.id,
+        name: p.name,
+        age: p.age,
+      })),
+      teamBPlayers: teamBPlayers.map((p) => ({
+        id: p.id,
+        name: p.name,
+        age: p.age,
+      })),
+    });
+
     const nextMatchDetails = {
       id: match.id,
       date: match.date,
@@ -259,6 +295,8 @@ export default async function handler(
       tbdPlayers,
       requiredPlayers: group.requiredPlayers,
       sortCount: match.sortCount,
+      teamAAvgAge,
+      teamBAvgAge,
     };
 
     return res.status(200).json({
