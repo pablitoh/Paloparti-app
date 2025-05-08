@@ -29,6 +29,7 @@
     "antd": "5.12.5",
     "bcryptjs": "^3.0.2",
     "date-fns": "^4.1.0",
+    "dotenv": "^16.5.0",
     "jsonwebtoken": "^9.0.2",
     "next-auth": "^4.24.11",
     "rc-util": "^5.40.0",
