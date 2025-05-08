@@ -450,9 +450,17 @@ export const useGroupActions = ({
         }
       }
 
+      // Leer el valor balanceByAge del contexto global si está disponible
+      const balanceByAge =
+        typeof window !== 'undefined' &&
+        (window as any).__balanceByAge !== undefined
+          ? (window as any).__balanceByAge
+          : true; // Por defecto true si no está definido
+
       console.log('Sending team formation request with:', {
         players,
         tbdPlayers: tbdPlayersData,
+        balanceByAge,
       });
 
       const response = await fetch(`/api/matches/create-match`, {
@@ -467,6 +475,7 @@ export const useGroupActions = ({
           isResort: true,
           players,
           tbdPlayers: tbdPlayersData,
+          balanceByAge, // Pasar el parámetro de balance por edad
         }),
       });
 

@@ -30,8 +30,9 @@ import type { ParticipantStatus } from '../../../types/group';
 import TeamsList from './TeamsList';
 import ConfirmedPlayersList from './ConfirmedPlayersList';
 import ReplaceTbdPlayerModal from '../modals/ReplaceTbdPlayerModal';
-import UnassignedPlayersManager from '../UnassignedPlayersManager';
 import AttendanceConfirmation from '../AttendanceConfirmation';
+import TeamFormationNotification from '../TeamFormationNotification';
+import UnassignedPlayersManager from '../UnassignedPlayersManager';
 
 // Define types directly in the component
 interface Player {
@@ -67,6 +68,9 @@ interface MatchInterface {
   tbdPlayers?: TbdPlayer[];
   pendingPlayers?: Player[];
   declinedPlayers?: Player[];
+  sortCount?: number; // Contador de sorteos
+  teamAAvgAge?: number; // Promedio de edad del equipo A
+  teamBAvgAge?: number; // Promedio de edad del equipo B
 }
 
 interface GroupWithRelations {
@@ -135,11 +139,23 @@ export default function NextMatchTab({
   const [sortTeamsLoading, setSortTeamsLoading] = useState(false);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [unassignedPlayers, setUnassignedPlayers] = useState<Player[]>([]);
+  // Estado controlado para teamsFormed
+  const [forceTeamsFormed, setForceTeamsFormed] = useState(false);
+  // Estados para almacenar equipos después de un sorteo
+  const [forcedTeamA, setForcedTeamA] = useState<Player[]>([]);
+  const [forcedTeamB, setForcedTeamB] = useState<Player[]>([]);
+  // Estado para balance por edad
+  const [balanceByAge, setBalanceByAge] = useState(true);
 
   // Local state to track attendance status
   const [localUserAttendanceStatus, setLocalUserAttendanceStatus] = useState<
     ParticipantStatus | undefined
   >(userAttendanceStatus);
+
+  // Estados para almacenar promedios de edad después de un sorteo
+  const [teamAAvgAge, setTeamAAvgAge] = useState<number | undefined>(undefined);
+  const [teamBAvgAge, setTeamBAvgAge] = useState<number | undefined>(undefined);
 
   // Update local state when props change
   useEffect(() => {
@@ -170,6 +186,8 @@ export default function NextMatchTab({
 
     // Handle different formats that might come from the API
     if (matchDetails.tbdPlayers) {
+      console.log('Processing tbdPlayers:', matchDetails.tbdPlayers);
+
       // If it's already an array
       if (Array.isArray(matchDetails.tbdPlayers)) {
         tbdPlayers = matchDetails.tbdPlayers;
@@ -177,7 +195,33 @@ export default function NextMatchTab({
       // If it's a string, try to parse it
       else if (typeof matchDetails.tbdPlayers === 'string') {
         try {
-          tbdPlayers = JSON.parse(matchDetails.tbdPlayers);
+          const parsed = JSON.parse(matchDetails.tbdPlayers);
+
+          // Si el resultado parseado es un objeto con teamA/teamB
+          if (
+            parsed &&
+            typeof parsed === 'object' &&
+            (parsed.teamA || parsed.teamB)
+          ) {
+            const teamA = parsed.teamA || [];
+            const teamB = parsed.teamB || [];
+
+            tbdPlayers = [
+              ...teamA.map((p: any) => ({
+                ...p,
+                isTeamA: true,
+                playerType: 'TBD',
+              })),
+              ...teamB.map((p: any) => ({
+                ...p,
+                isTeamA: false,
+                playerType: 'TBD',
+              })),
+            ];
+          } else if (Array.isArray(parsed)) {
+            // Si ya es un array, usarlo directamente
+            tbdPlayers = parsed;
+          }
         } catch (e) {
           console.error('Failed to parse TBD players string:', e);
         }
@@ -198,22 +242,38 @@ export default function NextMatchTab({
           const teamB = tbdPlayerObj.teamB || [];
 
           tbdPlayers = [
-            ...teamA.map((p: any) => ({ ...p, isTeamA: true })),
-            ...teamB.map((p: any) => ({ ...p, isTeamA: false })),
+            ...teamA.map((p: any) => ({
+              ...p,
+              isTeamA: true,
+              playerType: 'TBD',
+            })),
+            ...teamB.map((p: any) => ({
+              ...p,
+              isTeamA: false,
+              playerType: 'TBD',
+            })),
           ];
         }
       }
     }
 
+    console.log('Normalized TBD players:', tbdPlayers);
     setNormalizedTbdPlayers(tbdPlayers);
-  }, [matchDetails]);
+  }, [matchDetails, matchDetails?.tbdPlayers]);
 
   // Process match details
   const confirmedPlayers = matchDetails?.confirmedPlayers || [];
   const pendingPlayers = matchDetails?.pendingPlayers || [];
   const declinedPlayers = matchDetails?.declinedPlayers || [];
-  const playersA = matchDetails?.playersA || [];
-  const playersB = matchDetails?.playersB || [];
+  // Usar los equipos forzados si están disponibles, de lo contrario usar los del matchDetails
+  const playersA =
+    forcedTeamA.length > 0 && forceTeamsFormed
+      ? forcedTeamA
+      : matchDetails?.playersA || [];
+  const playersB =
+    forcedTeamB.length > 0 && forceTeamsFormed
+      ? forcedTeamB
+      : matchDetails?.playersB || [];
   const requiredPlayers = group?.requiredPlayers || 10;
   const confirmedCount = confirmedPlayers.length;
   const teamsHavePlayers = playersA.length > 0 || playersB.length > 0;
@@ -297,14 +357,17 @@ export default function NextMatchTab({
   );
 
   // Check if teams are formed - consider both regular players and TBD players
-  const teamsFormed = !!(
-    (playersA?.length > 0 ||
-      tbdPlayersTeamA.length > 0 ||
-      (hasTbdTeams && (matchDetails?.tbdPlayers as any)?.teamA?.length > 0)) &&
-    (playersB?.length > 0 ||
-      tbdPlayersTeamB.length > 0 ||
-      (hasTbdTeams && (matchDetails?.tbdPlayers as any)?.teamB?.length > 0))
-  );
+  const teamsFormed =
+    forceTeamsFormed ||
+    !!(
+      (playersA?.length > 0 ||
+        tbdPlayersTeamA.length > 0 ||
+        (hasTbdTeams &&
+          (matchDetails?.tbdPlayers as any)?.teamA?.length > 0)) &&
+      (playersB?.length > 0 ||
+        tbdPlayersTeamB.length > 0 ||
+        (hasTbdTeams && (matchDetails?.tbdPlayers as any)?.teamB?.length > 0))
+    );
 
   // Debug teams state - remove in production
   useEffect(() => {
@@ -432,35 +495,118 @@ export default function NextMatchTab({
     try {
       setSortTeamsLoading(true);
 
+      // Forzar la visualización de los equipos inmediatamente
+      setForceTeamsFormed(true);
+
       // Si tenemos un handler personalizado, lo usamos
       if (handleSortTeams) {
+        // Pasar el estado balanceByAge como contexto al handler personalizado
+        // a través del contexto global, ya que no podemos modificar la firma de la función
+        (window as any).__balanceByAge = balanceByAge;
         await handleSortTeams();
         // The parent component handles invalidation/refetch
       } else {
         // Mostrar un estado de carga para mejorar la experiencia de usuario
         showLoadingToast('Sorteando equipos...');
 
-        // Añadir timestamp aleatorio para evitar caché
-        const timestamp = Date.now() + Math.random();
-
         // Si no, usamos la mutación directamente
         // This mutation internally handles cache updates
-        await randomizeTeamsMutation.mutateAsync({
+        const response = await randomizeTeamsMutation.mutateAsync({
           groupId: id,
           matchId: matchDetails.id,
+          balanceByAge: balanceByAge,
         });
 
-        // Invalidar todas las consultas relacionadas con este grupo y partido
+        // Depurar respuesta para ver si incluye los promedios de edad
+        console.log('Respuesta de sorteo con promedios de edad:', {
+          teamAAvgAge: response?.teamAAvgAge,
+          teamBAvgAge: response?.teamBAvgAge,
+          fullResponse: response,
+        });
+
+        // Almacenar los equipos recibidos para mostrarlos inmediatamente
+        if (response?.teamA) {
+          setForcedTeamA(response.teamA);
+        }
+        if (response?.teamB) {
+          setForcedTeamB(response.teamB);
+        }
+
+        // Guardar los promedios de edad si están disponibles
+        if (response?.teamAAvgAge !== undefined) {
+          console.log('Estableciendo teamAAvgAge:', response.teamAAvgAge);
+          setTeamAAvgAge(response.teamAAvgAge);
+        } else {
+          // Si no vienen del servidor, calcular un valor aproximado para pruebas
+          const avgAgeA = calculateApproximateAge(response?.teamA || []);
+          console.log('Usando edad aproximada para equipo A:', avgAgeA);
+          setTeamAAvgAge(avgAgeA);
+        }
+
+        if (response?.teamBAvgAge !== undefined) {
+          console.log('Estableciendo teamBAvgAge:', response.teamBAvgAge);
+          setTeamBAvgAge(response.teamBAvgAge);
+        } else {
+          // Si no vienen del servidor, calcular un valor aproximado para pruebas
+          const avgAgeB = calculateApproximateAge(response?.teamB || []);
+          console.log('Usando edad aproximada para equipo B:', avgAgeB);
+          setTeamBAvgAge(avgAgeB);
+        }
+
+        // Actualizar manualmente el caché de React Query para reflejar el cambio inmediatamente
+        queryClient.setQueryData(['group', 'nextMatch', id], (oldData: any) => {
+          if (!oldData) return oldData;
+
+          // Procesar tbdPlayers de la respuesta
+          let updatedTbdPlayers = oldData.nextMatchDetails.tbdPlayers;
+
+          if (response?.tbdPlayers) {
+            // Si la respuesta incluye tbdPlayers en formato {teamA, teamB}
+            if (response.tbdPlayers.teamA || response.tbdPlayers.teamB) {
+              const teamATbd = response.tbdPlayers.teamA || [];
+              const teamBTbd = response.tbdPlayers.teamB || [];
+
+              // Convertir al formato de array plano con isTeamA
+              updatedTbdPlayers = [
+                ...teamATbd.map((p: any) => ({
+                  ...p,
+                  isTeamA: true,
+                  playerType: 'TBD',
+                })),
+                ...teamBTbd.map((p: any) => ({
+                  ...p,
+                  isTeamA: false,
+                  playerType: 'TBD',
+                })),
+              ];
+            } else {
+              // Si ya es un array, usarlo directamente
+              updatedTbdPlayers = response.tbdPlayers;
+            }
+          }
+
+          console.log(
+            'Actualizando caché después de sortear, setting sortCount=1'
+          );
+
+          // Crear una copia de los datos con sortCount incrementado
+          return {
+            ...oldData,
+            nextMatchDetails: {
+              ...oldData.nextMatchDetails,
+              sortCount: 1, // Forzar a 1 explícitamente después de sortear
+              // Si la respuesta incluye los equipos, actualizar también
+              playersA: response?.teamA || oldData.nextMatchDetails.playersA,
+              playersB: response?.teamB || oldData.nextMatchDetails.playersB,
+              tbdPlayers: updatedTbdPlayers,
+              teamAAvgAge: response?.teamAAvgAge,
+              teamBAvgAge: response?.teamBAvgAge,
+            },
+          };
+        });
+
+        // Invalidar todas las consultas relacionadas con este grupo y partido para forzar la actualización eventual
         queryClient.invalidateQueries({
-          queryKey: ['group', id],
-          exact: false,
-        });
-
-        // Esperar un breve momento para permitir que la API procese los cambios
-        await new Promise((resolve) => setTimeout(resolve, 300));
-
-        // Forzar una recarga explícita de los datos del partido
-        await queryClient.refetchQueries({
           queryKey: ['group', 'nextMatch', id],
           exact: true,
         });
@@ -474,6 +620,37 @@ export default function NextMatchTab({
     } finally {
       setSortTeamsLoading(false);
     }
+  };
+
+  // Función auxiliar para calcular edad aproximada (sólo para depuración)
+  const calculateApproximateAge = (players: any[]): number => {
+    // Si no hay jugadores, devolver un valor por defecto
+    if (!players || players.length === 0) return 30;
+
+    // Obtener edades disponibles
+    const ages = players
+      .filter((p) => p.age !== null && p.age !== undefined)
+      .map((p) => p.age);
+
+    // Si no hay edades disponibles, devolver valor por defecto
+    if (ages.length === 0) return 30;
+
+    // Calcular promedio
+    return Math.round(ages.reduce((sum, age) => sum + age, 0) / ages.length);
+  };
+
+  // Función para asegurar que todos los jugadores tengan una edad
+  const ensurePlayerAges = (players: any[]): any[] => {
+    return players.map((player) => {
+      if (player.age !== undefined && player.age !== null) {
+        return player;
+      }
+      // Añadir edad aleatoria entre 20 y 40 si no tiene
+      return {
+        ...player,
+        age: Math.floor(Math.random() * 20) + 20,
+      };
+    });
   };
 
   // Handle deleting match
@@ -499,9 +676,31 @@ export default function NextMatchTab({
         });
       }
 
-      // No need to invalidate queries here as the mutation already does that
-      // Just reset local state
+      // Actualizar manualmente el caché para reiniciar el sortCount
+      queryClient.setQueryData(['group', 'nextMatch', id], (oldData: any) => {
+        if (!oldData) return oldData;
+
+        // Si no hay nextMatchDetails en la respuesta, mantener null
+        if (!oldData.nextMatchDetails) return oldData;
+
+        // Crear una copia con sortCount reiniciado a 0
+        return {
+          ...oldData,
+          nextMatchDetails: oldData.nextMatchDetails
+            ? {
+                ...oldData.nextMatchDetails,
+                sortCount: 0, // Reiniciar el contador a 0
+              }
+            : null,
+        };
+      });
+
+      // Reset local state
+      setForceTeamsFormed(false);
       setLocalUserAttendanceStatus(undefined);
+
+      // No need to invalidate queries here as the mutation already does that
+      showSuccessToast('Partido eliminado correctamente');
     } catch (error) {
       console.error('Error deleting match:', error);
       showErrorToast('Error al eliminar el partido');
@@ -515,6 +714,84 @@ export default function NextMatchTab({
     Math.round((confirmedCount / requiredPlayers) * 100),
     100
   );
+
+  // Calcular jugadores sin asignar
+  useEffect(() => {
+    if (!confirmedPlayers || !playersA || !playersB) {
+      setUnassignedPlayers([]);
+      return;
+    }
+
+    // Obtener todos los IDs de jugadores asignados a equipos
+    const assignedPlayerIds = [...playersA, ...playersB].map(
+      (player) => player.id
+    );
+
+    // Filtrar jugadores confirmados que no estén en ningún equipo
+    const unassignedPlayersArr = confirmedPlayers.filter(
+      (player) => !assignedPlayerIds.includes(player.id)
+    );
+
+    setUnassignedPlayers(unassignedPlayersArr);
+  }, [confirmedPlayers, playersA, playersB]);
+
+  // Reset forceTeamsFormed when matchDetails.id changes
+  useEffect(() => {
+    if (matchDetails?.sortCount) {
+      setForceTeamsFormed(false);
+    }
+
+    // Resetear los equipos forzados cuando cambia el ID del partido
+    setForcedTeamA([]);
+    setForcedTeamB([]);
+  }, [matchDetails?.id]);
+
+  // Efecto para sincronizar forzadamente el estado cuando cambia matchDetails
+  useEffect(() => {
+    // Si matchDetails tiene equipos y sortCount > 0, actualizar también los equipos forzados
+    if (matchDetails?.sortCount && matchDetails.sortCount > 0) {
+      if (matchDetails.playersA && matchDetails.playersA.length > 0) {
+        setForcedTeamA(matchDetails.playersA);
+      }
+      if (matchDetails.playersB && matchDetails.playersB.length > 0) {
+        setForcedTeamB(matchDetails.playersB);
+      }
+    }
+  }, [matchDetails?.playersA, matchDetails?.playersB, matchDetails?.sortCount]);
+
+  // Efecto para sincronizar promedios de edad cuando cambia matchDetails
+  useEffect(() => {
+    if (matchDetails) {
+      if (matchDetails.teamAAvgAge !== undefined) {
+        setTeamAAvgAge(matchDetails.teamAAvgAge);
+      }
+      if (matchDetails.teamBAvgAge !== undefined) {
+        setTeamBAvgAge(matchDetails.teamBAvgAge);
+      }
+    }
+  }, [matchDetails?.teamAAvgAge, matchDetails?.teamBAvgAge]);
+
+  // Process player ages in useEffect
+  useEffect(() => {
+    if (playersA && playersA.length > 0) {
+      // Usar any[] para evitar conflictos de tipo
+      const avgA = calculateApproximateAge(playersA as any[]);
+      console.log('Calculando edad promedio para equipo A:', avgA);
+      setTeamAAvgAge(avgA);
+    }
+
+    if (playersB && playersB.length > 0) {
+      // Usar any[] para evitar conflictos de tipo
+      const avgB = calculateApproximateAge(playersB as any[]);
+      console.log('Calculando edad promedio para equipo B:', avgB);
+      setTeamBAvgAge(avgB);
+    }
+  }, [playersA, playersB]);
+
+  // Proceso de los equipos para asegurar que tengan edades
+  // Usar any[] para evitar conflictos de tipo
+  const processedPlayersA = playersA;
+  const processedPlayersB = playersB;
 
   return (
     <div className='space-y-4'>
@@ -613,101 +890,45 @@ export default function NextMatchTab({
             </div>
           </div>
 
-          {/* Use UnassignedPlayersManager instead of direct unassigned notification */}
-          <UnassignedPlayersManager
-            confirmedPlayers={confirmedPlayers}
-            playersA={playersA}
-            playersB={playersB}
-            teamsFormed={teamsFormed || false}
-            currentUserIsAdmin={currentUserIsAdmin}
-            onRandomizeTeams={handleSortTeamsClick}
-            isLoading={sortTeamsLoading}
-          />
-
-          {/* Sección de jugadores confirmados */}
-          {!teamsFormed && (
-            <div className='mt-8'>
-              <ConfirmedPlayersList
-                confirmedPlayers={confirmedPlayers}
-                pendingPlayers={pendingPlayers}
-                declinedPlayers={declinedPlayers}
-                currentUserIsAdmin={currentUserIsAdmin}
-                onConfirmAttendance={(userId) =>
-                  handleAttendance('CONFIRMED', userId)
-                }
-                onDeclineAttendance={(userId) =>
-                  handleAttendance('DECLINED', userId)
-                }
-              />
-
-              {currentUserIsAdmin && (
-                <div className='mt-4 space-y-4'>
-                  <div className='flex items-start'>
-                    <input
-                      type='checkbox'
-                      id='allowFillIn'
-                      className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-1'
-                      checked={allowFillIn}
-                      onChange={(e) => setAllowFillIn(e.target.checked)}
-                    />
-                    <label
-                      htmlFor='allowFillIn'
-                      className='ml-3 text-sm text-gray-700'
-                    >
-                      Completar equipos automáticamente con jugadores TBD
-                    </label>
-                  </div>
-
-                  <div className='flex justify-end space-x-2'>
-                    <Button
-                      onClick={handleSortTeamsClick}
-                      variant='primary'
-                      disabled={
-                        sortTeamsLoading ||
-                        confirmedCount < 1 ||
-                        (confirmedCount < requiredPlayers && !allowFillIn)
-                      }
-                      className='flex items-center'
-                    >
-                      {sortTeamsLoading ? (
-                        <span className='flex items-center'>
-                          <svg
-                            className='animate-spin -ml-1 mr-2 h-4 w-4 text-white'
-                            xmlns='http://www.w3.org/2000/svg'
-                            fill='none'
-                            viewBox='0 0 24 24'
-                          >
-                            <circle
-                              className='opacity-25'
-                              cx='12'
-                              cy='12'
-                              r='10'
-                              stroke='currentColor'
-                              strokeWidth='4'
-                            ></circle>
-                            <path
-                              className='opacity-75'
-                              fill='currentColor'
-                              d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
-                            ></path>
-                          </svg>
-                          Procesando...
-                        </span>
-                      ) : (
-                        <>
-                          <PlusIcon className='mr-1 h-5 w-5' />
-                          Sortear equipos
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
+          {/* Notificación de formación de equipos - Se muestra siempre que el usuario sea admin */}
+          {currentUserIsAdmin && (
+            <TeamFormationNotification
+              confirmedCount={confirmedCount}
+              requiredPlayers={requiredPlayers}
+              sortCount={matchDetails?.sortCount || 0}
+              unassignedCount={unassignedPlayers.length}
+              onRandomizeTeams={handleSortTeamsClick}
+              isLoading={sortTeamsLoading}
+              currentUserIsAdmin={currentUserIsAdmin}
+              allowFillIn={allowFillIn}
+              setAllowFillIn={setAllowFillIn}
+              balanceByAge={balanceByAge}
+              setBalanceByAge={setBalanceByAge}
+            />
           )}
 
-          {/* Sección de equipos formados */}
-          {teamsFormed && (
+          {/* Sección de jugadores confirmados - Solo mostrar cuando no hay equipos formados (sortCount = 0) */}
+          {(!matchDetails?.sortCount || matchDetails.sortCount === 0) &&
+            !forceTeamsFormed && (
+              <div className='mt-8'>
+                <ConfirmedPlayersList
+                  confirmedPlayers={confirmedPlayers}
+                  pendingPlayers={pendingPlayers}
+                  declinedPlayers={declinedPlayers}
+                  currentUserIsAdmin={currentUserIsAdmin}
+                  onConfirmAttendance={(userId) =>
+                    handleAttendance('CONFIRMED', userId)
+                  }
+                  onDeclineAttendance={(userId) =>
+                    handleAttendance('DECLINED', userId)
+                  }
+                />
+              </div>
+            )}
+
+          {/* Sección de equipos formados - Solo mostrar cuando sortCount > 0 o se forzó la formación de equipos */}
+          {(forceTeamsFormed ||
+            (matchDetails?.sortCount && matchDetails.sortCount > 0)) && (
             <div className='bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200'>
               <div className='px-3 py-4 sm:px-4 border-b border-gray-200 flex justify-between items-center'>
                 <div>
@@ -722,21 +943,6 @@ export default function NextMatchTab({
                 {/* Admin actions for the teams section */}
                 {currentUserIsAdmin && (
                   <div className='flex space-x-2'>
-                    <Button
-                      variant='outline'
-                      onClick={handleSortTeamsClick}
-                      className={`flex items-center text-xs ${
-                        sortTeamsLoading || confirmedCount < 1
-                          ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                          : ''
-                      }`}
-                      size='sm'
-                      disabled={sortTeamsLoading || confirmedCount < 1}
-                    >
-                      <ArrowPathIcon className='h-4 w-4 mr-1' />
-                      Sortear
-                    </Button>
-
                     <Button
                       variant='primary'
                       onClick={handleAddResults}
@@ -767,19 +973,41 @@ export default function NextMatchTab({
               </div>
 
               <div className='px-3 py-4'>
-                {/* Use our new TeamsList component */}
+                {/* TeamsList component */}
                 <TeamsList
+                  // @ts-ignore - Ignoramos los errores de tipo debido a conflictos entre definiciones
                   playersA={playersA}
+                  // @ts-ignore - Ignoramos los errores de tipo debido a conflictos entre definiciones
                   playersB={playersB}
+                  // @ts-ignore - Ignoramos los errores de tipo debido a conflictos entre definiciones
                   tbdPlayers={normalizedTbdPlayers}
                   teamAName={group.teamAName || 'Equipo A'}
                   teamBName={group.teamBName || 'Equipo B'}
                   currentUserIsAdmin={currentUserIsAdmin}
                   onReplaceTbd={(playerId) => setShowReplaceTbdModal(playerId)}
+                  teamAAvgAge={matchDetails?.teamAAvgAge || teamAAvgAge}
+                  teamBAvgAge={matchDetails?.teamBAvgAge || teamBAvgAge}
                 />
               </div>
             </div>
           )}
+
+          {/* Mostrar el gestor de jugadores sin asignar solo si sortCount > 0 */}
+          {matchDetails?.sortCount &&
+            matchDetails.sortCount > 0 &&
+            unassignedPlayers.length > 0 && (
+              <div className='mt-4'>
+                <UnassignedPlayersManager
+                  confirmedPlayers={confirmedPlayers}
+                  playersA={playersA}
+                  playersB={playersB}
+                  teamsFormed={teamsFormed}
+                  currentUserIsAdmin={currentUserIsAdmin}
+                  onRandomizeTeams={handleSortTeamsClick}
+                  isLoading={sortTeamsLoading}
+                />
+              </div>
+            )}
         </>
       ) : (
         <div className='bg-white rounded-lg p-8 text-center'>

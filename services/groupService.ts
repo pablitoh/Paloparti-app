@@ -209,7 +209,8 @@ export const leaveGroup = async (groupId: string): Promise<Response> => {
  */
 export const randomizeTeams = async (
   groupId: string,
-  matchId: string
+  matchId: string,
+  balanceByAge: boolean = true
 ): Promise<{ success: boolean; groupId: string }> => {
   const response = await fetch(`/api/matches/create-match`, {
     method: 'POST',
@@ -222,6 +223,7 @@ export const randomizeTeams = async (
       mode: 'auto',
       // Using the matchId indicates this is a re-sort of an existing match
       isResort: true,
+      balanceByAge,
     }),
   });
 

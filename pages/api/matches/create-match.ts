@@ -73,6 +73,8 @@ export default async function handler(
 
     // Si es un re-sorteo, verificar que el partido existe
     let existingMatch = null;
+    let previousTeams = null; // Declarar aquí para poder usarlo más tarde
+
     if (isResort && matchId) {
       existingMatch = await prisma.match.findUnique({
         where: { id: matchId },
@@ -93,6 +95,34 @@ export default async function handler(
           message: 'Solo se pueden reorganizar partidos pendientes',
         });
       }
+
+      // Obtener información de los equipos actuales ANTES de recalcularlos
+      const previousMatchPlayers = await prisma.matchPlayer.findMany({
+        where: { matchId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      previousTeams = {
+        teamA: previousMatchPlayers
+          .filter((p: { isTeamA: boolean }) => p.isTeamA)
+          .map((p: { userId: string; user: { name: string | null } }) => ({
+            id: p.userId,
+            name: p.user.name,
+          })),
+        teamB: previousMatchPlayers
+          .filter((p: { isTeamA: boolean }) => !p.isTeamA)
+          .map((p: { userId: string; user: { name: string | null } }) => ({
+            id: p.userId,
+            name: p.user.name,
+          })),
+      };
 
       // Verify match players separately
       const matchPlayers = await prisma.matchPlayer.findMany({
@@ -213,6 +243,49 @@ export default async function handler(
           age: 30, // Valor por defecto
           role: 'MEMBER',
         }));
+      } else if (isResort && matchId) {
+        // Si es un resorteo, obtener TODOS los jugadores confirmados de asistencia, incluyendo los ya asignados a equipos
+        try {
+          const confirmedAttendance = await prisma.matchAttendance.findMany({
+            where: {
+              matchId,
+              status: 'CONFIRMED',
+            },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  birthdate: true,
+                },
+              },
+            },
+          });
+
+          mappedMembers = confirmedAttendance.map(
+            (attendance: {
+              user: {
+                id: string;
+                name: string | null;
+                birthdate: Date | null;
+              };
+            }) => ({
+              id: attendance.user.id,
+              name: attendance.user.name,
+              birthdate: attendance.user.birthdate,
+              age:
+                calculateAge(attendance.user.birthdate) ||
+                Math.floor(Math.random() * 40) + 18,
+              role: 'MEMBER',
+            })
+          );
+
+          console.log(
+            `Obtenidos ${mappedMembers.length} jugadores confirmados para el sorteo`
+          );
+        } catch (error) {
+          console.error('Error al obtener jugadores confirmados:', error);
+        }
       } else {
         // FALLBACK: Si no se proporcionaron jugadores, obtener los que confirmaron asistencia
         // Esto debería ejecutarse solo como respaldo
@@ -319,37 +392,6 @@ export default async function handler(
         return [teamA, teamB];
       };
 
-      // Si es un resorteo, obtener los equipos actuales para comparar después
-      let existingTeamA: string[] = [];
-      let existingTeamB: string[] = [];
-
-      if (isResort && matchId) {
-        try {
-          const currentMatchPlayers = await prisma.matchPlayer.findMany({
-            where: { matchId },
-            select: {
-              userId: true,
-              isTeamA: true,
-            },
-          });
-
-          existingTeamA = currentMatchPlayers
-            .filter((p: { isTeamA: boolean }) => p.isTeamA)
-            .map((p: { userId: string }) => p.userId);
-
-          existingTeamB = currentMatchPlayers
-            .filter((p: { isTeamA: boolean }) => !p.isTeamA)
-            .map((p: { userId: string }) => p.userId);
-
-          console.log('Equipos actuales antes del resorteo:', {
-            teamA: existingTeamA,
-            teamB: existingTeamB,
-          });
-        } catch (error) {
-          console.error('Error al obtener equipos actuales:', error);
-        }
-      }
-
       // Determinar el método de creación de equipos según el parámetro
       let autoTeamA: Member[] = [];
       let autoTeamB: Member[] = [];
@@ -369,12 +411,21 @@ export default async function handler(
           const newTeamBIds = autoTeamB.map((p) => p.id);
 
           // Calcular cuántos jugadores cambiaron de equipo
-          const teamAChanges = newTeamAIds.filter((id) =>
-            existingTeamB.includes(id)
-          ).length;
-          const teamBChanges = newTeamBIds.filter((id) =>
-            existingTeamA.includes(id)
-          ).length;
+          let teamAChanges = 0;
+          let teamBChanges = 0;
+
+          if (previousTeams) {
+            teamAChanges = newTeamAIds.filter((id) =>
+              previousTeams.teamB.some(
+                (player: { id: string }) => player.id === id
+              )
+            ).length;
+            teamBChanges = newTeamBIds.filter((id) =>
+              previousTeams.teamA.some(
+                (player: { id: string }) => player.id === id
+              )
+            ).length;
+          }
 
           // Consideramos que los equipos cambiaron si al menos un 25% de jugadores cambió de equipo
           const minChangeRequired = Math.max(
@@ -483,6 +534,11 @@ export default async function handler(
           // No actualizamos date ni location en un re-sorteo
           teamA: teamAName,
           teamB: teamBName,
+          tbdPlayers: JSON.stringify({
+            teamA: tbdPlayersTeamA,
+            teamB: tbdPlayersTeamB,
+          }),
+          sortCount: { increment: 1 },
         },
       });
     } else {
@@ -497,6 +553,11 @@ export default async function handler(
           scoreA: 0,
           scoreB: 0,
           status: 'PENDING',
+          tbdPlayers: JSON.stringify({
+            teamA: tbdPlayersTeamA,
+            teamB: tbdPlayersTeamB,
+          }),
+          sortCount: 0,
         },
       });
 
@@ -543,37 +604,6 @@ export default async function handler(
       ? LogAction.TEAM_RESORTED
       : LogAction.TEAM_SORTED;
 
-    // Obtener información anterior de equipos si es un resort
-    let previousTeams = null;
-    if (isResort && matchId) {
-      const previousMatchPlayers = await prisma.matchPlayer.findMany({
-        where: { matchId },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
-      });
-
-      previousTeams = {
-        teamA: previousMatchPlayers
-          .filter((p: { isTeamA: boolean }) => p.isTeamA)
-          .map((p: { userId: string; user: { name: string | null } }) => ({
-            id: p.userId,
-            name: p.user.name,
-          })),
-        teamB: previousMatchPlayers
-          .filter((p: { isTeamA: boolean }) => !p.isTeamA)
-          .map((p: { userId: string; user: { name: string | null } }) => ({
-            id: p.userId,
-            name: p.user.name,
-          })),
-      };
-    }
-
     // Preparar los datos para el log
     const logData: any = {
       matchId,
@@ -589,7 +619,7 @@ export default async function handler(
       },
     };
 
-    // Solo incluir equipos anteriores si es un resort
+    // Solo incluir equipos anteriores si es un resort y sortCount > 0
     if (isResort && previousTeams) {
       logData.previousTeams = previousTeams;
     }

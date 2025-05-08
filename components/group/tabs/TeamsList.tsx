@@ -8,6 +8,7 @@ interface Player {
   name: string | null;
   avatar: string | null;
   playerType?: string;
+  age?: number;
 }
 
 interface TbdPlayer {
@@ -16,6 +17,7 @@ interface TbdPlayer {
   isTeamA: boolean;
   avatar?: string | null;
   playerType?: string;
+  age?: number;
 }
 
 interface TeamsListProps {
@@ -26,6 +28,8 @@ interface TeamsListProps {
   teamBName: string;
   currentUserIsAdmin: boolean;
   onReplaceTbd?: (playerId: string) => void;
+  teamAAvgAge?: number; // Promedio de edad del equipo A
+  teamBAvgAge?: number; // Promedio de edad del equipo B
 }
 
 interface PlayerItemProps {
@@ -39,6 +43,7 @@ interface TeamSectionProps {
   tbdPlayers: TbdPlayer[];
   teamName: string;
   colorClass: string;
+  avgAge?: number; // Promedio de edad del equipo
 }
 
 const TeamsList: React.FC<TeamsListProps> = ({
@@ -49,7 +54,48 @@ const TeamsList: React.FC<TeamsListProps> = ({
   teamBName,
   currentUserIsAdmin,
   onReplaceTbd,
+  teamAAvgAge,
+  teamBAvgAge,
 }) => {
+  // Depurar para ver si los valores están llegando al componente
+  console.log('TeamsList recibió promedios de edad:', {
+    teamAAvgAge,
+    teamBAvgAge,
+  });
+
+  // Calcular promedios de edad localmente en caso de que no vengan por props
+  const calculateLocalAvgAge = (players: any[]): number | undefined => {
+    if (!players || players.length === 0) return undefined;
+
+    // Filtrar jugadores que tienen edad
+    const playersWithAge = players.filter(
+      (player) => player.age !== undefined && player.age !== null
+    );
+
+    if (playersWithAge.length === 0) return undefined;
+
+    // Calcular promedio
+    const sum = playersWithAge.reduce(
+      (acc, player) => acc + (player.age || 0),
+      0
+    );
+    return Math.round(sum / playersWithAge.length);
+  };
+
+  // Usar valores calculados localmente si no vienen en las props
+  const effectiveTeamAAvgAge =
+    teamAAvgAge !== undefined ? teamAAvgAge : calculateLocalAvgAge(playersA);
+
+  const effectiveTeamBAvgAge =
+    teamBAvgAge !== undefined ? teamBAvgAge : calculateLocalAvgAge(playersB);
+
+  console.log('Promedio de edad efectivo:', {
+    effectiveTeamAAvgAge,
+    effectiveTeamBAvgAge,
+    playersA: playersA.map((p) => ({ id: p.id, age: p.age })),
+    playersB: playersB.map((p) => ({ id: p.id, age: p.age })),
+  });
+
   // Filter TBD players by team
   const teamATbdPlayers = tbdPlayers.filter((player) => player.isTeamA);
   const teamBTbdPlayers = tbdPlayers.filter((player) => !player.isTeamA);
@@ -103,36 +149,50 @@ const TeamsList: React.FC<TeamsListProps> = ({
     tbdPlayers,
     teamName,
     colorClass,
-  }) => (
-    <div className='p-4 w-full'>
-      <div className='text-center mb-4'>
-        <h3 className={`text-lg sm:text-xl font-bold ${colorClass}`}>
-          {teamName}
-        </h3>
+    avgAge,
+  }) => {
+    // Verificar si este equipo específico tiene promedio de edad
+    console.log(`TeamSection "${teamName}" avgAge:`, avgAge);
+
+    return (
+      <div className='p-4 w-full'>
+        <div className='text-center mb-4'>
+          <h3 className={`text-lg sm:text-xl font-bold ${colorClass}`}>
+            {teamName}
+          </h3>
+          {/* Mostrar el promedio de edad con un estilo más visible para depurar */}
+          {avgAge !== undefined ? (
+            <p className='text-sm font-medium text-gray-500 mt-1'>
+              (Prom. edad: {avgAge} años)
+            </p>
+          ) : (
+            <p className='text-xs text-gray-400 mt-1'>(Sin datos de edad)</p>
+          )}
+        </div>
+
+        <ul className='divide-y divide-gray-100'>
+          {/* Regular players */}
+          {players.map((player) => (
+            <PlayerItem
+              key={player.id}
+              player={player}
+              showReplaceButton={player.playerType === 'TBD'}
+            />
+          ))}
+
+          {/* TBD players */}
+          {tbdPlayers.map((player) => (
+            <PlayerItem
+              key={player.id}
+              player={player}
+              isTbd={true}
+              showReplaceButton={true}
+            />
+          ))}
+        </ul>
       </div>
-
-      <ul className='divide-y divide-gray-100'>
-        {/* Regular players */}
-        {players.map((player) => (
-          <PlayerItem
-            key={player.id}
-            player={player}
-            showReplaceButton={player.playerType === 'TBD'}
-          />
-        ))}
-
-        {/* TBD players */}
-        {tbdPlayers.map((player) => (
-          <PlayerItem
-            key={player.id}
-            player={player}
-            isTbd={true}
-            showReplaceButton={true}
-          />
-        ))}
-      </ul>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className='bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden'>
@@ -146,6 +206,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
             tbdPlayers={teamATbdPlayers}
             teamName={teamAName || 'Equipo A'}
             colorClass='text-blue-600'
+            avgAge={effectiveTeamAAvgAge}
           />
         </div>
 
@@ -159,6 +220,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
             tbdPlayers={teamBTbdPlayers}
             teamName={teamBName || 'Equipo B'}
             colorClass='text-red-600'
+            avgAge={effectiveTeamBAvgAge}
           />
         </div>
       </div>

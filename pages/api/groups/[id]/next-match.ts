@@ -91,6 +91,7 @@ export default async function handler(
         createdAt: true,
         updatedAt: true,
         tbdPlayers: true, // Intentar obtener los tbdPlayers si existen
+        sortCount: true,
         matchPlayers: {
           include: {
             user: {
@@ -257,6 +258,7 @@ export default async function handler(
       confirmedPlayers,
       tbdPlayers,
       requiredPlayers: group.requiredPlayers,
+      sortCount: match.sortCount,
     };
 
     return res.status(200).json({

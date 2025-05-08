@@ -265,6 +265,7 @@ interface ResetAttendanceParams {
 interface RandomizeTeamsParams {
   matchId: string;
   groupId: string;
+  balanceByAge?: boolean;
 }
 
 interface AttendanceMutationParams {
@@ -514,6 +515,8 @@ export const useRandomizeTeamsMutation = () => {
           mode: 'auto',
           isResort: true,
           forceNewShuffle: true, // Añadir parámetro para forzar un nuevo sorteo aleatorio
+          balanceByAge:
+            params.balanceByAge !== undefined ? params.balanceByAge : true, // Pasar el parámetro con valor por defecto true
         }),
       });
       if (!response.ok) {
