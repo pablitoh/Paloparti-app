@@ -1,0 +1,23 @@
+# Ignore backup files and directories
+backup/
+backup_donotbuild/
+excluded_files/
+**/**.backup
+**/**.bak
+**/**.broken
+**/**.new
+tmp/
+**/*.tsx.backup
+**/*.tsx.bak
+**/*.tsx.broken
+**/*.tsx.new
+**/*.[id].tsx
+pages/**/*.backup
+pages/**/*.bak
+pages/**/*.broken
+pages/**/*.new 
+
+# Ensure clean build
+.vercel/cache/
+.vercel/output/
+node_modules/.cache/ 

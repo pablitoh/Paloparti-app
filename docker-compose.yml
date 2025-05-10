@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: paloparti_db
+    environment:
+      POSTGRES_USER: paloparti
+      POSTGRES_PASSWORD: paloparti123
+      POSTGRES_DB: paloparti
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - paloparti_network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U paloparti']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: paloparti_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@paloparti.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - '5050:80'
+    networks:
+      - paloparti_network
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: paloparti_api
+    ports:
+      - '3001:3000'
+    environment:
+      DATABASE_URL: postgresql://paloparti:paloparti123@db:5432/paloparti
+      NODE_ENV: development
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - paloparti_network
+    depends_on:
+      db:
+        condition: service_healthy
+
+networks:
+  paloparti_network:
+    driver: bridge
+
+volumes:
+  postgres_data:

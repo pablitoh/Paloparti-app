@@ -1,0 +1,11 @@
+# Allow all robots by default
+User-agent: *
+Allow: /
+
+# Block specific directories if needed
+# User-agent: *
+# Disallow: /api/
+# Disallow: /admin/
+
+# Sitemap location
+# Sitemap: https://yourdomain.com/sitemap.xml 

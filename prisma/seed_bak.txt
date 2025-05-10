@@ -1,0 +1,428 @@
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+
+const prisma = new PrismaClient();
+
+const sports = [
+  'Fútbol',
+  'Tenis',
+  'Baloncesto',
+  'Pádel',
+  'Voleibol',
+  'Natación',
+];
+const locations = [
+  'Parque Central',
+  'Club Deportivo',
+  'Polideportivo Municipal',
+  'Centro Deportivo',
+  'Club Privado',
+  'Parque Deportivo',
+];
+
+// Función para generar una edad aleatoria entre 20 y 50 años
+const getRandomAge = () => Math.floor(Math.random() * 31) + 20; // 31 = (50-20+1)
+
+// Función para generar una fecha de nacimiento basada en una edad
+const getBirthdateFromAge = (age: number) => {
+  const today = new Date();
+  const birthYear = today.getFullYear() - age;
+  const birthMonth = Math.floor(Math.random() * 12);
+  const birthDay = Math.floor(Math.random() * 28) + 1; // Para evitar problemas con febrero
+  return new Date(birthYear, birthMonth, birthDay);
+};
+
+// Función para generar un resultado realista de goles (para deportes como fútbol)
+const getRandomScore = () => Math.floor(Math.random() * 5); // 0-4 goles por equipo
+
+function getRequiredPlayersForSport(sport: string): number {
+  switch (sport) {
+    case 'Fútbol':
+      return 10; // 5v5
+    case 'Baloncesto':
+      return 6; // 3v3
+    case 'Pádel':
+      return 4; // 2v2
+    case 'Tenis':
+      return 2; // 1v1
+    case 'Voleibol':
+      return 6; // 3v3
+    case 'Natación':
+      return 4; // 2v2
+    default:
+      return 4; // Default value
+  }
+}
+
+async function main() {
+  // First, clean up the database
+  try {
+    await prisma.goal.deleteMany();
+    await prisma.matchPlayer.deleteMany();
+    await prisma.$queryRaw`TRUNCATE TABLE "MatchAttendance" CASCADE;`;
+    await prisma.match.deleteMany();
+    await prisma.groupMember.deleteMany();
+    await prisma.$queryRaw`TRUNCATE TABLE "GroupInvitation" CASCADE;`;
+    await prisma.group.deleteMany();
+    await prisma.account.deleteMany();
+    await prisma.session.deleteMany();
+    await prisma.$queryRaw`TRUNCATE TABLE "ShortUrl" CASCADE;`;
+    await prisma.user.deleteMany();
+  } catch (error) {
+    console.error('Error during cleanup:', error);
+  }
+
+  // Create 30 test users with random ages
+  const users = [];
+  const hashedPassword = await bcrypt.hash('password123', 10);
+
+  // Create Test User 1 first (so we can reference it specifically)
+  const testUser1 = await prisma.user.create({
+    data: {
+      email: 'test1@example.com',
+      name: 'Test User 1',
+      image: 'https://ui-avatars.com/api/?name=Test+User+1',
+      password: hashedPassword,
+      birthdate: new Date(
+        new Date().getFullYear() - 30,
+        Math.floor(Math.random() * 12),
+        Math.floor(Math.random() * 28) + 1
+      ),
+    },
+  });
+  users.push(testUser1);
+
+  // Create the rest of the users
+  for (let i = 2; i <= 30; i++) {
+    const user = await prisma.user.create({
+      data: {
+        email: `test${i}@example.com`,
+        name: `Test User ${i}`,
+        image: `https://ui-avatars.com/api/?name=Test+User+${i}`,
+        password: hashedPassword,
+        birthdate: new Date(
+          new Date().getFullYear() - getRandomAge(),
+          Math.floor(Math.random() * 12),
+          Math.floor(Math.random() * 28) + 1
+        ),
+      },
+    });
+    users.push(user);
+  }
+
+  console.log(
+    'Usuarios creados con fechas de nacimiento aleatorias (edades entre 20 y 50 años)'
+  );
+
+  // Create groups for each sport
+  const groups = [];
+  for (let i = 0; i < sports.length; i++) {
+    const sport = sports[i];
+    const location = locations[i % locations.length];
+
+    // Generate an invite token for each group
+    const inviteToken = crypto.randomBytes(8).toString('hex');
+
+    // Alternar entre hacer que testUser1 sea el creador (admin) o simplemente un miembro
+    const isTestUser1Creator = i % 2 === 0;
+    const creator = isTestUser1Creator
+      ? testUser1
+      : users[(i % (users.length - 1)) + 1];
+
+    // Select 5 random users for this group (excluding the creator)
+    const availableUsers = users.filter((u) => u.id !== creator.id);
+    const selectedUsers = [];
+
+    // If testUser1 is not the creator, make sure to include them as a member
+    if (!isTestUser1Creator) {
+      selectedUsers.push(testUser1);
+
+      // Get other random users
+      const remainingUsers = availableUsers.filter(
+        (u) => u.id !== testUser1.id
+      );
+      const usersToSelect = Math.min(4, remainingUsers.length); // Select 4 more (for total of 5)
+
+      for (let j = 0; j < usersToSelect; j++) {
+        const randomIndex = Math.floor(Math.random() * remainingUsers.length);
+        selectedUsers.push(...remainingUsers.splice(randomIndex, 1));
+      }
+    } else {
+      // Just select random users if testUser1 is already the creator
+      const usersToSelect = Math.min(5, availableUsers.length);
+
+      for (let j = 0; j < usersToSelect; j++) {
+        const randomIndex = Math.floor(Math.random() * availableUsers.length);
+        selectedUsers.push(...availableUsers.splice(randomIndex, 1));
+      }
+    }
+
+    try {
+      // Create the group first
+      const groupId = crypto.randomBytes(16).toString('hex');
+      const nextMatchDate = new Date();
+      nextMatchDate.setDate(nextMatchDate.getDate() + 7);
+
+      // Create the group without the nextMatchId initially
+      const group = await prisma.$queryRaw`
+        INSERT INTO "Group" (
+          "id", "name", "description", "sport", "location", "createdAt", 
+          "createdBy", "requiredPlayers", "inviteToken", "totalMatches", "nextMatch"
+        ) 
+        VALUES (
+          ${groupId}, 
+          ${`${sport} Club`}, 
+          ${`Grupo de ${sport.toLowerCase()} para todos los niveles`}, 
+          ${sport}, 
+          ${location}, 
+          ${new Date()}, 
+          ${creator.id}, 
+          ${getRequiredPlayersForSport(sport)}, 
+          ${inviteToken},
+          0,
+          ${nextMatchDate}
+        )
+        RETURNING *
+      `;
+
+      // Cast the result to any type to access properties
+      const groupResult = group as any;
+      const resultGroupId = groupResult[0].id;
+
+      // Create group memberships
+      await prisma.groupMember.create({
+        data: {
+          groupId: resultGroupId,
+          userId: creator.id,
+          role: 'ADMIN',
+          status: 'CONFIRMED',
+        },
+      });
+
+      for (const user of selectedUsers) {
+        await prisma.groupMember.create({
+          data: {
+            groupId: resultGroupId,
+            userId: user.id,
+            role: 'MEMBER',
+            status: 'CONFIRMED',
+          },
+        });
+      }
+
+      // Now create the next match after the group exists
+      const nextMatch = await prisma.match.create({
+        data: {
+          id: crypto.randomBytes(16).toString('hex'),
+          date: nextMatchDate,
+          location: location,
+          groupId: resultGroupId, // Now we can safely reference the group
+          teamA: 'Equipo A',
+          teamB: 'Equipo B',
+          scoreA: 0,
+          scoreB: 0,
+          status: 'PENDING',
+        },
+      });
+
+      console.log(
+        `Created next match for group "${sport} Club": ${nextMatch.id}`
+      );
+
+      // Update the group to reference the next match
+      await prisma.group.update({
+        where: { id: resultGroupId },
+        data: { nextMatchId: nextMatch.id },
+      });
+
+      // Create attendance records for all members (with the creator confirmed)
+      await prisma.matchAttendance.create({
+        data: {
+          userId: creator.id,
+          groupId: resultGroupId,
+          matchId: nextMatch.id,
+          matchDate: nextMatchDate,
+          status: 'CONFIRMED', // Creator is automatically confirmed
+        },
+      });
+
+      // Create other members with pending status
+      for (const user of selectedUsers) {
+        await prisma.matchAttendance.create({
+          data: {
+            userId: user.id,
+            groupId: resultGroupId,
+            matchId: nextMatch.id,
+            matchDate: nextMatchDate,
+            status: 'PENDING',
+          },
+        });
+      }
+
+      // Create attendance records for all members with PENDING status (incluyendo al creador)
+      await prisma.matchAttendance.create({
+        data: {
+          userId: creator.id,
+          groupId: resultGroupId,
+          matchId: nextMatch.id,
+          matchDate: nextMatchDate,
+          status: 'PENDING', // Creador también con status PENDING para que no haya confirmados
+        },
+      });
+
+      // Create attendance records for other members (todos PENDING)
+      for (const user of selectedUsers) {
+        await prisma.matchAttendance.create({
+          data: {
+            userId: user.id,
+            groupId: resultGroupId,
+            matchId: nextMatch.id,
+            matchDate: nextMatchDate,
+            status: 'PENDING',
+          },
+        });
+      }
+
+      // Create short URL for the group's invite link
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const inviteUrl = `${baseUrl}/invite/${inviteToken}`;
+      const shortCode = crypto.randomBytes(4).toString('hex');
+
+      await prisma.$queryRaw`
+        INSERT INTO "ShortUrl" ("id", "shortCode", "originalUrl", "createdAt", "accessCount") 
+        VALUES (${crypto
+          .randomBytes(16)
+          .toString('hex')}, ${shortCode}, ${inviteUrl}, ${new Date()}, 0)
+      `;
+
+      console.log(
+        `Created group "${sport} Club" with invite token: ${inviteToken}`
+      );
+      console.log(
+        `Created short URL for "${sport} Club": ${baseUrl}/s/${shortCode}`
+      );
+
+      groups.push({ id: resultGroupId, location: location });
+    } catch (error) {
+      console.error(`Error creating ${sport} group:`, error);
+    }
+  }
+
+  // Resto del código para crear partidos
+  console.log(`Creados ${groups.length} grupos`);
+
+  // Create matches for each group
+  for (const group of groups) {
+    try {
+      const members = await prisma.groupMember.findMany({
+        where: { groupId: group.id },
+        include: { user: true },
+      });
+
+      if (members.length >= 4) {
+        // Crear varios partidos completados (pasados) con resultados
+        const numberOfCompletedMatches = Math.floor(Math.random() * 5) + 2; // 2-6 partidos completados
+
+        for (let i = 0; i < numberOfCompletedMatches; i++) {
+          const daysAgo = (i + 1) * 7; // Partidos cada 7 días en el pasado
+          const scoreA = getRandomScore();
+          const scoreB = getRandomScore();
+
+          // Seleccionar jugadores aleatoriamente para cada equipo
+          const allGroupMembers = [...members]; // Copia de todos los miembros disponibles
+          const shuffledMembers = allGroupMembers.sort(
+            () => Math.random() - 0.5
+          );
+
+          // Dividir los miembros en dos equipos
+          const halfIndex = Math.ceil(shuffledMembers.length / 2);
+          const teamAMembers = shuffledMembers.slice(0, halfIndex);
+          const teamBMembers = shuffledMembers.slice(halfIndex);
+
+          // Crear el partido
+          const match = await prisma.match.create({
+            data: {
+              date: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000),
+              location: group.location,
+              groupId: group.id,
+              teamA: 'Equipo A',
+              teamB: 'Equipo B',
+              scoreA,
+              scoreB,
+              status: 'COMPLETED',
+            },
+          });
+
+          // Registrar los jugadores de cada equipo
+          for (const member of teamAMembers) {
+            await prisma.matchPlayer.create({
+              data: {
+                matchId: match.id,
+                userId: member.userId,
+                isTeamA: true,
+              },
+            });
+          }
+
+          for (const member of teamBMembers) {
+            await prisma.matchPlayer.create({
+              data: {
+                matchId: match.id,
+                userId: member.userId,
+                isTeamA: false,
+              },
+            });
+          }
+
+          // Registrar goles aleatoriamente
+          for (let j = 0; j < scoreA; j++) {
+            const randomScorerIndex = Math.floor(
+              Math.random() * teamAMembers.length
+            );
+            const scorer = teamAMembers[randomScorerIndex];
+
+            await prisma.goal.create({
+              data: {
+                matchId: match.id,
+                userId: scorer.userId,
+                isTeamA: true,
+                minute: Math.floor(Math.random() * 90) + 1, // Minuto aleatorio entre 1-90
+              },
+            });
+          }
+
+          for (let j = 0; j < scoreB; j++) {
+            const randomScorerIndex = Math.floor(
+              Math.random() * teamBMembers.length
+            );
+            const scorer = teamBMembers[randomScorerIndex];
+
+            await prisma.goal.create({
+              data: {
+                matchId: match.id,
+                userId: scorer.userId,
+                isTeamA: false,
+                minute: Math.floor(Math.random() * 90) + 1,
+              },
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error creating matches for group ${group.id}:`, error);
+    }
+  }
+
+  console.log('Seed completed successfully');
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

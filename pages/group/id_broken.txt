@@ -1,0 +1,3753 @@
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import Button from '../../components/Button';
+import ParticipantCard from '../../components/ParticipantCard';
+import Layout from '../../components/Layout';
+import { RecurrenceType } from '../../types/match';
+import { useSession } from 'next-auth/react';
+import {
+  UserGroupIcon,
+  CalendarIcon,
+  MapPinIcon,
+  ChevronRightIcon,
+  CheckCircleIcon as CheckCircleIconOutline,
+  XCircleIcon as XCircleIconOutline,
+  ChevronUpIcon,
+  ChevronDownIcon,
+  PencilIcon,
+  TrashIcon,
+  ClipboardIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  QuestionMarkCircleIcon,
+  PlusIcon,
+  ArrowLeftIcon,
+} from '@heroicons/react/24/outline';
+import {
+  CheckCircleIcon as CheckCircleIconSolid,
+  XCircleIcon as XCircleIconSolid,
+} from '@heroicons/react/24/solid';
+import { prisma } from '../../lib/prisma';
+import type { PrismaClient } from '@prisma/client';
+import { Box, Typography, Chip, Avatar } from '@mui/material';
+import { toast } from 'react-hot-toast';
+import { getSession } from 'next-auth/react';
+
+type GroupWithRelations = NonNullable<
+  Awaited<ReturnType<PrismaClient['group']['findUnique']>>
+> & {
+  matches: NonNullable<Awaited<ReturnType<PrismaClient['match']['findMany']>>>;
+  members: Array<
+    NonNullable<
+      Awaited<ReturnType<PrismaClient['groupMember']['findUnique']>>
+    > & {
+      user: NonNullable<
+        Awaited<ReturnType<PrismaClient['user']['findUnique']>>
+      >;
+    }
+  >;
+  creator: NonNullable<Awaited<ReturnType<PrismaClient['user']['findUnique']>>>;
+  nextMatchRef?: NonNullable<
+    Awaited<ReturnType<PrismaClient['match']['findUnique']>>
+  >;
+  nextMatchId?: string;
+  nextMatchDetails?: MatchInterface;
+  message?: string; // Mensaje sobre el estado de la membresía
+  userStatus?: string; // Estado del usuario en el grupo
+};
+
+interface MatchInterface {
+  id: string;
+  date: string | Date;
+  location: string;
+  teamA: string;
+  teamB: string;
+  scoreA: number;
+  scoreB: number;
+  status: string;
+  playersA?: Array<{ id: string; name: string | null; avatar: string | null }>;
+  playersB?: Array<{ id: string; name: string | null; avatar: string | null }>;
+  confirmedPlayers?: Array<{
+    id: string;
+    name: string | null;
+    avatar: string | null;
+    age?: number | null;
+  }>;
+  goals?: Array<{
+    id: string;
+    isTeamA: boolean;
+    scorerId: string;
+    scorerName: string | null;
+    scorerAvatar: string | null;
+    minute?: number;
+  }>;
+  createdAt?: Date;
+  updatedAt?: Date;
+  groupId?: string;
+  goalsA?: Array<{
+    id: string;
+    isTeamA: boolean;
+    scorerId: string;
+    scorerName: string | null;
+    scorerAvatar: string | null;
+    minute?: number;
+  }>;
+  goalsB?: Array<{
+    id: string;
+    isTeamA?: boolean;
+    isTeamB?: boolean;
+    scorerId: string;
+    scorerName: string | null;
+    scorerAvatar: string | null;
+    minute?: number;
+  }>;
+}
+
+interface GroupInterface {
+  id: string;
+  name: string;
+  description: string | null;
+  sport: string;
+  location: string;
+  members: Array<{
+    id: string;
+    name: string | null;
+    avatar: string | null;
+    role: string;
+  }>;
+  matches: Array<MatchInterface>;
+  createdAt: string;
+  createdBy: string;
+  nextMatch: string | null;
+  nextMatchId: string | null;
+  nextMatchDetails: MatchInterface | null;
+  totalMatches: number;
+}
+
+interface Member {
+  id: string;
+  userId: string;
+  role: string;
+  status: ParticipantStatus;
+  user: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    image: string | null;
+    age?: number | null;
+  };
+  name?: string;
+  email?: string;
+  avatar?: string;
+}
+
+interface ExtendedMember extends Member {
+  isCaptain: boolean;
+  votedForResort: boolean;
+}
+
+interface Participant extends ExtendedMember {
+  isCaptain: boolean;
+  votedForResort: boolean;
+}
+
+interface Player {
+  id: string;
+  name: string | null;
+  avatar: string | null;
+}
+
+const mockUser = {
+  id: '1',
+  name: 'Juan Pérez',
+  isCaptain: true,
+  isReferee: false,
+};
+
+type ParticipantStatus =
+  | 'CONFIRMED'
+  | 'PENDING'
+  | 'DECLINED'
+  | 'confirmed'
+  | 'pending'
+  | 'declined';
+
+// Add a custom toast configuration function
+const showToast = (message: string, type: 'success' | 'error') => {
+  // Save current scroll position
+  const scrollPosition = window.scrollY;
+
+  // Configure toast to be less intrusive
+  toast[type](message, {
+    duration: 3000,
+    position: 'bottom-right',
+    style: {
+      padding: '12px',
+      borderRadius: '8px',
+      background: type === 'success' ? '#10B981' : '#EF4444',
+      color: 'white',
+      fontWeight: '500',
+      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    },
+    id: `toast-${Date.now()}`, // Ensure unique ID for each toast
+  });
+
+  // After toast appears, restore scroll position
+  setTimeout(() => {
+    window.scrollTo({
+      top: scrollPosition,
+      behavior: 'auto',
+    });
+  }, 100);
+};
+
+interface TbdPlayer {
+  id: string;
+  name: string;
+  isTeamA: boolean;
+}
+
+interface TbdPlayersData {
+  teamA: TbdPlayer[];
+  teamB: TbdPlayer[];
+}
+
+export default function GroupDetails() {
+  const router = useRouter();
+  const { id } = router.query as { id: string };
+  const { data: session, status } = useSession();
+  const user = session?.user;
+  const loading = status === 'loading';
+
+  const [group, setGroup] = useState<GroupWithRelations | null>(null);
+  const [showTeams, setShowTeams] = useState(false);
+  const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(true);
+  const [isParticipantsCollapsed, setIsParticipantsCollapsed] = useState(false);
+  const [isTeamsCollapsed, setIsTeamsCollapsed] = useState(false);
+  const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
+  const [participants, setParticipants] = useState<ExtendedMember[]>([]);
+  const [userAttendanceStatus, setUserAttendanceStatus] =
+    useState<ParticipantStatus | null>(null);
+  const [hasResorted, setHasResorted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [balanceByAge, setBalanceByAge] = useState(false);
+  const [playerGoalsMap, setPlayerGoalsMap] = useState<Record<string, number>>(
+    {}
+  );
+  const [pendingMatch, setPendingMatch] = useState<MatchInterface | null>(null);
+  const [activeMatch, setActiveMatch] = useState<MatchInterface | null>(null);
+  const [sortTeamsLoading, setSortTeamsLoading] = useState(false);
+  const [sortTeamsError, setSortTeamsError] = useState<string | null>(null);
+  const [sortLocation, setSortLocation] = useState('');
+  const [sortDate, setSortDate] = useState('');
+  const [currentUserIsAdmin, setCurrentUserIsAdmin] = useState(false);
+  const [confirmedCount, setConfirmedCount] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
+  const [teamA, setTeamA] = useState<Participant[]>([]);
+  const [teamB, setTeamB] = useState<Participant[]>([]);
+  const [hasVotedForResort, setHasVotedForResort] = useState(false);
+  const [showConfirmResort, setShowConfirmResort] = useState(false);
+  const [showNextMatchsConfirm, setShowNextMatchsConfirm] = useState(false);
+  const [openGenerateTeamsDialog, setOpenGenerateTeamsDialog] = useState(false);
+  const [isMatchHistoryCollapsed, setIsMatchHistoryCollapsed] = useState(false);
+  const [completedMatches, setCompletedMatches] = useState<MatchInterface[]>(
+    []
+  );
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [showInviteUrl, setShowInviteUrl] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [pendingRequests, setPendingRequests] = useState<ExtendedMember[]>([]);
+  const [shortInviteUrl, setShortInviteUrl] = useState<string | null>(null);
+  const [isGeneratingShortUrl, setIsGeneratingShortUrl] = useState(false);
+  const [isCopying, setIsCopying] = useState(false);
+  const [tbdPlayersLoaded, setTbdPlayersLoaded] = useState(false);
+  const [allowFillIn, setAllowFillIn] = useState(true);
+  const [resetAttendanceLoading, setResetAttendanceLoading] = useState(false);
+  const [goleadores, setGoleadores] = useState<
+    Array<{ id: string; name: string; goals: number; avatar: string | null }>
+  >([]);
+  const [mvps, setMvps] = useState<
+    Array<{
+      id: string;
+      name: string;
+      winRate: number;
+      matchesPlayed: number;
+      avatar: string | null;
+    }>
+  >([]);
+  const [selectedTab, setSelectedTab] = useState(0);
+  const [inviteLink, setInviteLink] = useState('');
+
+  // Controlar actualizaciones cíclicas
+  const [tbdRestored, setTbdRestored] = useState(false);
+
+  // Define all useMemo hooks at the top level
+  const isUserInGroup = useMemo(() => {
+    if (!user) return false;
+    return group?.members?.some((member: any) => member.userId === user.id);
+  }, [group?.members, user]);
+
+  // Verificar si el usuario está pendiente de confirmación
+  const isUserPendingInGroup = useMemo(() => {
+    if (!user) return false;
+    return group?.members?.some(
+      (member: any) => member.userId === user.id && member.status === 'pending'
+    );
+  }, [group?.members, user]);
+
+  // Obtener datos del grupo
+  const fetchGroupDetails = async () => {
+    if (!id) {
+      console.error('Missing group ID');
+      return;
+    }
+
+    // Esperar a que la sesión se cargue
+    if (status === 'loading') {
+      console.log('Session still loading, deferring group details fetch');
+      return;
+    }
+
+    if (status === 'unauthenticated') {
+      console.log('User not authenticated, redirecting to login');
+      router.push('/auth/signin');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      console.log(`Fetching group details for ID: ${id}`);
+
+      const response = await fetch(`/api/groups/${id}`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error(
+          `Error response from API: ${data.message || 'Unknown error'}`
+        );
+        setError(data.message || 'Error al cargar los detalles del grupo');
+        return;
+      }
+
+      console.log('Group data successfully fetched');
+
+      // Debug the response data
+      console.log(
+        'Next match details:',
+        data.nextMatchDetails || 'No details available'
+      );
+      console.log(
+        'Confirmed players count:',
+        data.nextMatchDetails?.confirmedPlayers?.length || 0
+      );
+
+      // Asegurar que los nombres de equipos estén correctos en nextMatchDetails
+      if (data.nextMatchDetails && data.teamAName && data.teamBName) {
+        data.nextMatchDetails.teamA =
+          data.nextMatchDetails.teamA || data.teamAName;
+        data.nextMatchDetails.teamB =
+          data.nextMatchDetails.teamB || data.teamBName;
+        console.log('Nombres de equipos actualizados en nextMatchDetails:', {
+          teamA: data.nextMatchDetails.teamA,
+          teamB: data.nextMatchDetails.teamB,
+        });
+      }
+
+      if (data.nextMatchDetails?.confirmedPlayers) {
+        console.log(
+          'Confirmed players list:',
+          data.nextMatchDetails.confirmedPlayers
+        );
+      }
+
+      // Verificar si el usuario actual es un administrador
+      const isAdmin = data.members.some(
+        (member: any) => member.userId === user?.id && member.role === 'ADMIN'
+      );
+
+      // Actualizar el estado global de isAdmin
+      setCurrentUserIsAdmin(isAdmin);
+      console.log('Usuario es admin:', isAdmin);
+
+      // Verificar y actualizar el estado de asistencia del usuario actual
+      const currentUserMember = data.members.find(
+        (member: any) => String(member.userId) === String(user?.id)
+      );
+
+      if (currentUserMember) {
+        // Normalizar el estado de asistencia (convertir a mayúsculas)
+        const normalizedStatus =
+          currentUserMember.status?.toUpperCase() || 'PENDING';
+        console.log('Estado de membresía del usuario:', normalizedStatus);
+
+        // Verificar también si el usuario tiene una confirmación específica para el próximo partido
+        if (data.nextMatchDetails && data.nextMatchDetails.confirmedPlayers) {
+          const isConfirmedForNextMatch =
+            data.nextMatchDetails.confirmedPlayers.some(
+              (player: any) => String(player.id) === String(user?.id)
+            );
+
+          if (isConfirmedForNextMatch) {
+            console.log('Usuario confirmado para el próximo partido');
+            setUserAttendanceStatus('CONFIRMED');
+          } else {
+            console.log('Usuario no confirmado para el próximo partido');
+            setUserAttendanceStatus('PENDING');
+          }
+        } else {
+          console.log(
+            'Estableciendo estado de asistencia del usuario desde miembro:',
+            normalizedStatus
+          );
+          setUserAttendanceStatus(normalizedStatus as ParticipantStatus);
+        }
+      }
+
+      // Update the group state with fresh data
+      setGroup(data);
+      console.log('Group state updated with fresh data');
+
+      // Contar jugadores confirmados para el próximo partido
+      if (data.nextMatchDetails && data.nextMatchDetails.confirmedPlayers) {
+        const confirmedForNextMatch =
+          data.nextMatchDetails.confirmedPlayers.length;
+        setConfirmedCount(confirmedForNextMatch);
+        console.log(
+          'Jugadores confirmados para el próximo partido:',
+          confirmedForNextMatch
+        );
+      } else {
+        // Si no hay confirmedPlayers, establecer a 0
+        setConfirmedCount(0);
+        console.log('No hay jugadores confirmados para el próximo partido');
+      }
+    } catch (error) {
+      console.error('Error fetching group details:', error);
+      setError('Error al cargar los detalles del grupo');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fetch group details when the component mounts or id changes
+  useEffect(() => {
+    fetchGroupDetails();
+  }, [id, session]);
+
+  // Process group data when it changes
+  useEffect(() => {
+    if (!group) return;
+
+    console.log('Processing group data for UI updates');
+
+    // Recuperar jugadores TBD del partido actual
+    if (group.nextMatchId && !tbdPlayersLoaded) {
+      try {
+        // Verificamos si hay TBD en el UI actual
+        const hasTbdInUI =
+          (group.nextMatchDetails?.playersA &&
+            group.nextMatchDetails.playersA.some(
+              (p) => p.name && p.name.includes('TBD')
+            )) ||
+          (group.nextMatchDetails?.playersB &&
+            group.nextMatchDetails.playersB.some(
+              (p) => p.name && p.name.includes('TBD')
+            ));
+
+        if (hasTbdInUI) {
+          console.log(
+            'Ya hay TBD players en el UI, no es necesario procesarlos'
+          );
+          setTbdPlayersLoaded(true);
+          return;
+        }
+
+        // Primero verificamos si hay TBD players en el partido (base de datos)
+        const tbdPlayersFromDB = group.matches?.find(
+          (m) => m.id === group.nextMatchId
+        )?.tbdPlayers;
+
+        let tbdData: { teamA: any[]; teamB: any[] } = { teamA: [], teamB: [] };
+
+        if (tbdPlayersFromDB) {
+          console.log(
+            'TBD players recuperados de la base de datos:',
+            tbdPlayersFromDB
+          );
+          tbdData = tbdPlayersFromDB as { teamA: any[]; teamB: any[] };
+        } else {
+          // No chequeamos localStorage - solo usamos la base de datos
+          if (!tbdPlayersFromDB) {
+            tbdData = { teamA: [], teamB: [] };
+          }
+        }
+
+        // Procesamos los TBD players si existen
+        if (
+          (tbdData.teamA && tbdData.teamA.length > 0) ||
+          (tbdData.teamB && tbdData.teamB.length > 0)
+        ) {
+          console.log(
+            'Encontrados TBD players para procesar:',
+            tbdData.teamA.length + tbdData.teamB.length
+          );
+
+          if (group.nextMatchDetails) {
+            // Crear una copia del estado actual
+            const updatedGroup = { ...group };
+
+            // Asegurar que nextMatchDetails existe
+            if (!updatedGroup.nextMatchDetails) {
+              updatedGroup.nextMatchDetails = {} as MatchInterface;
+            }
+
+            // Asegurar que playersA y playersB existan
+            if (!updatedGroup.nextMatchDetails.playersA) {
+              updatedGroup.nextMatchDetails.playersA = [];
+            }
+
+            if (!updatedGroup.nextMatchDetails.playersB) {
+              updatedGroup.nextMatchDetails.playersB = [];
+            }
+
+            // Filtrar jugadores existentes para eliminar posibles TBD antiguos
+            updatedGroup.nextMatchDetails.playersA =
+              updatedGroup.nextMatchDetails.playersA.filter(
+                (p) => !p.name || !p.name.includes('TBD')
+              );
+
+            updatedGroup.nextMatchDetails.playersB =
+              updatedGroup.nextMatchDetails.playersB.filter(
+                (p) => !p.name || !p.name.includes('TBD')
+              );
+
+            // Distribuir los TBD players según su equipo asignado
+            const tbdPlayersA = tbdData.teamA || [];
+            const tbdPlayersB = tbdData.teamB || [];
+
+            console.log(
+              'TBD Players - Equipo A:',
+              tbdPlayersA.length,
+              'Equipo B:',
+              tbdPlayersB.length
+            );
+
+            // Formatear los TBD players para la interfaz
+            const formattedTbdPlayersA = tbdPlayersA.map((p: any) => ({
+              id:
+                p.id ||
+                `tbd-${Date.now()}-${Math.random()
+                  .toString(36)
+                  .substring(2, 9)}`,
+              name: p.name || `TBD ${Math.floor(Math.random() * 100)}`,
+              avatar: null,
+            }));
+
+            const formattedTbdPlayersB = tbdPlayersB.map((p: any) => ({
+              id:
+                p.id ||
+                `tbd-${Date.now()}-${Math.random()
+                  .toString(36)
+                  .substring(2, 9)}`,
+              name: p.name || `TBD ${Math.floor(Math.random() * 100)}`,
+              avatar: null,
+            }));
+
+            // Agregar los TBD players formateados
+            updatedGroup.nextMatchDetails.playersA = [
+              ...updatedGroup.nextMatchDetails.playersA,
+              ...formattedTbdPlayersA,
+            ];
+
+            updatedGroup.nextMatchDetails.playersB = [
+              ...updatedGroup.nextMatchDetails.playersB,
+              ...formattedTbdPlayersB,
+            ];
+
+            // Actualizar el estado del grupo
+            setGroup(updatedGroup);
+            console.log(
+              'Group state updated with TBD players:',
+              formattedTbdPlayersA.length + formattedTbdPlayersB.length
+            );
+          }
+        }
+
+        // Marcar que ya restauramos los TBD para no repetirlo
+        setTbdPlayersLoaded(true);
+      } catch (error) {
+        console.error('Error al recuperar TBD players:', error);
+        setTbdPlayersLoaded(true); // Marcar como procesado aunque falle
+      }
+    }
+
+    // Buscar si hay un partido pendiente
+    const pendingMatchData =
+      group.matches?.find(
+        (m: any) =>
+          m.status === 'PENDING' && m.playersA && m.playersA.length > 0
+      ) ||
+      (group.nextMatchDetails &&
+      group.nextMatchDetails.playersA &&
+      group.nextMatchDetails.playersA.length > 0
+        ? group.nextMatchDetails
+        : null);
+
+    if (pendingMatchData) {
+      // Si hay partido pendiente con equipos, usarlo
+      console.log(
+        'Estableciendo partido pendiente con equipos sorteados:',
+        pendingMatchData.id
+      );
+
+      // Asegurarnos de que los nombres de los equipos estén correctos
+      if (pendingMatchData && group.teamAName && group.teamBName) {
+        pendingMatchData.teamA = pendingMatchData.teamA || group.teamAName;
+        pendingMatchData.teamB = pendingMatchData.teamB || group.teamBName;
+      }
+
+      setPendingMatch(pendingMatchData);
+      setShowTeams(false);
+    } else {
+      // No hay equipos sorteados, mostrar interfaz para sortear
+      setPendingMatch(null);
+      setShowTeams(true);
+    }
+
+    // Convertir miembros del grupo a participantes para mantener compatibilidad
+    console.log('Procesando miembros para el UI:', group.members?.length || 0);
+
+    if (group.members && Array.isArray(group.members)) {
+      const mappedParticipants = group.members.map((member: any) => {
+        // Obtenemos el usuario asociado al miembro (si existe)
+        const userObj = member.user || {
+          id: member.userId || '',
+          name: member.name || 'Sin nombre',
+          image: member.avatar || null,
+        };
+
+        // Asegurar que el status esté en mayúsculas para la interfaz
+        let normalizedStatus: ParticipantStatus = 'PENDING';
+
+        if (member.status) {
+          const status = member.status.toUpperCase();
+          if (
+            status === 'CONFIRMED' ||
+            status === 'DECLINED' ||
+            status === 'PENDING'
+          ) {
+            normalizedStatus = status as ParticipantStatus;
+          }
+        }
+
+        // Asegurar que tengamos un userId válido
+        const validUserId = member.userId || '';
+
+        return {
+          id: member.id, // ID del GroupMember
+          userId: validUserId, // ID del usuario
+          name: userObj.name || 'Sin nombre',
+          status: normalizedStatus,
+          isCaptain: member.role === 'ADMIN',
+          votedForResort: false,
+          age: userObj.age || 30,
+          avatar: userObj.image || member.avatar,
+          role: member.role,
+        };
+      });
+
+      console.log('Miembros procesados para UI:', mappedParticipants.length);
+      // No sobrescribir el grupo completo, solo actualizar una propiedad si es necesario
+      // setGroup(mappedParticipants as unknown as GroupWithRelations);
+
+      // If user is admin, filter out pending membership requests
+      if (currentUserIsAdmin) {
+        const pendingMemberships = group.members
+          .filter((m: any) => {
+            const status = m.status?.toUpperCase() || '';
+            return status === 'PENDING';
+          })
+          .map((m) => ({
+            ...m,
+            isCaptain: false,
+            votedForResort: false,
+          }));
+        console.log(
+          'Solicitudes de membresía pendientes:',
+          pendingMemberships.length
+        );
+        // No sobrescribir el grupo completo
+        // setGroup(pendingMemberships as GroupWithRelations);
+      }
+    }
+
+    // Generate invite URL using the group ID directly
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    setInviteUrl(`${baseUrl}/invite/${id}`);
+  }, [group, currentUserIsAdmin, id, tbdPlayersLoaded]);
+
+  // Generate short URL for invite link
+  useEffect(() => {
+    if (inviteUrl && !shortInviteUrl && !isGeneratingShortUrl) {
+      generateShortUrl();
+    }
+  }, [inviteUrl, shortInviteUrl]);
+
+  const generateShortUrl = async () => {
+    if (!inviteUrl || isGeneratingShortUrl) return;
+
+    setIsGeneratingShortUrl(true);
+
+    try {
+      const response = await fetch('/api/url-shortener', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: inviteUrl }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.shortUrl) {
+        setShortInviteUrl(data.shortUrl);
+      } else {
+        console.error('Error generating short URL:', data.error);
+      }
+    } catch (error) {
+      console.error('Error generating short URL:', error);
+    } finally {
+      setIsGeneratingShortUrl(false);
+    }
+  };
+
+  // Add debug log to check participants status
+  useEffect(() => {
+    if (group?.members) {
+      console.log('DEBUG - Participant status check:');
+      console.log('Current user ID:', user?.id, 'typeof:', typeof user?.id);
+      group.members.forEach((p) => {
+        console.log(`Participant ${p.name} (${p.id}):`, {
+          userId: p.userId,
+          userIdType: typeof p.userId,
+          currentUserId: user?.id,
+          isCurrentUser: p.userId === user?.id,
+          equalityCheck: `'${p.userId}' === '${user?.id}' = ${
+            p.userId === user?.id
+          }`,
+          status: p.status,
+          statusType: typeof p.status,
+          role: p.role,
+          isAdmin: p.role === 'ADMIN',
+          showSelfButtons: p.userId === user?.id,
+          showAdminButtons:
+            currentUserIsAdmin && p.userId !== user?.id && Boolean(p.userId),
+        });
+      });
+      console.log('Current user is admin:', currentUserIsAdmin);
+    }
+  }, [group, currentUserIsAdmin]);
+
+  // Determine admin status
+  useEffect(() => {
+    if (user && group) {
+      // Verify if the current user is an admin by checking group members
+      const isAdmin = group.members.some(
+        (member: any) => member.userId === user.id && member.role === 'ADMIN'
+      );
+      setCurrentUserIsAdmin(isAdmin);
+    }
+  }, [user, group]);
+
+  // Add a useEffect to set completed matches and expand details for the first one
+  useEffect(() => {
+    if (group && group.matches) {
+      const completed = group.matches.filter(
+        (match: any) => match.status === 'COMPLETED'
+      );
+      setCompletedMatches(completed);
+
+      // Initialize player goals for all matches
+      if (completed.length > 0) {
+        const allGoals: { [matchId: string]: { [playerId: string]: number } } =
+          {};
+        completed.forEach((match) => {
+          allGoals[match.id] = initializePlayerGoals(match);
+        });
+        setPlayerGoalsMap(
+          Object.values(allGoals).reduce(
+            (acc, curr) => ({ ...acc, ...curr }),
+            {}
+          )
+        );
+      }
+    }
+  }, [group]);
+
+  // Función para recuperar los TBD players si no están disponibles
+  const loadTbdPlayersFromAPI = async (matchId: string) => {
+    console.log('Intentando recuperar TBD players desde la API para:', matchId);
+
+    try {
+      // Verificar si hay TBD players en alguna parte
+      const hasTbdInTeamA = group?.nextMatchDetails?.playersA?.some(
+        (p) => p.name && p.name.includes('TBD')
+      );
+      const hasTbdInTeamB = group?.nextMatchDetails?.playersB?.some(
+        (p) => p.name && p.name.includes('TBD')
+      );
+
+      // Si ya hay TBD players en el estado actual, no hacemos nada
+      if (hasTbdInTeamA || hasTbdInTeamB) {
+        console.log(
+          'Ya hay TBD players en el estado, no es necesario recuperarlos'
+        );
+        return;
+      }
+
+      // Verificar cuántos TBD players necesitamos crear
+      const confirmedPlayers = group?.nextMatchDetails?.confirmedPlayers || [];
+      const requiredPlayers = group?.requiredPlayers || 10;
+      const missingPlayers = requiredPlayers - confirmedPlayers.length;
+
+      if (missingPlayers <= 0) {
+        console.log('No se necesitan jugadores TBD');
+        return;
+      }
+
+      console.log(`Se necesitan ${missingPlayers} jugadores TBD`);
+
+      // Crear TBD players para el equipo
+      const tbdPlayers = [];
+      for (let i = 0; i < missingPlayers; i++) {
+        // Alternamos el equipo para mantener el balance
+        const isTeamA = i % 2 === 0;
+        tbdPlayers.push({
+          id: `tbd-${Date.now()}-${i}`,
+          name: `TBD ${i + 1}`,
+          isTeamA,
+        });
+      }
+
+      // Llamar a la API para añadir los TBD players
+      const response = await fetch(`/api/matches/${matchId}/tbd-players`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tbdPlayers }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al añadir TBD players desde la API');
+      }
+
+      const data = await response.json();
+      console.log('TBD players añadidos exitosamente:', data);
+
+      // Recargar los datos del grupo para ver los cambios
+      fetchGroupDetails();
+    } catch (error) {
+      console.error('Error al recuperar TBD players desde la API:', error);
+    }
+  };
+
+  // Revisar si necesitamos cargar TBD players cuando cambia el grupo
+  useEffect(() => {
+    if (group?.nextMatchId) {
+      // Verificamos si hay equipos formados (playersA y playersB)
+      const teamsFormed =
+        group.nextMatchDetails?.playersA &&
+        group.nextMatchDetails?.playersB &&
+        group.nextMatchDetails?.playersA.length > 0 &&
+        group.nextMatchDetails?.playersB.length > 0;
+
+      if (!teamsFormed) {
+        return;
+      }
+
+      // Verificamos si hay jugadores TBD en el UI
+      const hasTbdInTeamA = group.nextMatchDetails?.playersA?.some(
+        (p) => p.name && p.name.includes('TBD')
+      );
+      const hasTbdInTeamB = group.nextMatchDetails?.playersB?.some(
+        (p) => p.name && p.name.includes('TBD')
+      );
+
+      if (hasTbdInTeamA || hasTbdInTeamB) {
+        console.log(
+          'Ya hay TBD players en el UI, no es necesario recuperarlos'
+        );
+        return;
+      }
+
+      // Verificamos si se necesitan TBD players (jugadores confirmados < jugadores requeridos)
+      const confirmedPlayers = group?.nextMatchDetails?.confirmedPlayers || [];
+      const requiredPlayers = group?.requiredPlayers || 10;
+      const needsTbdPlayers = confirmedPlayers.length < requiredPlayers;
+
+      // Verificamos si hay TBD players en la base de datos
+      const hasTbdPlayersInDB = group.matches?.find(
+        (m: any) => m.id === group.nextMatchId
+      )?.tbdPlayers;
+
+      // Verificamos si hay TBD players en localStorage (retrocompatibilidad)
+      const hasLocalTbdPlayers = null;
+
+      if (
+        teamsFormed &&
+        needsTbdPlayers &&
+        !hasTbdPlayersInDB &&
+        !hasLocalTbdPlayers &&
+        currentUserIsAdmin &&
+        !tbdPlayersLoaded
+      ) {
+        console.log(
+          'Equipos formados pero faltan TBD players. Cargando desde API...'
+        );
+        loadTbdPlayersFromAPI(group.nextMatchId);
+        setTbdPlayersLoaded(true);
+      }
+
+      // Si hay TBD players en la base de datos o en localStorage, se actualizarán cuando
+      // se procese el useEffect en la línea 442 del archivo actual
+    }
+  }, [group, currentUserIsAdmin, tbdPlayersLoaded]);
+
+  // Mantener actualizado el estado de asistencia del usuario actual
+  useEffect(() => {
+    if (user && group?.members) {
+      const currentUserParticipant = group.members.find(
+        (p) => String(p.userId) === String(user.id)
+      );
+
+      if (currentUserParticipant) {
+        console.log('Actualizando userAttendanceStatus:', {
+          prevStatus: userAttendanceStatus,
+          newStatus: currentUserParticipant.status,
+          userId: user.id,
+          participantId: currentUserParticipant.id,
+        });
+
+        setUserAttendanceStatus(currentUserParticipant.status);
+      }
+    }
+  }, [group?.members, user]);
+
+  // Función para calcular el puntaje de un equipo en un partido
+  const getScoreForTeam = (match: MatchInterface, isTeamA: boolean): number => {
+    // Si el partido ya tiene un resultado guardado, usar esos valores directamente
+    if (isTeamA && typeof match.scoreA === 'number') {
+      return match.scoreA;
+    } else if (!isTeamA && typeof match.scoreB === 'number') {
+      return match.scoreB;
+    }
+
+    // Si no hay resultado guardado, calcular por goles
+    const teamGoals =
+      match.goals?.filter((goal) => goal.isTeamA === isTeamA) || [];
+
+    return teamGoals.length;
+  };
+
+  // Function to get tomorrow's date in YYYY-MM-DD format
+  const getTomorrowDate = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  };
+
+  useEffect(() => {
+    // Set the default date to tomorrow when component loads
+    setSortDate(getTomorrowDate());
+  }, []);
+
+  // Función para confirmar/rechazar asistencia como administrador
+  const handleAdminAttendanceUpdate = async (
+    participantId: string,
+    userId: string,
+    status: string
+  ) => {
+    try {
+      if (!pendingMatch || !userId) {
+        console.error('Missing required data for admin match attendance', {
+          pendingMatch: Boolean(pendingMatch),
+          userId,
+        });
+        return;
+      }
+
+      console.log('Admin actualizando asistencia al partido:', {
+        matchId: pendingMatch.id,
+        userId,
+        status,
+      });
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/matches/${pendingMatch.id}/attendance/${userId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            status: status,
+          }),
+        }
+      );
+
+      const data = await response.json();
+      console.log('Response from admin match attendance update:', data);
+
+      if (response.ok) {
+        // Actualizar UI
+        showToast('Asistencia confirmada', 'success');
+        fetchGroupDetails(); // Recargar los datos del grupo para ver cambios
+      } else {
+        showToast('Error al actualizar asistencia', 'error');
+      }
+    } catch (error) {
+      console.error('Error updating attendance as admin:', error);
+      showToast('Error al actualizar asistencia', 'error');
+    }
+  };
+
+  // Función para que un administrador actualice la asistencia de otro miembro
+  const handleAdminGroupAttendance = async (
+    memberId: string,
+    memberIdAsTarget: string,
+    status: string
+  ) => {
+    try {
+      if (!user || !id || !group) {
+        console.error('Missing required data', {
+          user,
+          id,
+          group: Boolean(group),
+        });
+        return;
+      }
+
+      // Normalize status case for consistent use throughout the function
+      const apiStatus = status.toUpperCase(); // API expects uppercase status
+      const uiStatus = status.toLowerCase(); // UI uses lowercase status
+
+      console.log('Admin actualizando asistencia:', {
+        memberId,
+        memberIdAsTarget: memberIdAsTarget,
+        apiStatus,
+        uiStatus,
+        endpoint: `${process.env.NEXT_PUBLIC_API_URL}/groups/${id}/attendance/${memberId}`,
+      });
+
+      // Guardar el estado anterior para poder restaurarlo en caso de error
+      const previousParticipants = [...group.members];
+      const participantToUpdate = group.members.find((p) => p.id === memberId);
+      const previousStatus = participantToUpdate?.status || 'pending';
+
+      // Actualizar inmediatamente el estado de la UI para dar feedback instantáneo
+      const updatedParticipants = group.members.map((p) => {
+        if (p.id === memberId) {
+          console.log(
+            `Admin actualizando estado local de ${p.status} a ${uiStatus}`
+          );
+          return {
+            ...p,
+            status: uiStatus as ParticipantStatus,
+          };
+        }
+        return p;
+      });
+
+      // Actualizar los participantes inmediatamente
+      setGroup({ ...group, members: updatedParticipants });
+
+      // Actualizar el contador de confirmados
+      const newConfirmedCount = updatedParticipants.filter(
+        (p) => p.status === 'confirmed'
+      ).length;
+      setConfirmedCount(newConfirmedCount);
+
+      // Realizar la llamada para actualizar el estado - Usando el ID del member directamente
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/groups/${id}/attendance/${memberId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            status: apiStatus, // Send uppercase status to API
+            useDirectMemberId: true, // Indicar que estamos usando el ID del miembro directamente
+          }),
+        }
+      );
+
+      try {
+        const data = await response.json();
+        console.log('Response from admin attendance update:', data);
+
+        if (response.ok) {
+          // También actualizar el modelo del grupo para mantener sincronizados los estados
+          const updatedGroupMembers = [...group.members];
+          const memberIndex = updatedGroupMembers.findIndex(
+            (m: any) => m.id === memberId
+          );
+
+          if (memberIndex !== -1) {
+            updatedGroupMembers[memberIndex] = {
+              ...updatedGroupMembers[memberIndex],
+              status: apiStatus, // Make sure we're setting the correct case for the group members object
+            };
+
+            // Actualizar el grupo sin causar un refresco completo
+            setGroup({ ...group, members: updatedGroupMembers });
+
+            console.log('Grupo actualizado localmente con éxito');
+          } else {
+            console.log(
+              'No se encontró el miembro para actualizar en el grupo, pero la API actualizó correctamente'
+            );
+          }
+        } else {
+          console.error('Error en servidor:', data);
+          alert(
+            `Error al actualizar la asistencia: ${
+              data.error || 'Error desconocido'
+            }`
+          );
+
+          // Revertir cambios en UI al estado anterior en caso de error
+          setGroup({ ...group, members: previousParticipants });
+          setConfirmedCount(
+            previousParticipants.filter((p) => p.status === 'confirmed').length
+          );
+        }
+      } catch (jsonError) {
+        console.error('Error parsing JSON:', jsonError);
+        alert(
+          `Error al procesar la respuesta: ${response.status} ${response.statusText}`
+        );
+
+        // Revertir cambios en UI al estado anterior en caso de error
+        setGroup({ ...group, members: previousParticipants });
+        setConfirmedCount(
+          previousParticipants.filter((p) => p.status === 'confirmed').length
+        );
+      }
+    } catch (error) {
+      console.error('Error actualizando asistencia del miembro:', error);
+      alert('Error al actualizar la asistencia. Inténtalo de nuevo.');
+
+      // En caso de error general, actualizar los datos desde el servidor
+      await fetchGroupDetails();
+    }
+  };
+
+  // Función para actualizar la asistencia del usuario actual al próximo partido
+  // Esta función sólo se debe usar desde la pestaña de próximo partido
+  const handleGroupAttendance = async (status: ParticipantStatus) => {
+    try {
+      setIsLoading(true);
+
+      // Ensure we have userId and groupId
+      const userId = session?.user?.id;
+      // Convert id to a safe string for groupId
+      const groupId =
+        typeof id === 'string' ? id : Array.isArray(id) ? id[0] : undefined;
+
+      if (!userId || !groupId) {
+        showToast(
+          'No se puede actualizar la asistencia. Falta información necesaria.',
+          'error'
+        );
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if there's a next match
+      if (!group?.nextMatchId) {
+        showToast('No hay un próximo partido programado.', 'error');
+        setIsLoading(false);
+        return;
+      }
+
+      console.log(
+        `Enviando solicitud de asistencia para el usuario actual: userId=${userId}, groupId=${groupId}, matchId=${group.nextMatchId}, status=${status}`
+      );
+
+      // Make the API call to update attendance
+      const response = await fetch('/api/attendances', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          groupId,
+          matchId: group.nextMatchId,
+          status,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Error updating attendance:', error);
+        showToast(
+          'Error al actualizar asistencia. Por favor, intenta de nuevo.',
+          'error'
+        );
+        return;
+      }
+
+      const data = await response.json();
+      console.log('Attendance API response:', data);
+
+      if (!data.success) {
+        console.error('API response indicates failure:', data);
+        showToast(
+          'Error en la respuesta del servidor. Intenta de nuevo.',
+          'error'
+        );
+        return;
+      }
+
+      // Set user attendance status based on the response
+      setUserAttendanceStatus(status);
+
+      console.log('Fetching updated group details after attendance change');
+
+      // Force a complete refresh of the group data
+      await fetchGroupDetails();
+
+      showToast('Has confirmado tu asistencia al próximo partido!', 'success');
+    } catch (error) {
+      console.error('Error in handleGroupAttendance:', error);
+      showToast(
+        'Error al actualizar asistencia. Por favor, intenta de nuevo.',
+        'error'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Función para copiar enlace al portapapeles
+  const copyInviteLink = () => {
+    const urlToCopy = shortInviteUrl || inviteUrl || '';
+
+    if (urlToCopy) {
+      setIsCopying(true);
+      navigator.clipboard
+        .writeText(urlToCopy)
+        .then(() => {
+          showToast('Enlace copiado al portapapeles', 'success');
+          // Mantener el estado de copiado por 2 segundos
+          setTimeout(() => {
+            setIsCopying(false);
+          }, 2000);
+        })
+        .catch((err) => {
+          console.error('Error al copiar enlace:', err);
+          showToast('Error al copiar enlace', 'error');
+          setIsCopying(false);
+        });
+    }
+  };
+
+  // Handle approve or reject membership request
+  const handleMembershipRequest = async (
+    userId: string,
+    action: 'APPROVE' | 'REJECT'
+  ) => {
+    try {
+      const response = await fetch(`/api/groups/${id}/member`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId, action }),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Error al ${
+            action === 'APPROVE' ? 'aprobar' : 'rechazar'
+          } la solicitud`
+        );
+      }
+
+      await fetchGroupDetails();
+      showToast(
+        `Solicitud ${
+          action === 'APPROVE' ? 'aprobada' : 'rechazada'
+        } correctamente`,
+        'success'
+      );
+    } catch (error) {
+      console.error(
+        `Error ${action === 'APPROVE' ? 'aprobando' : 'rechazando'} solicitud:`,
+        error
+      );
+      showToast(
+        `Error al ${
+          action === 'APPROVE' ? 'aprobar' : 'rechazar'
+        } la solicitud`,
+        'error'
+      );
+    }
+  };
+
+  // Función para abandonar el grupo
+  const handleLeaveGroup = async () => {
+    try {
+      const response = await fetch(`/api/groups/${id}/leave`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Error al abandonar el grupo');
+      }
+
+      showToast('Has abandonado el grupo correctamente', 'success');
+      router.push('/groups');
+    } catch (error) {
+      console.error('Error al abandonar el grupo:', error);
+      showToast('Error al abandonar el grupo', 'error');
+    }
+  };
+
+  // Función para calcular los goleadores y MVPs
+  const calculateStats = () => {
+    if (!group || !group.matches) return;
+
+    // Calcular goleadores
+    const goalsCount: Record<
+      string,
+      { goals: number; name: string; avatar: string | null }
+    > = {};
+
+    // Calcular victorias y partidos jugados para cada jugador
+    const playerStats: Record<
+      string,
+      { wins: number; matches: number; name: string; avatar: string | null }
+    > = {};
+
+    // Para cada partido completado
+    group.matches.forEach((match: any) => {
+      if (match.status !== 'COMPLETED') return;
+
+      // Registrar goles
+      if (match.goals && match.goals.length > 0) {
+        match.goals.forEach((goal: any) => {
+          if (!goalsCount[goal.scorerId]) {
+            goalsCount[goal.scorerId] = {
+              goals: 0,
+              name: goal.scorerName || 'Sin nombre',
+              avatar: goal.scorerAvatar,
+            };
+          }
+          goalsCount[goal.scorerId].goals += 1;
+        });
+      }
+
+      // Determinar el equipo ganador
+      const teamAWon = match.scoreA > match.scoreB;
+      const isDraw = match.scoreA === match.scoreB;
+
+      // Registrar victorias y partidos para jugadores del Equipo A
+      if (match.playersA) {
+        match.playersA.forEach((player: any) => {
+          if (!playerStats[player.id]) {
+            playerStats[player.id] = {
+              wins: 0,
+              matches: 0,
+              name: player.name || 'Sin nombre',
+              avatar: player.avatar,
+            };
+          }
+          playerStats[player.id].matches += 1;
+          if (teamAWon) playerStats[player.id].wins += 1;
+          if (isDraw) playerStats[player.id].wins += 0.5; // Media victoria por empate
+        });
+      }
+
+      // Registrar victorias y partidos para jugadores del Equipo B
+      if (match.playersB) {
+        match.playersB.forEach((player: any) => {
+          if (!playerStats[player.id]) {
+            playerStats[player.id] = {
+              wins: 0,
+              matches: 0,
+              name: player.name || 'Sin nombre',
+              avatar: player.avatar,
+            };
+          }
+          playerStats[player.id].matches += 1;
+          if (!teamAWon && !isDraw) playerStats[player.id].wins += 1;
+          if (isDraw) playerStats[player.id].wins += 0.5; // Media victoria por empate
+        });
+      }
+    });
+
+    // Convertir los objetos a arrays y ordenarlos
+    const sortedGoleadores = Object.entries(goalsCount)
+      .map(([id, data]) => ({
+        id,
+        name: data.name,
+        goals: data.goals,
+        avatar: data.avatar,
+      }))
+      .sort((a, b) => b.goals - a.goals);
+
+    const sortedMvps = Object.entries(playerStats)
+      .map(([id, data]) => ({
+        id,
+        name: data.name,
+        winRate: data.matches > 0 ? (data.wins / data.matches) * 100 : 0,
+        matchesPlayed: data.matches,
+        avatar: data.avatar,
+      }))
+      .filter((player) => player.matchesPlayed >= 3) // Solo jugadores con al menos 3 partidos
+      .sort((a, b) => b.winRate - a.winRate);
+
+    setGoleadores(sortedGoleadores);
+    setMvps(sortedMvps);
+  };
+
+  // Llamar a calculateStats cada vez que cambia el grupo
+  useEffect(() => {
+    if (group) {
+      calculateStats();
+    }
+  }, [group]);
+
+  // Actualizar el link de invitación cuando cambie el grupo
+  useEffect(() => {
+    if (group && group.inviteToken) {
+      const baseUrl = window.location.origin;
+      setInviteLink(`${baseUrl}/invite/${group.inviteToken}`);
+    }
+  }, [group]);
+
+  // Función para obtener el texto de recurrencia
+  const getRecurrenceText = () => {
+    if (!group) return '';
+
+    const dayNames = [
+      'domingo',
+      'lunes',
+      'martes',
+      'miércoles',
+      'jueves',
+      'viernes',
+      'sábado',
+    ];
+
+    if (!group.recurrenceType || group.recurrenceType === 'NONE') {
+      if (!group.nextMatch) {
+        return 'No hay próximo partido programado';
+      }
+
+      const nextDate = new Date(group.nextMatch);
+      const nextDateStr = nextDate.toLocaleDateString('es-ES', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+      });
+
+      return `Próximo partido: ${nextDateStr}`;
+    }
+
+    let frequencyText = '';
+    if (group.recurrenceType === 'WEEKLY') {
+      frequencyText = 'Semanal';
+    } else if (group.recurrenceType === 'BIWEEKLY') {
+      frequencyText = 'Quincenal';
+    } else if (group.recurrenceType === 'MONTHLY') {
+      frequencyText = 'Mensual';
+    }
+
+    let daysText = '';
+    if (group.recurrenceDays && group.recurrenceDays.length > 0) {
+      daysText = group.recurrenceDays
+        .map((day: number) => dayNames[day])
+        .map((day: string) => day.charAt(0).toUpperCase() + day.slice(1))
+        .join(', ');
+    }
+
+    let timeText = '';
+    if (group.recurrenceTime) {
+      timeText = `a las ${group.recurrenceTime} hrs`;
+    }
+
+    let recurrenceText = `Frecuencia: ${frequencyText}`;
+    if (daysText) recurrenceText += ` - Días: ${daysText}`;
+    if (timeText) recurrenceText += ` ${timeText}`;
+
+    if (group.nextMatch) {
+      const nextDate = new Date(group.nextMatch);
+      const nextDateStr = nextDate.toLocaleDateString('es-ES', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+      });
+
+      recurrenceText += `\nPróximo partido: ${nextDateStr}`;
+    }
+
+    return recurrenceText;
+  };
+
+  // Función para manejar el sorteo de equipos
+  const handleSortTeams = async () => {
+    try {
+      setSortTeamsLoading(true);
+
+      if (!group?.nextMatchId) {
+        showToast('No hay un próximo partido para este grupo', 'error');
+        setSortTeamsLoading(false);
+        return;
+      }
+
+      // Determinar cuántos jugadores confirmados hay y cuántos se necesitan
+      const confirmedPlayers = group?.nextMatchDetails?.confirmedPlayers || [];
+      const requiredPlayers = group?.requiredPlayers || 10;
+
+      // Asegurarnos de que requiredPlayers sea un número par para equipos equilibrados
+      const adjustedRequiredPlayers =
+        requiredPlayers % 2 === 0 ? requiredPlayers : requiredPlayers + 1;
+      const missingPlayers = adjustedRequiredPlayers - confirmedPlayers.length;
+
+      console.log('Jugadores confirmados:', confirmedPlayers.length);
+      console.log('Jugadores requeridos:', adjustedRequiredPlayers);
+      console.log('Jugadores faltantes:', missingPlayers);
+
+      // Si faltan jugadores y se seleccionó completar con TBD
+      let realPlayers = [...confirmedPlayers];
+      let tbdPlayers: Array<{ id: string; name: string; avatar: null }> = [];
+
+      if (missingPlayers > 0 && allowFillIn) {
+        // Generar exactamente los jugadores TBD necesarios para completar el equipo
+        for (let i = 0; i < missingPlayers; i++) {
+          const tbdPlayer = {
+            id: `tbd-${Date.now()}-${i}`,
+            name: `TBD ${i + 1}`,
+            avatar: null,
+          };
+          tbdPlayers.push(tbdPlayer);
+        }
+
+        console.log('Jugadores TBD creados:', tbdPlayers.length);
+      }
+
+      // Verificar que haya suficientes jugadores
+      if (
+        realPlayers.length < 2 ||
+        (realPlayers.length < adjustedRequiredPlayers && !allowFillIn)
+      ) {
+        showToast(
+          `Se necesitan ${
+            allowFillIn ? '2' : adjustedRequiredPlayers
+          } jugadores para sortear equipos`,
+          'error'
+        );
+        setSortTeamsLoading(false);
+        return;
+      }
+
+      // MEJORA: Distribuir equitativamente los jugadores reales
+      // Aleatorizar los jugadores reales
+      const shuffledRealPlayers = [...realPlayers].sort(
+        () => Math.random() - 0.5
+      );
+
+      // Dividir en equipos iguales
+      const halfCount = Math.floor(shuffledRealPlayers.length / 2);
+      const realTeamAPlayers = shuffledRealPlayers.slice(0, halfCount);
+      const realTeamBPlayers = shuffledRealPlayers.slice(halfCount);
+
+      // Distribuir equitativamente los TBD players
+      const halfTbdCount = Math.floor(tbdPlayers.length / 2);
+      const tbdPlayersA = tbdPlayers.slice(0, halfTbdCount);
+      const tbdPlayersB = tbdPlayers.slice(halfTbdCount);
+
+      console.log('Total jugadores reales:', realPlayers.length);
+      console.log(
+        'Jugadores reales por equipo - A:',
+        realTeamAPlayers.length,
+        'B:',
+        realTeamBPlayers.length
+      );
+      console.log(
+        'Jugadores TBD por equipo - A:',
+        tbdPlayersA.length,
+        'B:',
+        tbdPlayersB.length
+      );
+
+      // Preparar los datos para enviar al endpoint (solo jugadores reales)
+      const players = [
+        ...realTeamAPlayers.map((p) => ({
+          userId: p.id,
+          isTeamA: true,
+          isPlaceholder: false,
+        })),
+        ...realTeamBPlayers.map((p) => ({
+          userId: p.id,
+          isTeamA: false,
+          isPlaceholder: false,
+        })),
+      ];
+
+      // Preparar datos de TBD players para almacenar en la base de datos
+      const tbdPlayersData: TbdPlayersData = {
+        teamA: tbdPlayersA.map((p) => ({
+          id: p.id,
+          name: p.name,
+          isTeamA: true,
+        })),
+        teamB: tbdPlayersB.map((p) => ({
+          id: p.id,
+          name: p.name,
+          isTeamA: false,
+        })),
+      };
+
+      // Llamada a la API para generar equipos
+      const response = await fetch(`/api/matches/${group.nextMatchId}/resort`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          players: players,
+          tbdPlayers: tbdPlayersData,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Error response:', errorData);
+
+        let errorMessage = 'Error al sortear equipos';
+        try {
+          const errorJson = JSON.parse(errorData);
+          if (errorJson.message) {
+            errorMessage = errorJson.message;
+          }
+        } catch (e) {
+          if (errorData && errorData.length < 200) {
+            errorMessage = `Error: ${errorData}`;
+          }
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      console.log('Respuesta del API resort:', data);
+
+      // Crear una copia del estado actual
+      const updatedGroup = { ...group };
+      if (!updatedGroup.nextMatchDetails) {
+        updatedGroup.nextMatchDetails = {} as MatchInterface;
+      }
+
+      // Si tenemos respuesta de la API con datos del partido
+      if (data && data.match) {
+        const apiMatch = data.match;
+
+        // Mapear los jugadores de la API
+        let apiTeamAPlayers: any[] = [];
+        let apiTeamBPlayers: any[] = [];
+
+        if (apiMatch.playersA && Array.isArray(apiMatch.playersA)) {
+          apiTeamAPlayers = apiMatch.playersA.map((player: any) => {
+            return {
+              id: player.user?.id || player.userId,
+              name: player.user?.name || player.name || 'Jugador',
+              avatar: player.user?.image || null,
+            };
+          });
+        }
+
+        if (apiMatch.playersB && Array.isArray(apiMatch.playersB)) {
+          apiTeamBPlayers = apiMatch.playersB.map((player: any) => {
+            return {
+              id: player.user?.id || player.userId,
+              name: player.user?.name || player.name || 'Jugador',
+              avatar: player.user?.image || null,
+            };
+          });
+        }
+
+        // Combinar jugadores reales con TBD, manteniendo el balance
+        const combinedTeamA = [...apiTeamAPlayers, ...tbdPlayersA];
+        const combinedTeamB = [...apiTeamBPlayers, ...tbdPlayersB];
+
+        // Actualizar el estado
+        updatedGroup.nextMatchDetails.playersA = combinedTeamA;
+        updatedGroup.nextMatchDetails.playersB = combinedTeamB;
+
+        // Actualizar otros datos del partido
+        if (apiMatch.teamA)
+          updatedGroup.nextMatchDetails.teamA = apiMatch.teamA;
+        if (apiMatch.teamB)
+          updatedGroup.nextMatchDetails.teamB = apiMatch.teamB;
+
+        // Ya no guardamos los TBD players en localStorage, solo en la base de datos
+        if (tbdPlayersA.length > 0 || tbdPlayersB.length > 0) {
+          localStorage.setItem(
+            `tbdPlayers-${group.nextMatchId}`,
+            JSON.stringify({
+              teamA: tbdPlayersA,
+              teamB: tbdPlayersB,
+            })
+          );
+        }
+      } else {
+        // Fallback si no hay respuesta de la API
+        console.warn(
+          'No se recibieron datos del partido desde la API, usando datos locales'
+        );
+        updatedGroup.nextMatchDetails.playersA = [
+          ...realTeamAPlayers,
+          ...tbdPlayersA,
+        ];
+        updatedGroup.nextMatchDetails.playersB = [
+          ...realTeamBPlayers,
+          ...tbdPlayersB,
+        ];
+
+        // Guardar en localStorage
+        localStorage.setItem(
+          `tbdPlayers-${group.nextMatchId}`,
+          JSON.stringify({
+            teamA: tbdPlayersA,
+            teamB: tbdPlayersB,
+          })
+        );
+      }
+
+      // Actualizar el estado
+      setGroup(updatedGroup);
+      showToast('Equipos sorteados exitosamente', 'success');
+    } catch (error: any) {
+      console.error('Error al sortear equipos:', error);
+      showToast(error.message || 'Error al sortear equipos', 'error');
+    } finally {
+      setSortTeamsLoading(false);
+    }
+  };
+
+  // Función para inicializar los goles de los jugadores
+  const initializePlayerGoals = (match: MatchInterface) => {
+    const players = [...(match.playersA || []), ...(match.playersB || [])];
+    return players.reduce((acc: { [key: string]: number }, player) => {
+      acc[player.id] = 0;
+      return acc;
+    }, {});
+  };
+
+  const MembersTab = () => {
+    const confirmedMembersCount =
+      group?.nextMatchDetails?.confirmedPlayers?.length || 0;
+
+    // Verificar si un miembro está confirmado para el próximo partido
+    const isMemberConfirmedForNextMatch = (userId: string) => {
+      if (!group?.nextMatchDetails?.confirmedPlayers) {
+        console.log(`No confirmedPlayers found for userId: ${userId}`);
+        return false;
+      }
+
+      const isConfirmed = group.nextMatchDetails.confirmedPlayers.some(
+        (player) => player.id === userId
+      );
+
+      console.log(
+        `Checking confirmation for user ${userId}: ${
+          isConfirmed ? 'CONFIRMED' : 'NOT CONFIRMED'
+        }`
+      );
+
+      return isConfirmed;
+    };
+
+    // Función para que un admin confirme la asistencia de otro miembro
+    const handleConfirmAttendance = async (
+      memberId: string,
+      userId: string
+    ) => {
+      try {
+        setIsLoading(true); // Set global loading state
+        console.log(
+          `Administrador confirmando asistencia para usuario: ${userId}, memberId: ${memberId}`
+        );
+
+        // Solo los admins pueden modificar la asistencia de otros usuarios
+        const response = await fetch('/api/attendances', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId,
+            groupId: id,
+            matchId: group?.nextMatchId,
+            status: 'CONFIRMED',
+          }),
+        });
+
+        const data = await response.json();
+        console.log('Admin confirmation API response:', data);
+
+        if (!response.ok || !data.success) {
+          console.error('Error confirming attendance:', data);
+          showToast('No se pudo confirmar la asistencia', 'error');
+          return;
+        }
+
+        // Verificamos que la lista de confirmedPlayers se haya actualizado en la respuesta
+        if (data.confirmedPlayers) {
+          console.log('Updated confirmed players list:', data.confirmedPlayers);
+
+          // Actualizar manualmente el state de confirmedPlayers
+          if (group && group.nextMatchDetails) {
+            const updatedGroup = { ...group };
+            updatedGroup.nextMatchDetails = {
+              ...group.nextMatchDetails, // Preserve all existing properties
+              confirmedPlayers: data.confirmedPlayers,
+            };
+            setGroup(updatedGroup);
+          }
+        }
+
+        // Refrescar los datos completos inmediatamente
+        console.log('Fetching complete group details after admin confirmation');
+        await fetchGroupDetails();
+        showToast('Asistencia confirmada', 'success');
+      } catch (error) {
+        console.error('Error confirming attendance:', error);
+        showToast('Error al confirmar asistencia', 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Función para que un admin cancele la asistencia de otro miembro
+    const handleDeclineAttendance = async (
+      memberId: string,
+      userId: string
+    ) => {
+      try {
+        setIsLoading(true); // Set global loading state
+        console.log(
+          `Administrador rechazando asistencia para usuario: ${userId}, memberId: ${memberId}`
+        );
+
+        // Solo los admins pueden modificar la asistencia de otros usuarios
+        const response = await fetch('/api/attendances', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId,
+            groupId: id,
+            matchId: group?.nextMatchId,
+            status: 'DECLINED',
+          }),
+        });
+
+        const data = await response.json();
+        console.log('Admin decline API response:', data);
+
+        if (!response.ok || !data.success) {
+          console.error('Error declining attendance:', data);
+          showToast('No se pudo rechazar la asistencia', 'error');
+          return;
+        }
+
+        // Verificamos que la lista de confirmedPlayers se haya actualizado en la respuesta
+        if (data.confirmedPlayers) {
+          console.log('Updated confirmed players list:', data.confirmedPlayers);
+
+          // Actualizar manualmente el state de confirmedPlayers
+          if (group && group.nextMatchDetails) {
+            const updatedGroup = { ...group };
+            updatedGroup.nextMatchDetails = {
+              ...group.nextMatchDetails, // Preserve all existing properties
+              confirmedPlayers: data.confirmedPlayers,
+            };
+            setGroup(updatedGroup);
+          }
+        }
+
+        // Refrescar los datos completos inmediatamente
+        console.log('Fetching complete group details after admin decline');
+        await fetchGroupDetails();
+        showToast('Asistencia rechazada', 'success');
+      } catch (error) {
+        console.error('Error declining attendance:', error);
+        showToast('Error al rechazar asistencia', 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    return (
+      <div className='space-y-4'>
+        <div className='flex justify-between items-center'>
+          <h3 className='text-lg font-semibold'>
+            Miembros ({confirmedMembersCount} confirmados para el próximo
+            partido)
+          </h3>
+        </div>
+        <div className='overflow-x-auto'>
+          <table className='min-w-full divide-y divide-gray-200'>
+            <thead className='bg-gray-50'>
+              <tr>
+                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                  Nombre
+                </th>
+                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                  Estado para el próximo partido
+                </th>
+                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+            <tbody className='bg-white divide-y divide-gray-200'>
+              {group?.members?.map((member) => {
+                // Determinar el estado para el próximo partido específicamente
+                const isConfirmedForNextMatch = isMemberConfirmedForNextMatch(
+                  member.userId
+                );
+
+                // Verificar si el usuario actual es el dueño de esta fila
+                const isCurrentUser = user && member.userId === user.id;
+
+                return (
+                  <tr key={member.id}>
+                    <td className='px-6 py-4 whitespace-nowrap'>
+                      <div className='flex items-center'>
+                        <div className='flex-shrink-0 h-10 w-10'>
+                          <Avatar
+                            alt={member.name || ''}
+                            src={member.avatar || ''}
+                            className='h-10 w-10 rounded-full'
+                          />
+                        </div>
+                        <div className='ml-4'>
+                          <div className='text-sm font-medium text-gray-900'>
+                            {member.name}
+                            {member.role === 'ADMIN' && (
+                              <span className='ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800'>
+                                Admin
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className='px-6 py-4 whitespace-nowrap'>
+                      <span
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          isConfirmedForNextMatch
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}
+                      >
+                        {isConfirmedForNextMatch
+                          ? 'Confirmado'
+                          : 'No confirmado'}
+                      </span>
+                    </td>
+                    <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>
+                      <div className='flex space-x-2'>
+                        {/* Si es el usuario actual, no mostrar botones de confirmación
+                            Debe confirmar desde la pestaña de próximo partido */}
+                        {isCurrentUser ? (
+                          <span className='text-sm text-gray-500 italic'>
+                            Confirmar desde pestaña "Próximo Partido"
+                          </span>
+                        ) : (
+                          // Botones para administradores - solo visible si el usuario es admin
+                          currentUserIsAdmin && (
+                            <>
+                              {!isConfirmedForNextMatch && (
+                                <button
+                                  onClick={() =>
+                                    handleConfirmAttendance(
+                                      member.id,
+                                      member.userId
+                                    )
+                                  }
+                                  className='text-green-600 hover:text-green-900 bg-green-100 hover:bg-green-200 px-3 py-1 rounded-md'
+                                  disabled={isLoading}
+                                >
+                                  {isLoading ? 'Procesando...' : 'Confirmar'}
+                                </button>
+                              )}
+                              {isConfirmedForNextMatch && (
+                                <button
+                                  onClick={() =>
+                                    handleDeclineAttendance(
+                                      member.id,
+                                      member.userId
+                                    )
+                                  }
+                                  className='text-red-600 hover:text-red-900 bg-red-100 hover:bg-red-200 px-3 py-1 rounded-md'
+                                  disabled={isLoading}
+                                >
+                                  {isLoading
+                                    ? 'Procesando...'
+                                    : 'Cancelar asistencia'}
+                                </button>
+                              )}
+                            </>
+                          )
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  // Función para eliminar el partido pendiente
+  const handleDeleteMatch = async () => {
+    if (!pendingMatch || !currentUserIsAdmin) return;
+
+    try {
+      setIsLoading(true);
+
+      // No need to check for accessToken as the credentials will be sent with the cookie
+      // Make the request without setting Authorization header explicitly
+      const response = await fetch(`/api/matches/${pendingMatch.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Error al eliminar el partido');
+      }
+
+      showToast('El partido ha sido eliminado con éxito', 'success');
+
+      // Actualizar el estado local inmediatamente para mostrar los cambios al usuario
+      setPendingMatch(null);
+
+      // Si hay grupo con nextMatchDetails, limpiar los equipos
+      if (group && group.nextMatchDetails) {
+        // Crear una copia actualizada del grupo
+        const updatedGroup = { ...group };
+
+        // Limpiar los equipos de nextMatchDetails
+        if (updatedGroup.nextMatchDetails) {
+          updatedGroup.nextMatchDetails = {
+            ...updatedGroup.nextMatchDetails,
+            playersA: [],
+            playersB: [],
+          };
+        }
+
+        // Actualizar el estado del grupo
+        setGroup(updatedGroup);
+      }
+
+      // Actualizar los datos del grupo completamente
+      try {
+        await fetchGroupDetails();
+      } catch (fetchError) {
+        console.error('Error al actualizar datos del grupo:', fetchError);
+      }
+
+      // No redirigir, sólo actualizar la UI
+      // router.push(`/group/${id}`);
+    } catch (error) {
+      console.error('Error al eliminar el partido:', error);
+      showToast('Error al eliminar el partido', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Función para redirigir a la página de resultados
+  const handleAddResults = () => {
+    if (!pendingMatch) return;
+    router.push(`/matches/${pendingMatch.id}/results?edit=true`);
+  };
+
+  /**
+   * Resetea los estados de asistencia de todos los usuarios para el próximo partido
+   */
+  const resetAttendanceStatus = async () => {
+    if (!group || !group.nextMatchDetails || !group.id) return;
+
+    try {
+      setResetAttendanceLoading(true);
+
+      const response = await fetch(`/api/groups/${group.id}/resetAttendance`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al resetear los estados de asistencia');
+      }
+
+      // Refresh group details
+      fetchGroupDetails();
+      showToast('Estados de asistencia reseteados correctamente', 'success');
+    } catch (error) {
+      console.error('Error resetting attendance status:', error);
+      showToast('Error al resetear los estados de asistencia', 'error');
+    } finally {
+      setResetAttendanceLoading(false);
+    }
+  };
+
+  /**
+   * Formatea la fecha del partido
+   */
+  const formatMatchDate = (date: string | Date) => {
+    if (!date) return 'No programado';
+
+    // Ensure we have a Date object
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+
+    const formattedDate = dateObj.toLocaleDateString('es-ES', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    });
+    return formattedDate;
+  };
+
+  // Mostrar el conteo de jugadores confirmados
+  useEffect(() => {
+    // Si hay nextMatchDetails y confirmedPlayers, usar ese conteo
+    if (group?.nextMatchDetails?.confirmedPlayers) {
+      setConfirmedCount(group.nextMatchDetails.confirmedPlayers.length);
+      console.log(
+        `Estableciendo confirmedCount desde nextMatchDetails: ${group.nextMatchDetails.confirmedPlayers.length}`
+      );
+    }
+  }, [group?.nextMatchDetails?.confirmedPlayers]);
+
+  // Función para mostrar el botón de sorteo
+  const renderSortButton = () => {
+    // Calcular jugadores confirmados para el próximo partido
+    const confirmedPlayersCount =
+      group?.nextMatchDetails?.confirmedPlayers?.length || 0;
+
+    console.log(
+      `Renderizando botón de sorteo: ${confirmedPlayersCount} jugadores confirmados`
+    );
+
+    // Usar los nombres de equipos del grupo o los nombres por defecto
+    const teamAName = group?.teamAName || 'Equipo A';
+    const teamBName = group?.teamBName || 'Equipo B';
+
+    return (
+      <Button
+        onClick={handleSortTeams}
+        disabled={
+          isLoading ||
+          !currentUserIsAdmin ||
+          (confirmedPlayersCount < (group?.requiredPlayers || 10) &&
+            !allowFillIn)
+        }
+        className='w-full'
+      >
+        Sortear {teamAName} vs {teamBName} (
+        {group?.nextMatchDetails?.confirmedPlayers?.length || 0}/
+        {group?.requiredPlayers || 10})
+      </Button>
+    );
+  };
+
+  // Componente para mostrar la lista de jugadores confirmados
+  const ConfirmedPlayers = () => {
+    const confirmedPlayers = group?.nextMatchDetails?.confirmedPlayers || [];
+
+    return (
+      <div className='mt-8'>
+        <h3 className='text-xl font-semibold mb-4'>
+          Jugadores confirmados ({confirmedPlayers.length}/
+          {group?.requiredPlayers || 10})
+        </h3>
+
+        {confirmedPlayers.length === 0 ? (
+          <p className='text-gray-500'>Aún no hay jugadores confirmados</p>
+        ) : (
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+            {confirmedPlayers.map((player) => (
+              <div
+                key={player.id}
+                className='flex items-center gap-2 bg-white p-2 rounded'
+              >
+                <div className='w-8 h-8 rounded-full overflow-hidden'>
+                  <img
+                    src={player.avatar || 'https://via.placeholder.com/40'}
+                    alt={player.name || 'Jugador'}
+                    className='w-full h-full object-cover'
+                  />
+                </div>
+                <span>{player.name || 'Jugador sin nombre'}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Componente para la pestaña de próximo partido
+  const NextMatchTab = () => {
+    const matchDetails = group?.nextMatchDetails;
+    const confirmedPlayers = matchDetails?.confirmedPlayers || [];
+    const confirmedCount = confirmedPlayers.length;
+    const requiredPlayers = group?.requiredPlayers || 10;
+
+    // Verificar si hay equipos formados
+    const teamsFormed =
+      matchDetails &&
+      matchDetails.playersA &&
+      matchDetails.playersB &&
+      matchDetails.playersA.length > 0 &&
+      matchDetails.playersB.length > 0;
+
+    // Verificar si el usuario actual está confirmado
+    const isCurrentUserConfirmed = user?.id
+      ? confirmedPlayers.some((player) => player.id === user.id)
+      : false;
+
+    // Función para formatear la fecha
+    const formatNextMatchDate = (date: string | Date) => {
+      if (!date) return 'Fecha no disponible';
+
+      const matchDate = new Date(date);
+      const now = new Date();
+
+      // Opciones de formato
+      const options: Intl.DateTimeFormatOptions = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      };
+
+      // Formatear fecha
+      return matchDate.toLocaleDateString('es-ES', options);
+    };
+
+    return (
+      <div className='space-y-6'>
+        {matchDetails ? (
+          <>
+            {/* Cabecera con información del partido */}
+            <div className='bg-white rounded-lg overflow-hidden'>
+              <div className='bg-blue-600 px-6 py-4'>
+                <h3 className='text-xl font-semibold text-white'>
+                  Próximo partido
+                </h3>
+                <p className='text-blue-100 mt-1'>
+                  {matchDetails.date && formatNextMatchDate(matchDetails.date)}
+                </p>
+              </div>
+
+              <div className='p-6'>
+                <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
+                  {/* Detalles del partido */}
+                  <div className='bg-gray-50 rounded-lg p-4'>
+                    <h4 className='text-md font-medium text-gray-800 mb-3'>
+                      Detalles
+                    </h4>
+                    <ul className='space-y-3'>
+                      <li className='flex items-start'>
+                        <MapPinIcon className='h-5 w-5 text-gray-400 mr-2 mt-0.5' />
+                        <div>
+                          <p className='text-sm font-medium text-gray-700'>
+                            Ubicación
+                          </p>
+                          <p className='text-sm text-gray-900'>
+                            {matchDetails.location}
+                          </p>
+                        </div>
+                      </li>
+                      <li className='flex items-start'>
+                        <CalendarIcon className='h-5 w-5 text-gray-400 mr-2 mt-0.5' />
+                        <div>
+                          <p className='text-sm font-medium text-gray-700'>
+                            Fecha
+                          </p>
+                          <p className='text-sm text-gray-900'>
+                            {matchDetails.date &&
+                              formatNextMatchDate(matchDetails.date)}
+                          </p>
+                        </div>
+                      </li>
+                      <li className='flex items-start'>
+                        <CheckCircleIcon className='h-5 w-5 text-gray-400 mr-2 mt-0.5' />
+                        <div>
+                          <p className='text-sm font-medium text-gray-700'>
+                            Confirmados
+                          </p>
+                          <p className='text-sm text-gray-900'>
+                            {confirmedCount} jugadores
+                          </p>
+                        </div>
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Estado de mi asistencia */}
+                  <div className='bg-gray-50 rounded-lg p-4'>
+                    <h4 className='text-md font-medium text-gray-800 mb-3'>
+                      Mi asistencia
+                    </h4>
+                    {isUserInGroup ? (
+                      <div className='space-y-4'>
+                        <div className='flex items-center mb-4'>
+                          <div
+                            className={`w-3 h-3 rounded-full mr-2 ${
+                              isCurrentUserConfirmed
+                                ? 'bg-green-500'
+                                : 'bg-yellow-500'
+                            }`}
+                          ></div>
+                          <p className='text-sm text-gray-700'>
+                            {isCurrentUserConfirmed
+                              ? 'Has confirmado tu asistencia'
+                              : 'Aún no has confirmado'}
+                          </p>
+                        </div>
+
+                        <div className='flex space-x-3'>
+                          <Button
+                            variant={
+                              isCurrentUserConfirmed ? 'success' : 'outline'
+                            }
+                            size='sm'
+                            onClick={() => handleGroupAttendance('CONFIRMED')}
+                            className='flex-1'
+                          >
+                            <span className='flex items-center justify-center'>
+                              <CheckCircleIcon className='h-4 w-4 mr-1' />
+                              Asistiré
+                            </span>
+                          </Button>
+                          <Button
+                            variant={
+                              userAttendanceStatus === 'DECLINED'
+                                ? 'danger'
+                                : 'outline'
+                            }
+                            size='sm'
+                            onClick={() => handleGroupAttendance('DECLINED')}
+                            className='flex-1'
+                          >
+                            <span className='flex items-center justify-center'>
+                              <XCircleIcon className='h-4 w-4 mr-1' />
+                              No asistiré
+                            </span>
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className='text-sm text-gray-500'>
+                        Debes ser miembro del grupo para confirmar asistencia
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Acciones para administradores */}
+                  {currentUserIsAdmin && (
+                    <div className='bg-gray-50 rounded-lg p-4'>
+                      <h4 className='text-md font-medium text-gray-800 mb-3'>
+                        Acciones de administrador
+                      </h4>
+                      <div className='space-y-3'>
+                        {/* Checkbox para permitir completar con TBD */}
+                        <div className='flex items-center'>
+                          <input
+                            type='checkbox'
+                            checked={allowFillIn}
+                            onChange={(e) => setAllowFillIn(e.target.checked)}
+                            id='allowFillIn'
+                            className='rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4'
+                          />
+                          <label
+                            htmlFor='allowFillIn'
+                            className='ml-2 text-sm text-gray-700'
+                          >
+                            Permitir sortear con jugadores insuficientes
+                            (completar con "TBD")
+                          </label>
+                        </div>
+
+                        {/* Botón para sortear equipos */}
+                        <Button
+                          variant={sortTeamsLoading ? 'secondary' : 'primary'}
+                          onClick={handleSortTeams}
+                          disabled={
+                            sortTeamsLoading ||
+                            (confirmedCount < requiredPlayers && !allowFillIn)
+                          }
+                          className='w-full justify-center'
+                          size='sm'
+                        >
+                          <span className='flex items-center'>
+                            {sortTeamsLoading ? (
+                              <div className='animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2'></div>
+                            ) : (
+                              <svg
+                                xmlns='http://www.w3.org/2000/svg'
+                                viewBox='0 0 24 24'
+                                fill='currentColor'
+                                className='w-4 h-4 mr-2'
+                              >
+                                <path d='M3.375 3C2.339 3 1.5 3.84 1.5 4.875v.75c0 1.036.84 1.875 1.875 1.875h17.25c1.035 0 1.875-.84 1.875-1.875v-.75C22.5 3.839 21.66 3 20.625 3H3.375z' />
+                                <path
+                                  fillRule='evenodd'
+                                  d='M3.087 9l.54 9.176A3 3 0 006.62 21h10.757a3 3 0 002.995-2.824L20.913 9H3.087zm6.133 2.845a.75.75 0 011.06 0l1.72 1.72 1.72-1.72a.75.75 0 111.06 1.06l-1.72 1.72 1.72 1.72a.75.75 0 11-1.06 1.06L12 15.685l-1.72 1.72a.75.75 0 11-1.06-1.06l1.72-1.72-1.72-1.72a.75.75 0 010-1.06z'
+                                  clipRule='evenodd'
+                                />
+                              </svg>
+                            )}
+                            {teamsFormed
+                              ? 'Sortear de nuevo'
+                              : 'Sortear equipos'}{' '}
+                            ({confirmedCount}/{requiredPlayers})
+                          </span>
+                        </Button>
+
+                        {/* Botones que solo aparecen después de generar equipos */}
+                        {teamsFormed && (
+                          <>
+                            {/* Botón para terminar partido */}
+                            <Button
+                              variant='success'
+                              onClick={handleAddResults}
+                              className='w-full justify-center'
+                              size='sm'
+                            >
+                              <span className='flex items-center'>
+                                <svg
+                                  xmlns='http://www.w3.org/2000/svg'
+                                  viewBox='0 0 24 24'
+                                  fill='currentColor'
+                                  className='w-4 h-4 mr-2'
+                                >
+                                  <path
+                                    fillRule='evenodd'
+                                    d='M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z'
+                                    clipRule='evenodd'
+                                  />
+                                </svg>
+                                Terminar partido
+                              </span>
+                            </Button>
+
+                            {/* Botón para eliminar partido */}
+                            <Button
+                              variant='danger'
+                              onClick={handleDeleteMatch}
+                              className='w-full justify-center'
+                              size='sm'
+                            >
+                              <span className='flex items-center'>
+                                <TrashIcon className='h-4 w-4 mr-2' />
+                                Eliminar partido
+                              </span>
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Equipos (si ya están formados) - Mostrar antes que la lista de jugadores confirmados */}
+            {teamsFormed && (
+              <div className='bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200'>
+                <div className='px-4 py-5 sm:px-6 border-b border-gray-200'>
+                  <h3 className='text-lg font-medium leading-6 text-gray-900'>
+                    Equipos formados
+                  </h3>
+                  <p className='mt-1 max-w-2xl text-sm text-gray-500'>
+                    Los equipos ya han sido formados para el próximo partido
+                  </p>
+                </div>
+
+                <div className='p-4 grid grid-cols-1 md:grid-cols-2 gap-4'>
+                  {/* Equipo A */}
+                  <div className='bg-blue-50 rounded-lg p-4'>
+                    <h4 className='text-md font-medium text-blue-800 mb-3 flex items-center'>
+                      <span className='w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs mr-2'>
+                        A
+                      </span>
+                      Equipo {matchDetails.teamA || 'A'}
+                    </h4>
+
+                    <ul className='space-y-2'>
+                      {matchDetails.playersA &&
+                        matchDetails.playersA.map((player) => (
+                          <li key={player.id} className='flex items-center'>
+                            {!player.name || player.name.includes('TBD') ? (
+                              <>
+                                {/* Placeholder para jugador TBD */}
+                                <div className='h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center mr-2'>
+                                  <span className='text-xs text-gray-500'>
+                                    ?
+                                  </span>
+                                </div>
+                                <div className='flex flex-col'>
+                                  <span className='text-sm text-gray-500 italic'>
+                                    {player.name || 'Jugador pendiente'}
+                                  </span>
+
+                                  {/* Botón para reemplazar TBD solo visible para administradores */}
+                                  {currentUserIsAdmin && (
+                                    <div className='mt-1'>
+                                      <select
+                                        className='text-xs py-1 px-2 border rounded'
+                                        defaultValue=''
+                                        onChange={(e) => {
+                                          const selectedId = e.target.value;
+                                          if (selectedId) {
+                                            handleReplaceTbdPlayer(
+                                              player.id,
+                                              selectedId,
+                                              true
+                                            );
+                                          }
+                                        }}
+                                      >
+                                        <option value='' disabled>
+                                          Reemplazar...
+                                        </option>
+                                        {group?.members
+                                          ?.filter(
+                                            (member) =>
+                                              // Solo mostrar miembros que no estén ya en el partido
+                                              !group.nextMatchDetails?.playersA?.some(
+                                                (p) =>
+                                                  !p.name?.includes('TBD') &&
+                                                  p.id === member.userId
+                                              ) &&
+                                              !group.nextMatchDetails?.playersB?.some(
+                                                (p) =>
+                                                  !p.name?.includes('TBD') &&
+                                                  p.id === member.userId
+                                              )
+                                          )
+                                          .map((member) => (
+                                            <option
+                                              key={member.userId}
+                                              value={member.userId}
+                                            >
+                                              {member.user?.name ||
+                                                'Sin nombre'}
+                                            </option>
+                                          ))}
+                                      </select>
+                                    </div>
+                                  )}
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <Avatar
+                                  alt={player.name || ''}
+                                  src={player.avatar || ''}
+                                  className='h-8 w-8 rounded-full mr-2'
+                                />
+                                <span className='text-sm text-gray-800'>
+                                  {player.name}
+                                  {user?.id === player.id && ' (tú)'}
+                                </span>
+                              </>
+                            )}
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+
+                  {/* Equipo B */}
+                  <div className='bg-red-50 rounded-lg p-4'>
+                    <h4 className='text-md font-medium text-red-800 mb-3 flex items-center'>
+                      <span className='w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center text-xs mr-2'>
+                        B
+                      </span>
+                      Equipo {matchDetails.teamB || 'B'}
+                    </h4>
+
+                    <ul className='space-y-2'>
+                      {matchDetails.playersB &&
+                        matchDetails.playersB.map((player) => (
+                          <li key={player.id} className='flex items-center'>
+                            {!player.name || player.name.includes('TBD') ? (
+                              <>
+                                {/* Placeholder para jugador TBD */}
+                                <div className='h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center mr-2'>
+                                  <span className='text-xs text-gray-500'>
+                                    ?
+                                  </span>
+                                </div>
+                                <div className='flex flex-col'>
+                                  <span className='text-sm text-gray-500 italic'>
+                                    {player.name || 'Jugador pendiente'}
+                                  </span>
+
+                                  {/* Botón para reemplazar TBD solo visible para administradores */}
+                                  {currentUserIsAdmin && (
+                                    <div className='mt-1'>
+                                      <select
+                                        className='text-xs py-1 px-2 border rounded'
+                                        defaultValue=''
+                                        onChange={(e) => {
+                                          const selectedId = e.target.value;
+                                          if (selectedId) {
+                                            handleReplaceTbdPlayer(
+                                              player.id,
+                                              selectedId,
+                                              false
+                                            );
+                                          }
+                                        }}
+                                      >
+                                        <option value='' disabled>
+                                          Reemplazar...
+                                        </option>
+                                        {group?.members
+                                          ?.filter(
+                                            (member) =>
+                                              // Solo mostrar miembros que no estén ya en el partido
+                                              !group.nextMatchDetails?.playersA?.some(
+                                                (p) =>
+                                                  !p.name?.includes('TBD') &&
+                                                  p.id === member.userId
+                                              ) &&
+                                              !group.nextMatchDetails?.playersB?.some(
+                                                (p) =>
+                                                  !p.name?.includes('TBD') &&
+                                                  p.id === member.userId
+                                              )
+                                          )
+                                          .map((member) => (
+                                            <option
+                                              key={member.userId}
+                                              value={member.userId}
+                                            >
+                                              {member.user?.name ||
+                                                'Sin nombre'}
+                                            </option>
+                                          ))}
+                                      </select>
+                                    </div>
+                                  )}
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <Avatar
+                                  alt={player.name || ''}
+                                  src={player.avatar || ''}
+                                  className='h-8 w-8 rounded-full mr-2'
+                                />
+                                <span className='text-sm text-gray-800'>
+                                  {player.name}
+                                  {user?.id === player.id && ' (tú)'}
+                                </span>
+                              </>
+                            )}
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Acciones para los equipos formados - Solo visible para administradores */}
+                {currentUserIsAdmin && (
+                  <div className='px-4 py-3 bg-gray-50 border-t border-gray-200'>
+                    <div className='flex flex-col sm:flex-row gap-3 justify-end'>
+                      {/* Botón para terminar partido */}
+                      <Button
+                        variant='success'
+                        onClick={handleAddResults}
+                        size='sm'
+                      >
+                        <span className='flex items-center'>
+                          <svg
+                            xmlns='http://www.w3.org/2000/svg'
+                            viewBox='0 0 24 24'
+                            fill='currentColor'
+                            className='w-4 h-4 mr-2'
+                          >
+                            <path
+                              fillRule='evenodd'
+                              d='M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z'
+                              clipRule='evenodd'
+                            />
+                          </svg>
+                          Terminar partido
+                        </span>
+                      </Button>
+
+                      {/* Botón para eliminar partido */}
+                      <Button
+                        variant='danger'
+                        onClick={handleDeleteMatch}
+                        size='sm'
+                      >
+                        <span className='flex items-center'>
+                          <TrashIcon className='h-4 w-4 mr-2' />
+                          Eliminar partido
+                        </span>
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Lista de jugadores confirmados */}
+            <div className='bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200'>
+              <div className='px-4 py-5 sm:px-6 border-b border-gray-200'>
+                <h3 className='text-lg font-medium leading-6 text-gray-900'>
+                  Jugadores confirmados ({confirmedCount}/{requiredPlayers})
+                </h3>
+                <p className='mt-1 max-w-2xl text-sm text-gray-500'>
+                  Estos jugadores han confirmado su asistencia al próximo
+                  partido
+                </p>
+              </div>
+
+              {confirmedCount > 0 ? (
+                <ul className='divide-y divide-gray-200'>
+                  {confirmedPlayers.map((player) => (
+                    <li
+                      key={player.id}
+                      className='px-4 py-4 sm:px-6 hover:bg-gray-50'
+                    >
+                      <div className='flex items-center justify-between'>
+                        <div className='flex items-center'>
+                          <div className='flex-shrink-0 h-10 w-10'>
+                            <Avatar
+                              alt={player.name || ''}
+                              src={player.avatar || ''}
+                              className='h-10 w-10 rounded-full'
+                            />
+                          </div>
+                          <div className='ml-4'>
+                            <div className='text-sm font-medium text-gray-900'>
+                              {player.name}
+                              {user?.id === player.id && ' (tú)'}
+                            </div>
+                            {player.age && (
+                              <div className='text-sm text-gray-500'>
+                                {player.age} años
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {currentUserIsAdmin && user?.id !== player.id && (
+                          <button
+                            onClick={() =>
+                              handleAdminAttendanceUpdate(
+                                '', // No necesitamos el memberId aquí
+                                player.id,
+                                'DECLINED'
+                              )
+                            }
+                            className='inline-flex items-center px-2 py-1 border border-red-600 text-red-600 hover:bg-red-50 rounded-md text-xs transition-colors'
+                          >
+                            <XCircleIcon className='h-4 w-4 mr-1' />
+                            Cancelar
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className='px-4 py-5 sm:px-6 text-center'>
+                  <p className='text-gray-500'>
+                    Aún no hay jugadores confirmados
+                  </p>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className='bg-white rounded-lg p-6 text-center border border-gray-200 shadow-sm'>
+            <svg
+              xmlns='http://www.w3.org/2000/svg'
+              className='h-12 w-12 mx-auto text-gray-400 mb-4'
+              fill='none'
+              viewBox='0 0 24 24'
+              stroke='currentColor'
+            >
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                strokeWidth={1}
+                d='M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'
+              />
+            </svg>
+            <h3 className='text-lg font-medium text-gray-900 mb-2'>
+              No hay próximo partido programado
+            </h3>
+            <p className='text-gray-500 max-w-md mx-auto mb-4'>
+              Aún no se ha programado el próximo partido para este grupo.
+            </p>
+            {currentUserIsAdmin && (
+              <Button
+                variant='primary'
+                onClick={() => router.push(`/matches/create?groupId=${id}`)}
+              >
+                <span className='flex items-center'>
+                  <PlusIcon className='h-4 w-4 mr-1' />
+                  Programar partido
+                </span>
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Function to get player goals count from a match
+  const getPlayerGoals = (match: MatchInterface, playerId: string): number => {
+    return (
+      match.goals?.filter((goal) => goal.scorerId === playerId).length || 0
+    );
+  };
+
+  // Function to render soccer ball icons based on goal count
+  const renderGoalBalls = (count: number) => {
+    if (count === 0) return null;
+
+    return (
+      <div className='flex space-x-1 ml-2'>
+        {Array.from({ length: count }).map((_, i) => (
+          <span key={i} role='img' aria-label='goal' className='text-sm'>
+            ⚽
+          </span>
+        ))}
+      </div>
+    );
+  };
+
+  // New HistoryTab component
+  const HistoryTab = () => {
+    const redirectToGroup = (tabIndex = 1) => {
+      // Navigate to group page with history tab selected
+      router.push(`/group/${id}?tab=${tabIndex}`);
+    };
+
+    return (
+      <div className='space-y-6'>
+        <div className='flex justify-between items-center'>
+          <h3 className='text-xl font-semibold text-gray-900'>
+            Historial de partidos
+          </h3>
+          <span className='text-sm text-gray-500'>
+            {completedMatches.length} partidos jugados
+          </span>
+        </div>
+
+        {completedMatches && completedMatches.length > 0 ? (
+          <div className='space-y-6'>
+            {completedMatches.map((match) => (
+              <div
+                key={match.id}
+                className='bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden'
+              >
+                {/* Cabecera del partido */}
+                <div className='bg-gray-50 px-4 py-3 border-b border-gray-200'>
+                  <div className='flex justify-between items-center'>
+                    <div className='flex items-center'>
+                      <CalendarIcon className='h-5 w-5 text-gray-400 mr-2' />
+                      <span className='text-sm font-medium text-gray-700'>
+                        {formatMatchDate(match.date)}
+                      </span>
+                    </div>
+                    <div className='flex items-center'>
+                      <MapPinIcon className='h-5 w-5 text-gray-400 mr-1' />
+                      <span className='text-sm text-gray-700'>
+                        {match.location}
+                      </span>
+                    </div>
+                    {currentUserIsAdmin && (
+                      <button
+                        onClick={() =>
+                          router.push(`/matches/${match.id}/results?edit=true`)
+                        }
+                        className='flex items-center px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors'
+                      >
+                        <PencilIcon className='h-3.5 w-3.5 mr-1' />
+                        Editar
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Resultado del partido */}
+                <div className='p-4'>
+                  <div className='flex items-center justify-center mb-6'>
+                    <div className='flex flex-col items-center w-1/3'>
+                      <div className='w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mb-2'>
+                        <span className='text-blue-800 font-bold'>
+                          {match.teamA.charAt(0)}
+                        </span>
+                      </div>
+                      <h4 className='text-sm font-semibold text-gray-900'>
+                        {match.teamA}
+                      </h4>
+                    </div>
+
+                    <div className='w-1/3 flex justify-center'>
+                      <div className='px-6 py-2 bg-gray-50 rounded-lg flex items-center shadow-sm'>
+                        <span className='text-2xl font-bold text-gray-900'>
+                          {match.scoreA}
+                        </span>
+                        <span className='mx-3 text-gray-400'>-</span>
+                        <span className='text-2xl font-bold text-gray-900'>
+                          {match.scoreB}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className='flex flex-col items-center w-1/3'>
+                      <div className='w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-2'>
+                        <span className='text-red-800 font-bold'>
+                          {match.teamB.charAt(0)}
+                        </span>
+                      </div>
+                      <h4 className='text-sm font-semibold text-gray-900'>
+                        {match.teamB}
+                      </h4>
+                    </div>
+                  </div>
+
+                  {/* Jugadores y goles */}
+                  <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                    {/* Equipo A */}
+                    <div className='bg-blue-50 rounded-lg p-3'>
+                      <h5 className='text-sm font-medium text-blue-800 mb-2 flex items-center'>
+                        <span className='w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs mr-2'>
+                          A
+                        </span>
+                        Equipo {match.teamA}
+                      </h5>
+                      <div className='space-y-1.5'>
+                        {match.playersA &&
+                          match.playersA.map((player) => {
+                            const goalsCount = getPlayerGoals(match, player.id);
+                            return (
+                              <div
+                                key={player.id}
+                                className='flex items-center justify-between p-2 bg-white rounded shadow-sm'
+                              >
+                                <div className='flex items-center'>
+                                  <Avatar
+                                    alt={player.name || 'Jugador'}
+                                    src={player.avatar || ''}
+                                    className='w-7 h-7 rounded-full mr-2'
+                                  />
+                                  <span className='text-sm font-medium text-gray-800'>
+                                    {player.name || 'Jugador sin nombre'}
+                                  </span>
+                                </div>
+                                {goalsCount > 0 && (
+                                  <div className='flex items-center text-yellow-600'>
+                                    <span className='text-xs font-medium mr-1'>
+                                      {goalsCount}
+                                    </span>
+                                    <span
+                                      role='img'
+                                      aria-label='goal'
+                                      className='text-sm'
+                                    >
+                                      ⚽
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+
+                    {/* Equipo B */}
+                    <div className='bg-red-50 rounded-lg p-3'>
+                      <h5 className='text-sm font-medium text-red-800 mb-2 flex items-center'>
+                        <span className='w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-xs mr-2'>
+                          B
+                        </span>
+                        Equipo {match.teamB}
+                      </h5>
+                      <div className='space-y-1.5'>
+                        {match.playersB &&
+                          match.playersB.map((player) => {
+                            const goalsCount = getPlayerGoals(match, player.id);
+                            return (
+                              <div
+                                key={player.id}
+                                className='flex items-center justify-between p-2 bg-white rounded shadow-sm'
+                              >
+                                <div className='flex items-center'>
+                                  <Avatar
+                                    alt={player.name || 'Jugador'}
+                                    src={player.avatar || ''}
+                                    className='w-7 h-7 rounded-full mr-2'
+                                  />
+                                  <span className='text-sm font-medium text-gray-800'>
+                                    {player.name || 'Jugador sin nombre'}
+                                  </span>
+                                </div>
+                                {goalsCount > 0 && (
+                                  <div className='flex items-center text-yellow-600'>
+                                    <span className='text-xs font-medium mr-1'>
+                                      {goalsCount}
+                                    </span>
+                                    <span
+                                      role='img'
+                                      aria-label='goal'
+                                      className='text-sm'
+                                    >
+                                      ⚽
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className='bg-white rounded-lg p-6 text-center border border-gray-200 shadow-sm'>
+            <svg
+              xmlns='http://www.w3.org/2000/svg'
+              className='h-12 w-12 mx-auto text-gray-400 mb-4'
+              fill='none'
+              viewBox='0 0 24 24'
+              stroke='currentColor'
+            >
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                strokeWidth={1}
+                d='M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10'
+              />
+            </svg>
+            <h3 className='text-lg font-medium text-gray-900 mb-2'>
+              No hay partidos completados
+            </h3>
+            <p className='text-gray-500 max-w-md mx-auto'>
+              Aún no se han registrado resultados de partidos en este grupo.
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Define the tab content mapping
+  const tabComponents = [
+    { label: 'Próximo Partido', component: <NextMatchTab /> },
+    {
+      label: 'Historial',
+      component: <HistoryTab />,
+    },
+    {
+      label: 'Goleadores',
+      component: (
+        <div className='space-y-6'>
+          <div className='flex justify-between items-center'>
+            <h3 className='text-xl font-semibold text-gray-900'>
+              Tabla de goleadores
+            </h3>
+            <span className='text-sm text-gray-500'>
+              {goleadores.length} jugadores
+            </span>
+          </div>
+
+          {goleadores && goleadores.length > 0 ? (
+            <div className='bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden'>
+              <div className='bg-gray-50 px-6 py-3 border-b border-gray-200'>
+                <div className='grid grid-cols-12 gap-4'>
+                  <div className='col-span-1'>
+                    <span className='text-xs font-medium text-gray-500 uppercase'>
+                      Pos.
+                    </span>
+                  </div>
+                  <div className='col-span-7'>
+                    <span className='text-xs font-medium text-gray-500 uppercase'>
+                      Jugador
+                    </span>
+                  </div>
+                  <div className='col-span-4 text-center'>
+                    <span className='text-xs font-medium text-gray-500 uppercase'>
+                      Goles
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className='divide-y divide-gray-200'>
+                {goleadores.map((goleador, index) => (
+                  <div
+                    key={goleador.id}
+                    className={`px-6 py-4 hover:bg-gray-50 transition-colors ${
+                      index < 3 ? 'bg-gradient-to-r from-amber-50 to-white' : ''
+                    }`}
+                  >
+                    <div className='grid grid-cols-12 gap-4 items-center'>
+                      <div className='col-span-1'>
+                        <div
+                          className={`
+                          flex items-center justify-center w-8 h-8 rounded-full
+                          ${
+                            index === 0
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : index === 1
+                              ? 'bg-gray-100 text-gray-600'
+                              : index === 2
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-blue-50 text-blue-600'
+                          }
+                        `}
+                        >
+                          <span className='text-sm font-semibold'>
+                            {index + 1}
+                          </span>
+                        </div>
+                      </div>
+                      <div className='col-span-7'>
+                        <div className='flex items-center'>
+                          <div className='flex-shrink-0'>
+                            <Avatar
+                              alt={goleador.name || ''}
+                              src={goleador.avatar || ''}
+                              className='h-9 w-9 rounded-full'
+                            />
+                          </div>
+                          <div className='ml-3'>
+                            <p className='text-sm font-medium text-gray-900'>
+                              {goleador.name}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className='col-span-4 text-center'>
+                        <div className='inline-flex items-center justify-center px-3 py-1 rounded-full bg-green-100'>
+                          <span className='text-sm font-semibold text-green-800'>
+                            {goleador.goals}
+                          </span>
+                          <span className='ml-1 text-green-600'>⚽</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className='bg-white rounded-lg p-6 text-center border border-gray-200 shadow-sm'>
+              <svg
+                xmlns='http://www.w3.org/2000/svg'
+                className='h-12 w-12 mx-auto text-gray-400 mb-4'
+                fill='none'
+                viewBox='0 0 24 24'
+                stroke='currentColor'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={1}
+                  d='M16 4v12l-4-2-4 2V4M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z'
+                />
+              </svg>
+              <h3 className='text-lg font-medium text-gray-900 mb-2'>
+                No hay datos de goleadores
+              </h3>
+              <p className='text-gray-500 max-w-md mx-auto'>
+                Aún no se han registrado goles o no se han jugado suficientes
+                partidos para mostrar estadísticas.
+              </p>
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      label: 'MVPs',
+      component: (
+        <div className='space-y-6'>
+          <div className='flex justify-between items-center'>
+            <div>
+              <h3 className='text-xl font-semibold text-gray-900'>
+                Ranking de MVPs
+              </h3>
+              <p className='text-sm text-gray-500'>
+                Jugadores con mejor porcentaje de victorias (mínimo 3 partidos
+                jugados)
+              </p>
+            </div>
+            <span className='text-sm text-gray-500'>
+              {mvps.length} jugadores
+            </span>
+          </div>
+
+          {mvps && mvps.length > 0 ? (
+            <div className='bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden'>
+              <div className='bg-gray-50 px-6 py-3 border-b border-gray-200'>
+                <div className='grid grid-cols-12 gap-4'>
+                  <div className='col-span-1'>
+                    <span className='text-xs font-medium text-gray-500 uppercase'>
+                      Pos.
+                    </span>
+                  </div>
+                  <div className='col-span-6'>
+                    <span className='text-xs font-medium text-gray-500 uppercase'>
+                      Jugador
+                    </span>
+                  </div>
+                  <div className='col-span-3 text-center'>
+                    <span className='text-xs font-medium text-gray-500 uppercase'>
+                      % Victorias
+                    </span>
+                  </div>
+                  <div className='col-span-2 text-center'>
+                    <span className='text-xs font-medium text-gray-500 uppercase'>
+                      Partidos
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className='divide-y divide-gray-200'>
+                {mvps.map((mvp, index) => (
+                  <div
+                    key={mvp.id}
+                    className={`px-6 py-4 hover:bg-gray-50 transition-colors ${
+                      index < 3 ? 'bg-gradient-to-r from-blue-50 to-white' : ''
+                    }`}
+                  >
+                    <div className='grid grid-cols-12 gap-4 items-center'>
+                      <div className='col-span-1'>
+                        <div
+                          className={`
+                          flex items-center justify-center w-8 h-8 rounded-full
+                          ${
+                            index === 0
+                              ? 'bg-blue-100 text-blue-700'
+                              : index === 1
+                              ? 'bg-blue-50 text-blue-600'
+                              : index === 2
+                              ? 'bg-blue-50 text-blue-600'
+                              : 'bg-gray-100 text-gray-600'
+                          }
+                        `}
+                        >
+                          <span className='text-sm font-semibold'>
+                            {index + 1}
+                          </span>
+                        </div>
+                      </div>
+                      <div className='col-span-6'>
+                        <div className='flex items-center'>
+                          <div className='flex-shrink-0'>
+                            <Avatar
+                              alt={mvp.name || ''}
+                              src={mvp.avatar || ''}
+                              className='h-9 w-9 rounded-full'
+                            />
+                          </div>
+                          <div className='ml-3'>
+                            <p className='text-sm font-medium text-gray-900'>
+                              {mvp.name}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className='col-span-3 text-center'>
+                        <div className='inline-flex items-center justify-center px-3 py-1 rounded-full bg-indigo-100'>
+                          <span className='text-sm font-semibold text-indigo-800'>
+                            {mvp.winRate.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className='col-span-2 text-center'>
+                        <span className='text-sm font-medium text-gray-700'>
+                          {mvp.matchesPlayed}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className='bg-white rounded-lg p-6 text-center border border-gray-200 shadow-sm'>
+              <svg
+                xmlns='http://www.w3.org/2000/svg'
+                className='h-12 w-12 mx-auto text-gray-400 mb-4'
+                fill='none'
+                viewBox='0 0 24 24'
+                stroke='currentColor'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={1}
+                  d='M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'
+                />
+              </svg>
+              <h3 className='text-lg font-medium text-gray-900 mb-2'>
+                No hay suficientes datos
+              </h3>
+              <p className='text-gray-500 max-w-md mx-auto'>
+                Se necesitan al menos 3 partidos jugados por usuario para
+                calcular las estadísticas de MVPs.
+              </p>
+            </div>
+          )}
+        </div>
+      ),
+    },
+    { label: 'Miembros', component: <MembersTab /> },
+    {
+      label: 'Solicitudes',
+      component: (
+        <div className='space-y-6'>
+          <div className='flex justify-between items-center'>
+            <h3 className='text-xl font-semibold text-gray-900'>
+              Solicitudes pendientes
+            </h3>
+            <span className='text-sm text-gray-500'>
+              {pendingRequests.length} solicitudes
+            </span>
+          </div>
+
+          {pendingRequests && pendingRequests.length > 0 ? (
+            <div className='bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden'>
+              <ul className='divide-y divide-gray-200'>
+                {pendingRequests.map((request) => (
+                  <li
+                    key={request.id}
+                    className='hover:bg-gray-50 transition-colors'
+                  >
+                    <div className='px-6 py-4 flex items-center justify-between'>
+                      <div className='flex items-center'>
+                        <div className='flex-shrink-0 h-10 w-10'>
+                          <Avatar
+                            className='h-10 w-10 rounded-full'
+                            src={request.avatar || ''}
+                            alt={request.name || ''}
+                          />
+                        </div>
+                        <div className='ml-4'>
+                          <div className='flex items-center'>
+                            <div className='text-sm font-medium text-gray-900'>
+                              {request.name}
+                            </div>
+                            <span className='ml-2 px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-700'>
+                              Pendiente
+                            </span>
+                          </div>
+                          {request.email && (
+                            <div className='text-sm text-gray-500'>
+                              {request.email}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className='flex space-x-2'>
+                        <button
+                          onClick={() =>
+                            handleMembershipRequest(request.userId, 'APPROVE')
+                          }
+                          className='inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 transition-colors'
+                        >
+                          <CheckCircleIcon className='h-4 w-4 mr-1' />
+                          Aprobar
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleMembershipRequest(request.userId, 'REJECT')
+                          }
+                          className='inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 transition-colors'
+                        >
+                          <XCircleIcon className='h-4 w-4 mr-1' />
+                          Rechazar
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className='bg-white rounded-lg p-6 text-center border border-gray-200 shadow-sm'>
+              <svg
+                xmlns='http://www.w3.org/2000/svg'
+                className='h-12 w-12 mx-auto text-gray-400 mb-4'
+                fill='none'
+                viewBox='0 0 24 24'
+                stroke='currentColor'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={1}
+                  d='M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z'
+                />
+              </svg>
+              <h3 className='text-lg font-medium text-gray-900 mb-2'>
+                No hay solicitudes pendientes
+              </h3>
+              <p className='text-gray-500 max-w-md mx-auto'>
+                No tienes usuarios esperando aprobación para unirse al grupo en
+                este momento.
+              </p>
+            </div>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  // Function to handle tab selection from URL query param
+  useEffect(() => {
+    // Check if tab parameter exists in URL
+    const tabParam = router.query.tab;
+    if (tabParam && !isNaN(Number(tabParam))) {
+      setSelectedTab(Number(tabParam));
+    }
+  }, [router.query]);
+
+  // Función para reemplazar un jugador TBD con un jugador real
+  const handleReplaceTbdPlayer = async (
+    tbdPlayerId: string,
+    userId: string,
+    isTeamA: boolean
+  ) => {
+    if (!group?.nextMatchId) return;
+
+    try {
+      setIsLoading(true);
+
+      const response = await fetch(
+        `/api/matches/${group.nextMatchId}/replace-tbd`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            tbdPlayerId,
+            userId,
+            isTeamA,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Error replacing TBD player:', errorData);
+
+        throw new Error('Error al reemplazar jugador TBD');
+      }
+
+      const data = await response.json();
+      console.log('TBD player replaced successfully:', data);
+
+      // Recargar los datos del grupo
+      await fetchGroupDetails();
+
+      showToast('Jugador reemplazado exitosamente', 'success');
+    } catch (error) {
+      console.error('Error replacing TBD player:', error);
+      showToast('Error al reemplazar jugador TBD', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Layout>
+      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+        {isLoading ? (
+          <div className='flex justify-center items-center min-h-screen'>
+            <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500'></div>
+          </div>
+        ) : error ? (
+          <div className='text-center text-red-600'>{error}</div>
+        ) : group ? (
+          <div className='space-y-6'>
+            {/* Header with title and actions - Improved design */}
+            <div className='bg-white rounded-xl shadow-sm p-6 mb-0'>
+              <div className='flex items-center justify-between mb-4 flex-wrap gap-3'>
+                <div className='flex items-center gap-4'>
+                  <button
+                    onClick={() => router.push('/groups')}
+                    className='flex items-center justify-center p-2 rounded-full text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-all'
+                  >
+                    <ArrowLeftIcon className='h-5 w-5' />
+                  </button>
+                  <h1 className='text-2xl font-bold text-gray-800'>
+                    {group.name}
+                  </h1>
+                  {currentUserIsAdmin && (
+                    <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800'>
+                      Admin
+                    </span>
+                  )}
+                </div>
+                <div className='flex items-center space-x-2'>
+                  {group.userStatus === 'PENDING' ? (
+                    <span className='px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm'>
+                      Solicitud pendiente
+                    </span>
+                  ) : (
+                    isUserInGroup && (
+                      <button
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              '¿Estás seguro de que quieres salir de este grupo?'
+                            )
+                          ) {
+                            handleLeaveGroup();
+                          }
+                        }}
+                        className='px-3 py-1.5 text-sm text-red-600 hover:text-white hover:bg-red-600 border border-red-600 rounded-lg transition-all duration-200'
+                      >
+                        Salir del grupo
+                      </button>
+                    )
+                  )}
+                  {currentUserIsAdmin && (
+                    <>
+                      <Link
+                        href={`/edit-group/${id}`}
+                        className='p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all'
+                        title='Editar grupo'
+                      >
+                        <PencilIcon className='h-5 w-5' />
+                      </Link>
+                      <button
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              '¿Estás seguro de que quieres eliminar este grupo? Esta acción no se puede deshacer.'
+                            )
+                          ) {
+                            handleLeaveGroup();
+                          }
+                        }}
+                        className='p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all'
+                        title='Eliminar grupo'
+                      >
+                        <TrashIcon className='h-5 w-5' />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Información del grupo - Diseño mejorado */}
+              <div className='grid grid-cols-1 md:grid-cols-3 gap-6 mt-4'>
+                {/* Columna 1: Información básica */}
+                <div className='space-y-4'>
+                  <div className='bg-gray-50 rounded-lg p-4 border border-gray-100 hover:border-gray-200 transition-colors'>
+                    <div className='flex items-center gap-3 mb-3'>
+                      <div className='flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600'>
+                        <CalendarIcon className='h-5 w-5' />
+                      </div>
+                      <h3 className='font-medium text-gray-900'>Detalles</h3>
+                    </div>
+                    <div className='space-y-3'>
+                      <div>
+                        <p className='text-sm font-medium text-gray-500'>
+                          Deporte
+                        </p>
+                        <p className='text-base text-gray-900 font-medium'>
+                          {group.sport}
+                        </p>
+                      </div>
+                      <div>
+                        <p className='text-sm font-medium text-gray-500'>
+                          Ubicación
+                        </p>
+                        <p className='text-base text-gray-900 font-medium flex items-center'>
+                          <MapPinIcon className='h-4 w-4 text-gray-400 mr-1' />
+                          {group.location}
+                        </p>
+                      </div>
+                      <div>
+                        <p className='text-sm font-medium text-gray-500'>
+                          Total partidos
+                        </p>
+                        <p className='text-base text-gray-900 font-medium'>
+                          {group.totalMatches}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Columna 2: Recurrencia y próximo partido */}
+                <div className='space-y-4'>
+                  <div className='bg-gray-50 rounded-lg p-4 border border-gray-100 hover:border-gray-200 transition-colors'>
+                    <div className='flex items-center gap-3 mb-3'>
+                      <div className='flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600'>
+                        <CalendarIcon className='h-5 w-5' />
+                      </div>
+                      <h3 className='font-medium text-gray-900'>
+                        Próximo partido
+                      </h3>
+                    </div>
+                    <div className='space-y-3'>
+                      <div>
+                        <p className='text-sm font-medium text-gray-500'>
+                          Fecha
+                        </p>
+                        <p className='text-base text-gray-900 font-medium'>
+                          {group.nextMatchDetails ? (
+                            <span className='flex items-center'>
+                              <CalendarIcon className='h-4 w-4 text-gray-400 mr-1' />
+                              {formatMatchDate(group.nextMatchDetails.date)}
+                            </span>
+                          ) : group.nextMatch ? (
+                            <span className='flex items-center'>
+                              <CalendarIcon className='h-4 w-4 text-gray-400 mr-1' />
+                              {formatMatchDate(group.nextMatch)}
+                            </span>
+                          ) : (
+                            'No programado'
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <p className='text-sm font-medium text-gray-500'>
+                          Frecuencia
+                        </p>
+                        <p className='text-base text-gray-900 font-medium'>
+                          {getRecurrenceText()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Columna 3: Link de invitación */}
+                <div className='space-y-4'>
+                  <div className='bg-gray-50 rounded-lg p-4 border border-gray-100 hover:border-gray-200 transition-colors'>
+                    <div className='flex items-center gap-3 mb-3'>
+                      <div className='flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600'>
+                        <ClipboardIcon className='h-5 w-5' />
+                      </div>
+                      <h3 className='font-medium text-gray-900'>
+                        Invitar miembros
+                      </h3>
+                    </div>
+                    <div>
+                      <p className='text-sm font-medium text-gray-500 mb-2'>
+                        Link de invitación
+                      </p>
+                      <div className='flex items-center space-x-2 bg-white border border-gray-200 rounded-lg p-2'>
+                        <div className='flex-1 text-sm text-gray-700 truncate font-mono'>
+                          {shortInviteUrl || inviteUrl || 'Generando enlace...'}
+                        </div>
+                        <button
+                          onClick={copyInviteLink}
+                          className='p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-md transition-colors flex items-center justify-center'
+                          title='Copiar enlace'
+                        >
+                          <ClipboardIcon className='h-4 w-4' />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Navigation tabs - Improved design */}
+            <div className='bg-white rounded-xl shadow-sm mb-0'>
+              <nav
+                className='flex overflow-x-auto rounded-t-xl'
+                aria-label='Tabs'
+              >
+                {tabComponents.map((tab, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedTab(index)}
+                    className={`${
+                      selectedTab === index
+                        ? 'border-blue-500 text-blue-600 bg-blue-50'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                    } flex-1 whitespace-nowrap py-4 px-4 border-b-2 font-medium text-sm transition-all duration-200`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            {/* Contenido de las pestañas */}
+            <div className='bg-white rounded-xl shadow-sm p-6'>
+              {tabComponents[selectedTab].component}
+            </div>
+          </div>
+        ) : (
+          <div className='text-center text-gray-600'>Grupo no encontrado</div>
+        )}
+      </div>
+    </Layout>
+  );
+}
