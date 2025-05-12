@@ -4,6 +4,7 @@ import { authOptions } from './auth/[...nextauth]';
 import { prisma } from '../../lib/prisma';
 import { logGroupEvent } from '../../utils/serverLogEvents';
 import { LogAction } from '../../utils/logTypes';
+import { PLAYER_ROLES } from '../../components/group/AttendanceConfirmation';
 
 interface ConfirmedPlayer {
   id: string;
@@ -33,7 +34,21 @@ export default async function handler(
       });
     }
 
-    const { userId, groupId, matchId, status } = req.body;
+    const { userId, groupId, matchId, status, playerRoles } = req.body;
+
+    // Logging for debugging
+    console.log('======= BACKEND API ATTENDANCES =======');
+    console.log('USER ID:', session.user.id);
+    console.log('TARGET USER ID:', userId || session.user.id);
+    console.log('MATCH ID:', matchId);
+    console.log('STATUS:', status);
+    console.log('PLAYER ROLES:', playerRoles);
+    console.log('PLAYER ROLES TYPE:', typeof playerRoles);
+    console.log('PLAYER ROLES IS ARRAY:', Array.isArray(playerRoles));
+    if (Array.isArray(playerRoles)) {
+      console.log('PLAYER ROLES LENGTH:', playerRoles.length);
+      console.log('PLAYER ROLES CONTENT:', JSON.stringify(playerRoles));
+    }
 
     // Validate required fields
     if (!matchId || !status) {
@@ -54,12 +69,33 @@ export default async function handler(
       });
     }
 
+    // Validar y procesar playerRoles
+    let validatedRoles: string[] = [];
+    if (status === 'CONFIRMED') {
+      // Usar exactamente los roles que llegaron, si es un array
+      if (Array.isArray(playerRoles) && playerRoles.length > 0) {
+        // Hacer una copia para evitar mutaciones
+        validatedRoles = [...playerRoles];
+        console.log('USANDO ROLES DEL CLIENTE:', validatedRoles);
+      } else {
+        // Si no es un array o está vacío, usar el valor por defecto
+        validatedRoles = [PLAYER_ROLES.WILDCARD];
+        console.log(
+          'NO ES ARRAY O ESTÁ VACÍO - USANDO VALOR DEFAULT:',
+          validatedRoles
+        );
+      }
+    }
+
+    console.log('ROLES VALIDADOS FINAL:', validatedRoles);
+
     // Fetch match and group info in a single query
     const match = await prisma.match.findUnique({
       where: { id: matchId },
       select: {
         groupId: true,
         date: true,
+        tbdPlayers: true,
         group: {
           select: {
             members: {
@@ -109,6 +145,39 @@ export default async function handler(
       });
     }
 
+    // Actualizar TBD players para almacenar los roles (ya que no tenemos campo metadata)
+    if (status === 'CONFIRMED' && validatedRoles.length > 0) {
+      try {
+        // Obtener TBD players actuales o inicializar objeto vacío
+        let tbdPlayers = match.tbdPlayers
+          ? typeof match.tbdPlayers === 'string'
+            ? JSON.parse(match.tbdPlayers as string)
+            : match.tbdPlayers
+          : {};
+
+        // Asegurarnos de que tbdPlayers tenga la estructura correcta
+        if (!tbdPlayers.playerRoles) {
+          tbdPlayers.playerRoles = {};
+        }
+
+        // Guardar los roles del jugador usando su ID como clave
+        tbdPlayers.playerRoles[targetUserId] = validatedRoles;
+        console.log('Guardando roles en tbdPlayers:', tbdPlayers);
+
+        // Actualizar el campo tbdPlayers en la tabla Match
+        await prisma.match.update({
+          where: { id: matchId },
+          data: {
+            tbdPlayers: tbdPlayers,
+          },
+        });
+
+        console.log('tbdPlayers actualizado correctamente');
+      } catch (error) {
+        console.error('Error al actualizar tbdPlayers:', error);
+      }
+    }
+
     // Upsert attendance record in a single query
     const attendance = await prisma.matchAttendance.upsert({
       where: {
@@ -141,6 +210,7 @@ export default async function handler(
           {
             matchId,
             status,
+            playerRoles: validatedRoles,
           }
         );
       } else {
@@ -159,6 +229,7 @@ export default async function handler(
             userId: targetUserId,
             userName: targetUser?.name,
             status,
+            playerRoles: validatedRoles,
           }
         );
       }
@@ -167,10 +238,13 @@ export default async function handler(
       // No interrumpimos el flujo principal si falla el log
     }
 
+    console.log('======= FIN BACKEND API ATTENDANCES =======');
+
     return res.status(200).json({
       success: true,
       message: 'Attendance updated successfully',
       attendance,
+      playerRoles: validatedRoles,
     });
   } catch (error) {
     console.error('Error updating attendance:', error);
