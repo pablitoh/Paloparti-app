@@ -80,7 +80,8 @@ interface LazyMembersTabProps extends LazyTabProps {
   currentUserIsAdmin: boolean;
   handleAdminAttendanceUpdate: (
     userId: string,
-    status: ParticipantStatus
+    status: ParticipantStatus,
+    playerRoles?: string[]
   ) => Promise<void>;
   handleLeaveGroup: () => Promise<void>;
 }
@@ -140,6 +141,7 @@ interface GroupWithRelations {
 interface ApiResponse {
   nextMatchDetails?: MatchInterface;
   userAttendance?: ParticipantStatus;
+  userRoles?: string[];
 }
 
 // Components for each tab that handle their own data loading
@@ -241,6 +243,7 @@ const LazyNextMatchTab = ({
         }
         handleDeleteMatch={handleMatchDeletion}
         userAttendanceStatus={(data as ApiResponse)?.userAttendance}
+        userRoles={(data as ApiResponse)?.userRoles || []}
         allowFillIn={allowFillIn}
         setAllowFillIn={setAllowFillIn}
         setShowManualTeamFormationModal={setShowManualTeamFormationModal}
@@ -357,8 +360,12 @@ const LazyMembersTab = ({
         user={user}
         currentUserIsAdmin={currentUserIsAdmin}
         isLoading={isNextMatchLoading || isMembersLoading}
-        handleConfirmAttendance={async (memberId: string, userId: string) => {
-          await handleAdminAttendanceUpdate(userId, 'CONFIRMED');
+        handleConfirmAttendance={async (
+          memberId: string,
+          userId: string,
+          playerRoles?: string[]
+        ) => {
+          await handleAdminAttendanceUpdate(userId, 'CONFIRMED', playerRoles);
         }}
         handleDeclineAttendance={async (memberId: string, userId: string) => {
           await handleAdminAttendanceUpdate(userId, 'DECLINED');

@@ -2,12 +2,76 @@ import React from 'react';
 import { Avatar } from '@mui/material';
 import { UserIcon } from '@heroicons/react/24/outline';
 import { UserPlusIcon } from '@heroicons/react/24/outline';
+import { PLAYER_ROLES } from '../AttendanceConfirmation';
+
+// Iconos para los diferentes roles
+import {
+  HandRaisedIcon,
+  ShieldCheckIcon,
+  Squares2X2Icon,
+  BoltIcon,
+  StarIcon,
+} from '@heroicons/react/24/outline';
+
+// Mapeo de roles a iconos y prioridad (para ordenamiento)
+const ROLE_ICONS: Record<
+  string,
+  { icon: React.ReactElement; priority: number }
+> = {
+  [PLAYER_ROLES.GOALKEEPER]: {
+    icon: (
+      <div title='Arquero' className='relative'>
+        <HandRaisedIcon className='h-5 w-5 text-yellow-600' />
+        <span className='absolute -top-1 -right-1 text-xs'>🧤</span>
+      </div>
+    ),
+    priority: 0,
+  },
+  [PLAYER_ROLES.DEFENDER]: {
+    icon: (
+      <div title='Defensor' className='relative'>
+        <ShieldCheckIcon className='h-5 w-5 text-blue-600' />
+        <span className='absolute -top-1 -right-1 text-xs'>🛡️</span>
+      </div>
+    ),
+    priority: 1,
+  },
+  [PLAYER_ROLES.MIDFIELDER]: {
+    icon: (
+      <div title='Mediocampo' className='relative'>
+        <Squares2X2Icon className='h-5 w-5 text-green-600' />
+        <span className='absolute -top-1 -right-1 text-xs'>⚽</span>
+      </div>
+    ),
+    priority: 2,
+  },
+  [PLAYER_ROLES.FORWARD]: {
+    icon: (
+      <div title='Delantero' className='relative'>
+        <BoltIcon className='h-5 w-5 text-red-600' />
+        <span className='absolute -top-1 -right-1 text-xs'>👟</span>
+      </div>
+    ),
+    priority: 3,
+  },
+  [PLAYER_ROLES.WILDCARD]: {
+    icon: (
+      <div title='Comodín' className='relative'>
+        <StarIcon className='h-5 w-5 text-purple-600' />
+        <span className='absolute -top-1 -right-1 text-xs'>🔄</span>
+      </div>
+    ),
+    priority: 4,
+  },
+};
 
 interface Player {
   id: string;
   name: string | null;
   avatar: string | null;
   playerType?: string;
+  playerRoles?: string[]; // Array de roles del jugador
+  assignedRole?: string; // Rol asignado para la formación
   age?: number;
 }
 
@@ -17,6 +81,8 @@ interface TbdPlayer {
   isTeamA: boolean;
   avatar?: string | null;
   playerType?: string;
+  playerRoles?: string[]; // Array de roles del jugador
+  assignedRole?: string; // Rol asignado para la formación
   age?: number;
 }
 
@@ -45,6 +111,50 @@ interface TeamSectionProps {
   colorClass: string;
   avgAge?: number; // Promedio de edad del equipo
 }
+
+// Función para obtener el rol principal de un jugador (el de mayor prioridad)
+const getPrimaryRole = (playerRoles?: string[]): string | undefined => {
+  if (!playerRoles || playerRoles.length === 0) return undefined;
+
+  // Encontrar el rol con la prioridad más alta (número más bajo tiene mayor prioridad)
+  return playerRoles.reduce((primaryRole, currentRole) => {
+    const primaryPriority = ROLE_ICONS[primaryRole]?.priority ?? 999;
+    const currentPriority = ROLE_ICONS[currentRole]?.priority ?? 999;
+    return currentPriority < primaryPriority ? currentRole : primaryRole;
+  }, playerRoles[0]);
+};
+
+// Función para ordenar jugadores por rol
+const sortPlayersByRole = (
+  players: (Player | TbdPlayer)[]
+): (Player | TbdPlayer)[] => {
+  return [...players].sort((a, b) => {
+    const roleA = getPrimaryRole(a.playerRoles);
+    const roleB = getPrimaryRole(b.playerRoles);
+
+    // Si algún jugador no tiene rol, ponerlo al final
+    if (!roleA && !roleB) return 0;
+    if (!roleA) return 1;
+    if (!roleB) return -1;
+
+    // Ordenar por prioridad de rol
+    return (
+      (ROLE_ICONS[roleA]?.priority ?? 999) -
+      (ROLE_ICONS[roleB]?.priority ?? 999)
+    );
+  });
+};
+
+// Función para obtener roles del jugador desde datos adicionales
+const getPlayerRoles = (player: Player | TbdPlayer): string[] => {
+  // Si el jugador tiene roles directamente definidos, usarlos
+  if (player.playerRoles && Array.isArray(player.playerRoles)) {
+    return player.playerRoles;
+  }
+
+  // Si no tiene roles, devolver array vacío
+  return [];
+};
 
 const TeamsList: React.FC<TeamsListProps> = ({
   playersA,
@@ -112,43 +222,92 @@ const TeamsList: React.FC<TeamsListProps> = ({
     player,
     isTbd = false,
     showReplaceButton = false,
-  }) => (
-    <li className='py-2 flex items-center justify-between'>
-      <div className='flex items-center gap-2 sm:gap-3'>
-        {isTbd ? (
-          <div className='h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gray-200 flex items-center justify-center'>
-            <UserIcon className='h-5 w-5 sm:h-6 sm:w-6 text-gray-500' />
-          </div>
-        ) : (
-          <Avatar
-            src={player.avatar || ''}
-            alt={player.name || 'Jugador'}
-            className='h-8 w-8 sm:h-10 sm:w-10 rounded-full'
-          />
-        )}
-        <div className='min-w-0'>
-          <p className='font-medium text-gray-800 text-sm sm:text-base truncate max-w-[120px] sm:max-w-full'>
-            {player.name || (isTbd ? 'TBD' : 'Jugador sin nombre')}
-          </p>
-          {(player.playerType === 'TBD' || isTbd) && (
-            <span className='text-xs text-gray-500 italic'>
-              Jugador pendiente
-            </span>
-          )}
-        </div>
-      </div>
+  }) => {
+    // Obtener roles del jugador y determinar el rol principal
+    const playerRoles = getPlayerRoles(player);
 
-      {showReplaceButton && currentUserIsAdmin && onReplaceTbd && (
-        <button
-          onClick={() => onReplaceTbd(player.id)}
-          className='p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors'
-          title='Reemplazar jugador'
-        >
-          <UserPlusIcon className='h-4 w-4 sm:h-5 sm:w-5' />
-        </button>
-      )}
-    </li>
-  );
+    // Priorizar el rol asignado si existe
+    const displayRole = player.assignedRole || getPrimaryRole(playerRoles);
+
+    // Mostrar el ícono del rol asignado primero, seguido por los demás roles seleccionados
+    const allRoles = displayRole
+      ? [displayRole, ...playerRoles.filter((role) => role !== displayRole)]
+      : playerRoles;
+
+    // Eliminar duplicados
+    const uniqueRoles = [...new Set(allRoles)];
+
+    // Obtener íconos para los roles
+    const roleIcons = uniqueRoles.map((role) => ROLE_ICONS[role]?.icon);
+
+    return (
+      <li className='py-2 flex items-center justify-between'>
+        <div className='flex items-center gap-2 sm:gap-3'>
+          {isTbd ? (
+            <div className='h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gray-200 flex items-center justify-center'>
+              <UserIcon className='h-5 w-5 sm:h-6 sm:w-6 text-gray-500' />
+            </div>
+          ) : (
+            <Avatar
+              src={player.avatar || ''}
+              alt={player.name || 'Jugador'}
+              className='h-8 w-8 sm:h-10 sm:w-10 rounded-full'
+            />
+          )}
+          <div className='min-w-0'>
+            <div className='flex items-center'>
+              <p className='font-medium text-gray-800 text-sm sm:text-base truncate max-w-[120px] sm:max-w-full'>
+                {player.name || (isTbd ? 'TBD' : 'Jugador sin nombre')}
+              </p>
+              <div className='flex space-x-1 ml-2'>
+                {roleIcons.map((icon, index) => (
+                  <span
+                    key={index}
+                    className={`flex-shrink-0 ${
+                      index === 0 && player.assignedRole
+                        ? 'bg-yellow-100 p-1 rounded-full'
+                        : ''
+                    }`}
+                    title={uniqueRoles[index]}
+                  >
+                    {icon}
+                  </span>
+                ))}
+              </div>
+            </div>
+            {(player.playerType === 'TBD' || isTbd) && (
+              <span className='text-xs text-gray-500 italic'>
+                Jugador pendiente
+              </span>
+            )}
+            {!isTbd && player.assignedRole && (
+              <span className='text-xs text-gray-600 font-medium'>
+                {player.assignedRole === PLAYER_ROLES.GOALKEEPER
+                  ? 'Arquero'
+                  : player.assignedRole === PLAYER_ROLES.DEFENDER
+                  ? 'Defensor'
+                  : player.assignedRole === PLAYER_ROLES.MIDFIELDER
+                  ? 'Mediocampista'
+                  : player.assignedRole === PLAYER_ROLES.FORWARD
+                  ? 'Delantero'
+                  : 'Comodín'}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {showReplaceButton && currentUserIsAdmin && onReplaceTbd && (
+          <button
+            onClick={() => onReplaceTbd(player.id)}
+            className='p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors'
+            title='Reemplazar jugador'
+          >
+            <UserPlusIcon className='h-4 w-4 sm:h-5 sm:w-5' />
+          </button>
+        )}
+      </li>
+    );
+  };
 
   // Componente para un equipo
   const TeamSection: React.FC<TeamSectionProps> = ({
@@ -160,6 +319,10 @@ const TeamsList: React.FC<TeamsListProps> = ({
   }) => {
     // Verificar si este equipo específico tiene promedio de edad
     console.log(`TeamSection "${teamName}" avgAge:`, avgAge);
+
+    // Ordenar los jugadores por rol
+    const sortedPlayers = sortPlayersByRole(players);
+    const sortedTbdPlayers = sortPlayersByRole(tbdPlayers);
 
     return (
       <div className='p-4 w-full'>
@@ -179,7 +342,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
 
         <ul className='divide-y divide-gray-100'>
           {/* Regular players */}
-          {players.map((player) => (
+          {sortedPlayers.map((player) => (
             <PlayerItem
               key={player.id}
               player={player}
@@ -188,7 +351,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
           ))}
 
           {/* TBD players */}
-          {tbdPlayers.map((player) => (
+          {sortedTbdPlayers.map((player) => (
             <PlayerItem
               key={player.id}
               player={player}

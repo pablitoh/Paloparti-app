@@ -14,6 +14,7 @@ export interface Participant {
   isReferee?: boolean;
   age?: number;
   favoritePosition?: string;
+  playerRoles?: string[];
   joinDate?: string;
   lastMatch?: string;
   matchesPlayed?: number;

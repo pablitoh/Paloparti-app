@@ -2,6 +2,7 @@ import { useRouter } from 'next/router';
 import { showSuccessToast, showErrorToast } from '../services/toastService';
 import type { ParticipantStatus } from '../types/group';
 import { useQueryClient } from '@tanstack/react-query';
+import { PLAYER_ROLES } from '../components/group/AttendanceConfirmation';
 import {
   useUserAttendanceMutation,
   useAdminAttendanceMutation,
@@ -148,7 +149,10 @@ export const useGroupActions = ({
     }
   };
 
-  const handleAttendance = async (status: ParticipantStatus): Promise<void> => {
+  const handleAttendance = async (
+    status: ParticipantStatus,
+    playerRoles?: string[]
+  ): Promise<void> => {
     if (!groupId) {
       console.error('ID de grupo inválido');
       showErrorToast('ID de grupo inválido');
@@ -156,6 +160,56 @@ export const useGroupActions = ({
     }
 
     try {
+      // Intentar leer los roles desde localStorage (funcionalidad principal)
+      let effectiveRoles: string[] = [];
+
+      if (status === 'CONFIRMED') {
+        try {
+          // Primero verificar si se proporcionaron roles como parámetro
+          if (Array.isArray(playerRoles) && playerRoles.length > 0) {
+            console.log('Usando roles de parámetros:', playerRoles);
+            effectiveRoles = [...playerRoles];
+          } else {
+            // Si no hay parámetros, intentar leer de localStorage
+            const storedRoles = localStorage.getItem(
+              'paloparti_selected_roles'
+            );
+            if (storedRoles) {
+              console.log('Roles encontrados en localStorage:', storedRoles);
+              try {
+                const parsedRoles = JSON.parse(storedRoles);
+                if (Array.isArray(parsedRoles) && parsedRoles.length > 0) {
+                  effectiveRoles = parsedRoles;
+                } else {
+                  // Valor predeterminado si parsedRoles no es un array válido
+                  effectiveRoles = [PLAYER_ROLES.WILDCARD];
+                }
+              } catch (e) {
+                console.error('Error parsing stored roles:', e);
+                effectiveRoles = [PLAYER_ROLES.WILDCARD];
+              }
+            } else {
+              // Valor predeterminado
+              console.log('Usando valor predeterminado: Comodín');
+              effectiveRoles = [PLAYER_ROLES.WILDCARD];
+            }
+          }
+        } catch (e) {
+          console.error('Error procesando roles:', e);
+          // Fallback a valor predeterminado en caso de error
+          effectiveRoles = [PLAYER_ROLES.WILDCARD];
+        }
+
+        // Validar que haya al menos un rol seleccionado
+        if (effectiveRoles.length === 0) {
+          console.error('No se proporcionaron roles');
+          showErrorToast(
+            'Selecciona al menos una posición para confirmar asistencia'
+          );
+          return;
+        }
+      }
+
       // First, ensure we have the latest match ID by fetching it if necessary
       let currentMatchId = nextMatchId;
       if (!currentMatchId) {
@@ -181,81 +235,91 @@ export const useGroupActions = ({
         }
       }
 
-      const response = await fetch(`/api/attendances`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          matchId: currentMatchId,
-          status,
-          groupId,
-        }),
-      });
+      // Construir el payload
+      const payload: any = { status };
+
+      // Solo añadir playerRoles si status es CONFIRMED
+      if (status === 'CONFIRMED') {
+        payload.playerRoles = effectiveRoles;
+      }
+
+      console.log('Enviando payload al servidor:', payload);
+
+      const response = await fetch(
+        `/api/matches/${currentMatchId}/attendance`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      // Parsear la respuesta
+      let data;
+      try {
+        data = await response.json();
+        console.log('Respuesta del servidor:', data);
+      } catch (e) {
+        console.error('Error parsing response:', e);
+        throw new Error('Error processing server response');
+      }
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update attendance');
+        throw new Error(data.message || 'Failed to update attendance');
       }
 
-      const data = await response.json();
+      // Limpiar localStorage después de completar
+      if (status === 'CONFIRMED') {
+        localStorage.removeItem('paloparti_selected_roles');
+      }
 
-      // Forzar la invalidación de todas las consultas relevantes
-      await Promise.all([
-        queryClient.invalidateQueries({
+      // Forzar invalidación completa de la caché para asegurar actualización de UI
+      await queryClient.invalidateQueries({
+        queryKey: ['group', 'nextMatch', groupId],
+        exact: true,
+        refetchType: 'active',
+      });
+
+      // Si la caché está vacía, forzar una recarga de la página
+      const cachedData = queryClient.getQueryData([
+        'group',
+        'nextMatch',
+        groupId,
+      ]);
+      if (!cachedData) {
+        console.log('No hay datos en caché, forzando recarga de datos');
+        await queryClient.refetchQueries({
           queryKey: ['group', 'nextMatch', groupId],
           exact: true,
-          refetchType: 'active',
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ['group', 'members', groupId],
-          exact: true,
-          refetchType: 'active',
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ['group', 'basic', groupId],
-          exact: true,
-          refetchType: 'active',
-        }),
-      ]);
-
-      // Actualizar manualmente el caché con los nuevos datos si están disponibles
-      if (data.nextMatchDetails) {
-        queryClient.setQueryData(
-          ['group', 'nextMatch', groupId],
-          (oldData: any) => ({
-            ...oldData,
-            nextMatchDetails: data.nextMatchDetails,
-            userAttendance: status,
-          })
-        );
+        });
       }
 
-      // Show appropriate message
-      const successMessage =
+      showSuccessToast(
         status === 'CONFIRMED'
           ? 'Asistencia confirmada'
           : status === 'DECLINED'
-          ? 'Has indicado que no asistirás'
-          : 'Estado de asistencia actualizado';
-
-      showSuccessToast(successMessage);
+          ? 'Asistencia rechazada'
+          : 'Estado de asistencia actualizado'
+      );
 
       if (onSuccess) {
         onSuccess();
       }
 
       return data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating attendance:', error);
-      showErrorToast('Error al actualizar asistencia');
-      throw error; // Re-throw the error to be handled by the component
+      showErrorToast(error.message || 'Error al actualizar asistencia');
+      throw error;
     }
   };
 
   const handleAdminAttendanceUpdate = async (
     userId: string,
-    status: ParticipantStatus
+    status: ParticipantStatus,
+    playerRoles?: string[]
   ) => {
     if (!groupId) {
       showErrorToast('ID de grupo inválido');
@@ -288,6 +352,14 @@ export const useGroupActions = ({
         }
       }
 
+      // Usar roles proporcionados o asignar Comodín por defecto
+      const rolesParaEnviar =
+        status === 'CONFIRMED'
+          ? playerRoles && playerRoles.length > 0
+            ? playerRoles
+            : [PLAYER_ROLES.WILDCARD]
+          : [];
+
       const response = await fetch(`/api/attendances`, {
         method: 'POST',
         headers: {
@@ -298,6 +370,7 @@ export const useGroupActions = ({
           matchId: currentMatchId,
           status,
           groupId,
+          playerRoles: rolesParaEnviar,
         }),
       });
 
@@ -400,11 +473,18 @@ export const useGroupActions = ({
         confirmedPlayers.length
       );
 
-      // Crear el formato de jugadores que espera la API
-      const players = confirmedPlayers.map((player: any) => ({
-        userId: player.id,
-        name: player.name,
-      }));
+      // Crear el formato de jugadores que espera la API, incluyendo los roles de jugador
+      const players = confirmedPlayers.map((player: any) => {
+        // Verificar si el jugador tiene roles definidos
+        const playerRoles = player.playerRoles || [PLAYER_ROLES.WILDCARD];
+        console.log(`Roles del jugador ${player.id}:`, playerRoles);
+
+        return {
+          userId: player.id,
+          name: player.name,
+          playerRoles: playerRoles, // Incluir los roles del jugador
+        };
+      });
 
       console.log('Jugadores enviados para sorteo:', players.length);
 
@@ -457,10 +537,18 @@ export const useGroupActions = ({
           ? (window as any).__balanceByAge
           : true; // Por defecto true si no está definido
 
+      // Leer el valor balanceByRole del contexto global si está disponible
+      const balanceByRole =
+        typeof window !== 'undefined' &&
+        (window as any).__balanceByRole !== undefined
+          ? (window as any).__balanceByRole
+          : true; // Por defecto true si no está definido
+
       console.log('Sending team formation request with:', {
         players,
         tbdPlayers: tbdPlayersData,
         balanceByAge,
+        balanceByRole,
       });
 
       const response = await fetch(`/api/matches/create-match`, {
@@ -476,6 +564,7 @@ export const useGroupActions = ({
           players,
           tbdPlayers: tbdPlayersData,
           balanceByAge, // Pasar el parámetro de balance por edad
+          balanceByRole, // Activar balance por roles
         }),
       });
 

@@ -7,13 +7,18 @@ import {
   XMarkIcon,
   ArrowRightOnRectangleIcon,
 } from '@heroicons/react/24/outline';
+import RoleSelectionModal from '../modals/RoleSelectionModal';
 
 interface MembersTabProps {
   group: GroupWithRelations;
   user: AuthUser | null;
   currentUserIsAdmin: boolean;
   isLoading: boolean;
-  handleConfirmAttendance: (memberId: string, userId: string) => Promise<void>;
+  handleConfirmAttendance: (
+    memberId: string,
+    userId: string,
+    playerRoles?: string[]
+  ) => Promise<void>;
   handleDeclineAttendance: (memberId: string, userId: string) => Promise<void>;
   handleLeaveGroup?: () => Promise<void>;
 }
@@ -22,6 +27,7 @@ interface ActionButtonsProps {
   member: Member;
   isConfirmedForNextMatch: boolean;
   isCurrentUser: boolean | null;
+  onOpenRoleModal: (member: Member) => void;
 }
 
 export default function MembersTab({
@@ -44,6 +50,9 @@ export default function MembersTab({
     id: string;
     action: 'confirm' | 'decline';
   } | null>(null);
+  // Estado para el modal de selección de roles
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
 
   // Inicializar el estado local con los datos del grupo
   useEffect(() => {
@@ -75,28 +84,44 @@ export default function MembersTab({
     );
   };
 
+  // Función para abrir el modal de selección de roles
+  const handleOpenRoleModal = (member: Member) => {
+    if (isMaxPlayersReached && !isMemberConfirmedForNextMatch(member.userId))
+      return;
+    setSelectedMember(member);
+    setIsRoleModalOpen(true);
+  };
+
+  // Función para manejar la confirmación después de seleccionar roles
+  const handleConfirmWithRoles = async (roles: string[]) => {
+    if (!selectedMember) return;
+
+    setProcessingButton({ id: selectedMember.id, action: 'confirm' });
+    try {
+      // Pasar los roles seleccionados a la función de confirmación
+      await handleConfirmAttendance(
+        selectedMember.id,
+        selectedMember.userId,
+        roles
+      );
+      setMembersConfirmationStatus((prev) => ({
+        ...prev,
+        [selectedMember.userId]: true,
+      }));
+      setLocalConfirmedCount((prev) => prev + 1);
+    } finally {
+      setProcessingButton(null);
+      setSelectedMember(null);
+    }
+  };
+
   // Componente para los botones de acciones
   const ActionButtons: React.FC<ActionButtonsProps> = ({
     member,
     isConfirmedForNextMatch,
     isCurrentUser,
+    onOpenRoleModal,
   }) => {
-    const handleConfirm = async () => {
-      if (isMaxPlayersReached && !isConfirmedForNextMatch) return;
-
-      setProcessingButton({ id: member.id, action: 'confirm' });
-      try {
-        await handleConfirmAttendance(member.id, member.userId);
-        setMembersConfirmationStatus((prev) => ({
-          ...prev,
-          [member.userId]: true,
-        }));
-        setLocalConfirmedCount((prev) => prev + 1);
-      } finally {
-        setProcessingButton(null);
-      }
-    };
-
     const handleDecline = async () => {
       setProcessingButton({ id: member.id, action: 'decline' });
       try {
@@ -131,7 +156,7 @@ export default function MembersTab({
       <div className='flex gap-2 mt-2 md:mt-0 flex-wrap justify-end'>
         {!isConfirmed && (
           <button
-            onClick={handleConfirm}
+            onClick={() => onOpenRoleModal(member)}
             className='text-green-600 hover:text-green-900 bg-green-100 hover:bg-green-200 px-3 py-1.5 md:py-1 rounded-md text-xs md:text-sm flex items-center min-w-[90px] justify-center'
             disabled={
               isLoading ||
@@ -308,6 +333,7 @@ export default function MembersTab({
                         member={member}
                         isConfirmedForNextMatch={isConfirmedForNextMatch}
                         isCurrentUser={isCurrentUser}
+                        onOpenRoleModal={handleOpenRoleModal}
                       />
                     </td>
                   </tr>
@@ -381,6 +407,7 @@ export default function MembersTab({
                     member={member}
                     isConfirmedForNextMatch={isConfirmedForNextMatch}
                     isCurrentUser={isCurrentUser}
+                    onOpenRoleModal={handleOpenRoleModal}
                   />
                 </div>
               )}
@@ -408,6 +435,20 @@ export default function MembersTab({
             Salir del grupo
           </button>
         </div>
+      )}
+
+      {/* Modal de selección de roles */}
+      {isRoleModalOpen && selectedMember && (
+        <RoleSelectionModal
+          isOpen={isRoleModalOpen}
+          onClose={() => {
+            setIsRoleModalOpen(false);
+            setSelectedMember(null);
+          }}
+          onConfirm={handleConfirmWithRoles}
+          playerName={selectedMember.name || 'Jugador'}
+          initialRoles={[]}
+        />
       )}
     </div>
   );

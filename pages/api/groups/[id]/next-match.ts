@@ -4,6 +4,7 @@ import { authOptions } from '../../auth/[...nextauth]';
 import { prisma } from '../../../../lib/prisma';
 import { Match, MatchPlayer, User } from '@prisma/client';
 import { calculateAge } from '../../../../lib/utils';
+import { PLAYER_ROLES } from '../../../../components/group/AttendanceConfirmation';
 
 // Interfaces for type safety
 interface MatchWithRelations extends Match {
@@ -130,40 +131,142 @@ export default async function handler(
         (attendance: (typeof match.attendance)[0]) =>
           attendance.status === 'CONFIRMED'
       )
-      .map((attendance: (typeof match.attendance)[0]) => ({
-        id: attendance.userId,
-        name: attendance.user?.name || null,
-        avatar: attendance.user?.image || null,
-        age: calculateAge(attendance.user?.birthdate || null),
-      }));
+      .map((attendance: (typeof match.attendance)[0]) => {
+        // Intentar extraer los roles del jugador desde tbdPlayers
+        let playerRoles: string[] = [PLAYER_ROLES.WILDCARD]; // Valor por defecto
+        if (match.tbdPlayers) {
+          try {
+            // Intentar extraer roles de tbdPlayers según el formato almacenado
+            const tbdObj =
+              typeof match.tbdPlayers === 'string'
+                ? JSON.parse(match.tbdPlayers)
+                : match.tbdPlayers;
 
-    // Obtener la asistencia del usuario actual
+            // Si tenemos la estructura playerRoles que guarda los roles por userId
+            if (tbdObj.playerRoles && tbdObj.playerRoles[attendance.userId]) {
+              playerRoles = tbdObj.playerRoles[attendance.userId];
+              console.log(
+                `Roles encontrados para ${attendance.userId}:`,
+                playerRoles
+              );
+            }
+          } catch (error) {
+            console.error('Error al extraer roles de jugador:', error);
+          }
+        }
+
+        return {
+          id: attendance.userId,
+          name: attendance.user?.name || null,
+          avatar: attendance.user?.image || null,
+          age: calculateAge(attendance.user?.birthdate || null),
+          playerRoles: playerRoles, // Roles elegidos por el usuario
+        };
+      });
+
+    // Obtener la asistencia del usuario actual y sus roles
     const userAttendance = match.attendance.find(
       (attendance: (typeof match.attendance)[0]) =>
         attendance.userId === session.user.id
     );
 
+    // Extraer los roles del usuario actual si existe
+    let userRoles: string[] = [];
+    if (userAttendance && match.tbdPlayers) {
+      try {
+        const tbdObj =
+          typeof match.tbdPlayers === 'string'
+            ? JSON.parse(match.tbdPlayers)
+            : match.tbdPlayers;
+
+        if (tbdObj.playerRoles && tbdObj.playerRoles[session.user.id]) {
+          userRoles = tbdObj.playerRoles[session.user.id];
+          console.log(
+            `Roles del usuario actual recuperados: ${userRoles.join(', ')}`
+          );
+        }
+      } catch (error) {
+        console.error('Error al extraer roles del usuario actual:', error);
+      }
+    }
+
     // Formatear la respuesta
     // Usar matchPlayers para obtener los jugadores de cada equipo
     const teamAPlayers = (match.matchPlayers as any[])
       .filter((player: any) => player.isTeamA)
-      .map((player: any) => ({
-        id: player.userId,
-        name: player.user?.name || null,
-        avatar: player.user?.image || null,
-        isTeamA: true,
-        age: calculateAge(player.user?.birthdate || null),
-      }));
+      .map((player: any) => {
+        // Obtener roles del jugador si existen
+        let playerRoles: string[] = [PLAYER_ROLES.WILDCARD]; // Valor por defecto
+        let assignedRole: string | undefined;
+
+        if (match.tbdPlayers) {
+          try {
+            const tbdObj =
+              typeof match.tbdPlayers === 'string'
+                ? JSON.parse(match.tbdPlayers)
+                : match.tbdPlayers;
+
+            if (tbdObj.playerRoles && tbdObj.playerRoles[player.userId]) {
+              playerRoles = tbdObj.playerRoles[player.userId];
+            }
+
+            // Obtener el rol asignado para la formación
+            if (tbdObj.assignedRoles && tbdObj.assignedRoles[player.userId]) {
+              assignedRole = tbdObj.assignedRoles[player.userId];
+            }
+          } catch (error) {
+            console.error('Error al extraer roles para teamAPlayers:', error);
+          }
+        }
+
+        return {
+          id: player.userId,
+          name: player.user?.name || null,
+          avatar: player.user?.image || null,
+          isTeamA: true,
+          age: calculateAge(player.user?.birthdate || null),
+          playerRoles: playerRoles, // Roles elegidos por el usuario
+          assignedRole: assignedRole, // Rol asignado para la formación
+        };
+      });
 
     const teamBPlayers = (match.matchPlayers as any[])
       .filter((player: any) => !player.isTeamA)
-      .map((player: any) => ({
-        id: player.userId,
-        name: player.user?.name || null,
-        avatar: player.user?.image || null,
-        isTeamA: false,
-        age: calculateAge(player.user?.birthdate || null),
-      }));
+      .map((player: any) => {
+        // Obtener roles del jugador si existen
+        let playerRoles: string[] = [PLAYER_ROLES.WILDCARD]; // Valor por defecto
+        let assignedRole: string | undefined;
+
+        if (match.tbdPlayers) {
+          try {
+            const tbdObj =
+              typeof match.tbdPlayers === 'string'
+                ? JSON.parse(match.tbdPlayers)
+                : match.tbdPlayers;
+
+            if (tbdObj.playerRoles && tbdObj.playerRoles[player.userId]) {
+              playerRoles = tbdObj.playerRoles[player.userId];
+            }
+
+            // Obtener el rol asignado para la formación
+            if (tbdObj.assignedRoles && tbdObj.assignedRoles[player.userId]) {
+              assignedRole = tbdObj.assignedRoles[player.userId];
+            }
+          } catch (error) {
+            console.error('Error al extraer roles para teamBPlayers:', error);
+          }
+        }
+
+        return {
+          id: player.userId,
+          name: player.user?.name || null,
+          avatar: player.user?.image || null,
+          isTeamA: false,
+          age: calculateAge(player.user?.birthdate || null),
+          playerRoles: playerRoles, // Roles elegidos por el usuario
+          assignedRole: assignedRole, // Rol asignado para la formación
+        };
+      });
 
     // Procesar los TBD players
     let tbdPlayers: TbdPlayer[] = [];
@@ -302,6 +405,7 @@ export default async function handler(
     return res.status(200).json({
       nextMatchDetails,
       userAttendance: userAttendance ? userAttendance.status : null,
+      userRoles: userRoles,
     });
   } catch (error) {
     console.error('Error al obtener próximo partido:', error);

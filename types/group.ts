@@ -5,6 +5,7 @@ export interface Player {
   name: string | null;
   avatar: string | null;
   playerType?: string;
+  playerRoles?: string[];
   age?: number | null;
   isTeamA?: boolean;
 }
@@ -14,6 +15,7 @@ export interface TbdPlayer {
   name: string;
   isTeamA: boolean;
   playerType?: string;
+  playerRoles?: string[];
   avatar?: string | null;
   age?: number | null;
 }

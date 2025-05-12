@@ -266,6 +266,7 @@ interface RandomizeTeamsParams {
   matchId: string;
   groupId: string;
   balanceByAge?: boolean;
+  balanceByRole?: boolean;
 }
 
 interface AttendanceMutationParams {
@@ -517,6 +518,8 @@ export const useRandomizeTeamsMutation = () => {
           forceNewShuffle: true, // Añadir parámetro para forzar un nuevo sorteo aleatorio
           balanceByAge:
             params.balanceByAge !== undefined ? params.balanceByAge : false, // Pasar el parámetro con valor por defecto false
+          balanceByRole:
+            params.balanceByRole !== undefined ? params.balanceByRole : true, // Pasar el parámetro con valor por defecto true
         }),
       });
       if (!response.ok) {

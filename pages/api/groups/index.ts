@@ -232,7 +232,7 @@ export default async function handler(
             create: {
               userId: userId,
               role: 'ADMIN', // El creador siempre es admin
-              status: 'CONFIRMED', // El creador queda automáticamente aceptado
+              status: 'CONFIRMED', // El creador está confirmado como miembro
             },
           },
         },
@@ -268,7 +268,7 @@ export default async function handler(
           groupId: newGroup.id,
           matchId: newMatch.id,
           matchDate: nextMatchDate,
-          status: 'CONFIRMED', // El creador está confirmado para el próximo partido
+          status: 'PENDING', // El creador no está automáticamente confirmado para el partido
         },
       });
 

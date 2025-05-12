@@ -40,6 +40,7 @@ interface Player {
   name: string | null;
   avatar: string | null;
   playerType?: string;
+  playerRoles?: string[]; // Roles del jugador
   age?: number | null;
   isTeamA?: boolean;
 }
@@ -108,11 +109,15 @@ interface NextMatchTabProps {
   currentUserIsAdmin: boolean;
   isUserInGroup: boolean;
   setShowReplaceTbdModal: (id: string) => void;
-  handleGroupAttendance?: (status: ParticipantStatus) => Promise<void>;
+  handleGroupAttendance?: (
+    status: ParticipantStatus,
+    playerRoles?: string[]
+  ) => Promise<void>;
   handleSortTeams?: () => Promise<void>;
   handleAddResults?: () => void;
   handleDeleteMatch?: (id: string) => void;
   userAttendanceStatus?: ParticipantStatus;
+  userRoles?: string[];
   allowFillIn: boolean;
   setAllowFillIn: (value: boolean) => void;
   setShowManualTeamFormationModal: (value: boolean) => void;
@@ -130,6 +135,7 @@ export default function NextMatchTab({
   handleAddResults,
   handleDeleteMatch,
   userAttendanceStatus,
+  userRoles,
   allowFillIn,
   setAllowFillIn,
   setShowManualTeamFormationModal,
@@ -147,6 +153,8 @@ export default function NextMatchTab({
   const [forcedTeamB, setForcedTeamB] = useState<Player[]>([]);
   // Estado para balance por edad
   const [balanceByAge, setBalanceByAge] = useState(false);
+  // Estado para balance por rol
+  const [balanceByRole, setBalanceByRole] = useState(true);
 
   // Local state to track attendance status
   const [localUserAttendanceStatus, setLocalUserAttendanceStatus] = useState<
@@ -407,85 +415,155 @@ export default function NextMatchTab({
       weekday: 'long',
       day: 'numeric',
       month: 'long',
+    });
+
+    // Format time separately to avoid seconds
+    const formattedTime = dateObj.toLocaleTimeString('es-ES', {
       hour: '2-digit',
       minute: '2-digit',
     });
 
-    // Capitalize first letter
-    return formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
+    // Capitalize first letter and combine date and time
+    return (
+      formattedDate.charAt(0).toUpperCase() +
+      formattedDate.slice(1) +
+      ' ' +
+      formattedTime
+    );
   };
 
-  // Handle attendance
+  // Handle attendance for the current user
   const handleAttendance = async (
     status: ParticipantStatus,
-    userId?: string
+    playerRoles?: string[]
   ) => {
-    // Check if there's a valid match with a valid ID and also check if the group has a nextMatchId
-    if (!matchDetails?.id || !group?.nextMatchId) {
-      showErrorToast('No hay un partido activo para actualizar la asistencia');
+    if (!user?.id) {
+      console.error('No user ID available for attendance update');
       return;
     }
 
-    // Verify that the match ID matches the group's nextMatchId
-    if (matchDetails.id !== group.nextMatchId) {
-      console.error('Match ID mismatch after deletion, refreshing match data');
-      // Refresh the data
-      queryClient.invalidateQueries({
+    if (!matchDetails?.id) {
+      console.error('No match ID available for attendance update');
+      return;
+    }
+
+    try {
+      setAttendanceLoading(true);
+
+      console.log('Actualizando asistencia:', {
+        status,
+        playerRoles,
+        matchId: matchDetails.id,
+      });
+
+      // Si se proporcionó una función de manejo externa, usar esa
+      if (handleGroupAttendance) {
+        await handleGroupAttendance(status, playerRoles);
+
+        // Actualizar estado local inmediatamente para mostrar feedback al usuario
+        setLocalUserAttendanceStatus(status);
+
+        // Forzar la recarga de los datos del partido desde el servidor
+        const response = await fetch(`/api/groups/${id}/next-match`);
+        if (response.ok) {
+          const data = await response.json();
+
+          // Actualizar la caché de React Query directamente
+          queryClient.setQueryData(['group', 'nextMatch', id], data);
+
+          console.log(
+            'Datos actualizados después de confirmar asistencia:',
+            data
+          );
+        }
+
+        return;
+      }
+
+      // Si no hay función externa, implementar la lógica localmente
+      // Almacenar los roles en localStorage para que el backend pueda recuperarlos
+      if (
+        status === 'CONFIRMED' &&
+        Array.isArray(playerRoles) &&
+        playerRoles.length > 0
+      ) {
+        localStorage.setItem(
+          'paloparti_selected_roles',
+          JSON.stringify(playerRoles)
+        );
+      }
+
+      await fetch(`/api/matches/${matchDetails.id}/attendance`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status,
+          playerRoles: playerRoles || [],
+        }),
+      });
+
+      // Actualizar el estado local inmediatamente
+      setLocalUserAttendanceStatus(status);
+
+      // Forzar la recarga desde el servidor para asegurar que tenemos datos actualizados
+      await queryClient.invalidateQueries({
         queryKey: ['group', 'nextMatch', id],
         exact: true,
       });
-      showErrorToast(
-        'La información del partido ha cambiado, por favor intente nuevamente'
+
+      showSuccessToast(
+        status === 'CONFIRMED'
+          ? 'Asistencia confirmada'
+          : 'Asistencia rechazada'
       );
+    } catch (error) {
+      console.error('Error updating attendance:', error);
+      showErrorToast('Error al actualizar asistencia');
+    } finally {
+      setAttendanceLoading(false);
+    }
+  };
+
+  // Handle attendance updates by admin for other users
+  const handleAdminAttendance = async (
+    status: ParticipantStatus,
+    userId: string
+  ) => {
+    if (!matchDetails?.id || !currentUserIsAdmin) {
       return;
     }
 
     setAttendanceLoading(true);
     try {
-      // For admin actions on other players
-      const targetUserId = userId || user?.id;
+      // Call the admin attendance endpoint
+      const attendanceEndpoint = `/api/matches/${matchDetails.id}/attendance/${userId}`;
 
-      if (!targetUserId) {
-        console.error('No user ID available for attendance update');
-        return;
-      }
-
-      // Si tenemos un handler personalizado, lo usamos
-      if (handleGroupAttendance) {
-        await handleGroupAttendance(status);
-        return;
-      }
-
-      // Si no, usamos la mutación directamente - the API handles getting the current user ID
-      await userAttendanceMutation.mutateAsync({
-        matchId: matchDetails.id,
-        status,
-        groupId: id,
+      const attendanceResponse = await fetch(attendanceEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status }),
       });
 
-      // Update local state immediately for better UX
-      if (!userId || userId === user?.id) {
-        setLocalUserAttendanceStatus(status);
+      if (!attendanceResponse.ok) {
+        const errorData = await attendanceResponse.json();
+        throw new Error(errorData.message || 'Error al actualizar asistencia');
       }
 
       // Show success message
-      const successMessage =
-        status === 'CONFIRMED'
-          ? 'Asistencia confirmada'
-          : status === 'DECLINED'
-          ? 'Has indicado que no asistirás'
-          : 'Estado de asistencia actualizado';
+      showSuccessToast('Estado de asistencia actualizado');
 
-      showSuccessToast(successMessage);
-    } catch (error) {
-      console.error('Error updating attendance:', error);
-      showErrorToast('Error al actualizar asistencia');
-
-      // In case of error, force refresh data - this helps recover from deleted matches
-      queryClient.invalidateQueries({
+      // Refresh data
+      await queryClient.invalidateQueries({
         queryKey: ['group', 'nextMatch', id],
         exact: true,
       });
+    } catch (error) {
+      console.error('Error updating attendance:', error);
+      showErrorToast('Error al actualizar asistencia');
     } finally {
       setAttendanceLoading(false);
     }
@@ -506,6 +584,8 @@ export default function NextMatchTab({
         // Pasar el estado balanceByAge como contexto al handler personalizado
         // a través del contexto global, ya que no podemos modificar la firma de la función
         (window as any).__balanceByAge = balanceByAge;
+        // Pasar el estado balanceByRole de la misma manera
+        (window as any).__balanceByRole = balanceByRole;
         await handleSortTeams();
         // The parent component handles invalidation/refetch
       } else {
@@ -518,6 +598,7 @@ export default function NextMatchTab({
           groupId: id,
           matchId: matchDetails.id,
           balanceByAge: balanceByAge,
+          balanceByRole: balanceByRole,
         });
 
         // Depurar respuesta para ver si incluye los promedios de edad
@@ -975,6 +1056,7 @@ export default function NextMatchTab({
                           confirmedCount={confirmedCount}
                           requiredPlayers={requiredPlayers}
                           matchId={matchDetails?.id}
+                          initialPlayerRoles={userRoles || []}
                         />
                       </div>
                     )}
@@ -998,6 +1080,8 @@ export default function NextMatchTab({
               setAllowFillIn={setAllowFillIn}
               balanceByAge={balanceByAge}
               setBalanceByAge={setBalanceByAge}
+              balanceByRole={balanceByRole}
+              setBalanceByRole={setBalanceByRole}
             />
           )}
 
@@ -1006,19 +1090,22 @@ export default function NextMatchTab({
             !forceTeamsFormed && (
               <div className='mt-8'>
                 <ConfirmedPlayersList
-                  confirmedPlayers={confirmedPlayers}
-                  pendingPlayers={pendingPlayers}
-                  declinedPlayers={declinedPlayers}
+                  confirmedPlayers={confirmedPlayers || []}
+                  pendingPlayers={pendingPlayers || []}
+                  declinedPlayers={declinedPlayers || []}
                   currentUserIsAdmin={currentUserIsAdmin}
                   onConfirmAttendance={(userId) =>
-                    handleAttendance('CONFIRMED', userId)
+                    handleAdminAttendance('CONFIRMED', userId)
                   }
                   onDeclineAttendance={(userId) =>
-                    handleAttendance('DECLINED', userId)
+                    handleAdminAttendance('DECLINED', userId)
                   }
                 />
               </div>
             )}
+
+          {/* Este div vacío ayudará a capturar cualquier renderizado suelto */}
+          <div className='hidden'></div>
 
           {/* Sección de equipos formados - Solo mostrar cuando sortCount > 0 o se forzó la formación de equipos */}
           {(forceTeamsFormed ||

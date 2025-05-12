@@ -15,6 +15,8 @@ export default function CreateGroup() {
     sport: 'Fútbol',
     description: '',
     location: '',
+    teamAName: 'Equipo A',
+    teamBName: 'Equipo B',
     recurrenceType: 'NONE',
     recurrenceDays: [] as number[],
     recurrenceTime: '18:00',
@@ -313,10 +315,48 @@ export default function CreateGroup() {
 
             <div>
               <label
+                htmlFor='teamAName'
+                className='block text-sm font-medium text-gray-700 mb-1'
+              >
+                Nombre del Equipo A
+              </label>
+              <input
+                type='text'
+                id='teamAName'
+                name='teamAName'
+                value={formData.teamAName}
+                onChange={handleChange}
+                required
+                className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                placeholder='Ej: Rojos'
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor='teamBName'
+                className='block text-sm font-medium text-gray-700 mb-1'
+              >
+                Nombre del Equipo B
+              </label>
+              <input
+                type='text'
+                id='teamBName'
+                name='teamBName'
+                value={formData.teamBName}
+                onChange={handleChange}
+                required
+                className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                placeholder='Ej: Azules'
+              />
+            </div>
+
+            <div>
+              <label
                 htmlFor='requiredPlayers'
                 className='block text-sm font-medium text-gray-700 mb-1'
               >
-                Jugadores requeridos para sortear
+                Cantidad de jugadores
               </label>
               <input
                 type='number'
@@ -329,8 +369,8 @@ export default function CreateGroup() {
                 className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
               />
               <p className='mt-1 text-sm text-gray-500'>
-                Número mínimo de jugadores confirmados necesarios para sortear
-                los equipos (debe ser par)
+                Número total de jugadores que participarán en el partido (debe
+                ser par)
               </p>
             </div>
 

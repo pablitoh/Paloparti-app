@@ -13,6 +13,8 @@ interface TeamFormationNotificationProps {
   setAllowFillIn?: (value: boolean) => void;
   balanceByAge?: boolean;
   setBalanceByAge?: (value: boolean) => void;
+  balanceByRole?: boolean;
+  setBalanceByRole?: (value: boolean) => void;
 }
 
 const TeamFormationNotification = ({
@@ -27,6 +29,8 @@ const TeamFormationNotification = ({
   setAllowFillIn,
   balanceByAge = false,
   setBalanceByAge,
+  balanceByRole = true,
+  setBalanceByRole,
 }: TeamFormationNotificationProps) => {
   // Si no es admin, no mostrar nada
   if (!currentUserIsAdmin) return null;
@@ -183,6 +187,27 @@ const TeamFormationNotification = ({
             />
             <label htmlFor='allowFillIn' className='ml-3 text-sm text-gray-700'>
               Completar equipos automáticamente con jugadores TBD
+            </label>
+          </div>
+        </div>
+      )}
+
+      {/* Checkbox para equilibrar por rol - visible siempre que se pueda modificar */}
+      {setBalanceByRole && (
+        <div className='flex flex-col gap-2 px-4'>
+          <div className='flex items-start'>
+            <input
+              type='checkbox'
+              id='balanceByRole'
+              className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-1'
+              checked={balanceByRole}
+              onChange={(e) => setBalanceByRole(e.target.checked)}
+            />
+            <label
+              htmlFor='balanceByRole'
+              className='ml-3 text-sm text-gray-700'
+            >
+              Equilibrar equipos por posición de jugador
             </label>
           </div>
         </div>
