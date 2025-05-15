@@ -81,6 +81,7 @@ export default async function handler(
         avatar: member.user.image,
         role: member.role,
         status: member.status,
+        starRating: member.starRating,
         isCaptain: member.role === 'ADMIN' || member.userId === group.createdBy,
       }));
 
@@ -95,6 +96,7 @@ export default async function handler(
             avatar: member.user.image,
             role: member.role,
             status: member.status,
+            starRating: member.starRating,
           }))
       : [];
 

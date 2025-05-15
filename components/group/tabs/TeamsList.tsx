@@ -3,15 +3,7 @@ import { Avatar } from '@mui/material';
 import { UserIcon } from '@heroicons/react/24/outline';
 import { UserPlusIcon } from '@heroicons/react/24/outline';
 import { PLAYER_ROLES } from '../AttendanceConfirmation';
-
-// Iconos para los diferentes roles
-import {
-  HandRaisedIcon,
-  ShieldCheckIcon,
-  Squares2X2Icon,
-  BoltIcon,
-  StarIcon,
-} from '@heroicons/react/24/outline';
+import StarRating from '../../StarRating';
 
 // Mapeo de roles a iconos y prioridad (para ordenamiento)
 const ROLE_ICONS: Record<
@@ -20,45 +12,40 @@ const ROLE_ICONS: Record<
 > = {
   [PLAYER_ROLES.GOALKEEPER]: {
     icon: (
-      <div title='Arquero' className='relative'>
-        <HandRaisedIcon className='h-5 w-5 text-yellow-600' />
-        <span className='absolute -top-1 -right-1 text-xs'>🧤</span>
+      <div title='Arquero' className='text-lg'>
+        🧤
       </div>
     ),
     priority: 0,
   },
   [PLAYER_ROLES.DEFENDER]: {
     icon: (
-      <div title='Defensor' className='relative'>
-        <ShieldCheckIcon className='h-5 w-5 text-blue-600' />
-        <span className='absolute -top-1 -right-1 text-xs'>🛡️</span>
+      <div title='Defensor' className='text-lg'>
+        🛡️
       </div>
     ),
     priority: 1,
   },
   [PLAYER_ROLES.MIDFIELDER]: {
     icon: (
-      <div title='Mediocampo' className='relative'>
-        <Squares2X2Icon className='h-5 w-5 text-green-600' />
-        <span className='absolute -top-1 -right-1 text-xs'>⚽</span>
+      <div title='Mediocampo' className='text-lg'>
+        ⚽
       </div>
     ),
     priority: 2,
   },
   [PLAYER_ROLES.FORWARD]: {
     icon: (
-      <div title='Delantero' className='relative'>
-        <BoltIcon className='h-5 w-5 text-red-600' />
-        <span className='absolute -top-1 -right-1 text-xs'>👟</span>
+      <div title='Delantero' className='text-lg'>
+        👟
       </div>
     ),
     priority: 3,
   },
   [PLAYER_ROLES.WILDCARD]: {
     icon: (
-      <div title='Comodín' className='relative'>
-        <StarIcon className='h-5 w-5 text-purple-600' />
-        <span className='absolute -top-1 -right-1 text-xs'>🔄</span>
+      <div title='Comodín' className='text-lg'>
+        🔄
       </div>
     ),
     priority: 4,
@@ -73,6 +60,7 @@ interface Player {
   playerRoles?: string[]; // Array de roles del jugador
   assignedRole?: string; // Rol asignado para la formación
   age?: number;
+  starRating?: number; // Nivel de habilidad del jugador
 }
 
 interface TbdPlayer {
@@ -84,6 +72,7 @@ interface TbdPlayer {
   playerRoles?: string[]; // Array de roles del jugador
   assignedRole?: string; // Rol asignado para la formación
   age?: number;
+  starRating?: number; // Nivel de habilidad del jugador
 }
 
 interface TeamsListProps {
@@ -258,6 +247,11 @@ const TeamsList: React.FC<TeamsListProps> = ({
             <div className='flex items-center'>
               <p className='font-medium text-gray-800 text-sm sm:text-base truncate max-w-[120px] sm:max-w-full'>
                 {player.name || (isTbd ? 'TBD' : 'Jugador sin nombre')}
+                {player.age && !isTbd && (
+                  <span className='text-gray-400 font-normal ml-1'>
+                    ({player.age})
+                  </span>
+                )}
               </p>
               <div className='flex space-x-1 ml-2'>
                 {roleIcons.map((icon, index) => (
@@ -292,6 +286,16 @@ const TeamsList: React.FC<TeamsListProps> = ({
                   ? 'Delantero'
                   : 'Comodín'}
               </span>
+            )}
+            {!isTbd && player.starRating !== undefined && (
+              <div className='mt-1'>
+                <StarRating
+                  key={`rating-${player.id}-${player.starRating}`}
+                  rating={player.starRating}
+                  readOnly={true}
+                  size='sm'
+                />
+              </div>
             )}
           </div>
         </div>
@@ -332,11 +336,9 @@ const TeamsList: React.FC<TeamsListProps> = ({
           </h3>
           {/* Mostrar el promedio de edad con un estilo más visible para depurar */}
           {avgAge !== undefined ? (
-            <p className='text-sm font-medium text-gray-500 mt-1'>
-              (Prom. edad: {avgAge} años)
-            </p>
+            <p className='text-sm font-medium text-gray-500 mt-1'>({avgAge})</p>
           ) : (
-            <p className='text-xs text-gray-400 mt-1'>(Sin datos de edad)</p>
+            <p className='text-xs text-gray-400 mt-1'>(—)</p>
           )}
         </div>
 

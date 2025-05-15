@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { clearAuthState } from '../../lib/authUtils';
+import { clearAuthState, getSafeCallbackUrl } from '../../lib/authUtils';
 
 /**
  * Simplificación de la página de inicio de sesión
@@ -18,9 +18,13 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 
     // Si el usuario ya está autenticado, redirigirlo a /groups
     if (session) {
+      // Check for callbackUrl
+      const callbackUrl = context.query.callbackUrl as string | undefined;
+      const redirectUrl = getSafeCallbackUrl(callbackUrl, '/groups');
+
       return {
         redirect: {
-          destination: '/groups',
+          destination: redirectUrl,
           permanent: false,
         },
       };
@@ -30,6 +34,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     return {
       props: {
         error: context.query.error || null,
+        callbackUrl: context.query.callbackUrl || null,
       },
     };
   } catch (error) {
@@ -37,6 +42,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     return {
       props: {
         error: 'Error al procesar la solicitud',
+        callbackUrl: null,
       },
     };
   }
@@ -44,9 +50,10 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 
 interface SignInProps {
   error?: string | null;
+  callbackUrl?: string | null;
 }
 
-export default function SignIn({ error }: SignInProps) {
+export default function SignIn({ error, callbackUrl }: SignInProps) {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -69,7 +76,7 @@ export default function SignIn({ error }: SignInProps) {
     setLoading(true);
 
     try {
-      // Simplificado: sin callbackUrl para evitar interacciones no deseadas
+      // Use callbackUrl if available
       const result = await signIn('credentials', {
         email,
         password,
@@ -79,8 +86,12 @@ export default function SignIn({ error }: SignInProps) {
       if (result?.error) {
         toast.error(result.error);
       } else {
-        // Si el login fue exitoso, redireccionar a /groups
-        router.replace('/groups');
+        // Si el login fue exitoso, redireccionar según callbackUrl
+        const redirectUrl = getSafeCallbackUrl(
+          callbackUrl as string,
+          '/groups'
+        );
+        router.replace(redirectUrl);
       }
     } catch (error) {
       console.error('Error al iniciar sesión:', error);

@@ -37,9 +37,10 @@ export default async function handler(
     // Obtener los parámetros de paginación
     const page = parseInt(req.query.page as string) || 1;
     const pageSize = parseInt(req.query.pageSize as string) || 20;
+    const actionType = (req.query.actionType as string) || undefined;
 
     // Obtener los logs del grupo
-    const logs = await getGroupLogs(groupId, page, pageSize);
+    const logs = await getGroupLogs(groupId, page, pageSize, actionType);
 
     return res.status(200).json(logs);
   } catch (error) {

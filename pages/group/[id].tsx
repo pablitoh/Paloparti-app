@@ -10,6 +10,7 @@ import HistoryTab from '../../components/group/tabs/HistoryTab';
 import GoalsTab from '../../components/group/tabs/GoalsTab';
 import MvpTab from '../../components/group/tabs/MvpTab';
 import LogsTab from '../../components/group/tabs/LogsTab';
+import RequestsTab from '../../components/group/tabs/RequestsTab';
 import MobileDrawer from '../../components/group/MobileDrawer';
 import { Avatar } from '@mui/material';
 import {
@@ -197,6 +198,13 @@ const LazyNextMatchTab = ({
   const handleTeamSorting = async () => {
     try {
       setIsTeamsSorting(true);
+
+      // Check if we have a valid match with an ID
+      if (!apiData?.nextMatchDetails?.id) {
+        showErrorToast('No hay un partido válido para sortear equipos');
+        return;
+      }
+
       // Pass the current next match data to make sure we have the confirmed players
       await handleRandomTeams(apiData?.nextMatchDetails?.confirmedPlayers);
       // Don't refetch here as the mutation already handles it
@@ -381,12 +389,18 @@ const LazyRequestsTab = ({
   basicData,
   handleMembershipRequest,
 }: LazyRequestsTabProps) => {
-  const { data, isLoading } = useGroupMembers(groupId, {
+  const { data, isLoading, refetch } = useGroupMembers(groupId, {
     enabled: !!groupId,
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
+
+  // Forzar refetch cuando el componente se monta para asegurar que tenemos datos frescos
+  useEffect(() => {
+    // Cuando el componente se monta, forzamos un refetch para garantizar datos actualizados
+    refetch();
+  }, [refetch]);
 
   const pendingRequests = data?.pendingRequests || [];
 
@@ -398,101 +412,11 @@ const LazyRequestsTab = ({
         </div>
       ) : null}
 
-      <div className='space-y-6'>
-        <div className='flex justify-between items-center'>
-          <h3 className='text-xl font-semibold text-gray-900'>
-            Solicitudes pendientes
-          </h3>
-          <span className='text-sm text-gray-500'>
-            {pendingRequests.length || 0} solicitudes
-          </span>
-        </div>
-
-        {pendingRequests && pendingRequests.length > 0 ? (
-          <div className='bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden'>
-            <ul className='divide-y divide-gray-200'>
-              {pendingRequests.map((request: any) => (
-                <li
-                  key={request.id}
-                  className='hover:bg-gray-50 transition-colors'
-                >
-                  <div className='px-6 py-4 flex items-center justify-between'>
-                    <div className='flex items-center'>
-                      <div className='flex-shrink-0 h-10 w-10'>
-                        <Avatar
-                          className='h-10 w-10 rounded-full'
-                          src={request.avatar || ''}
-                          alt={request.name || ''}
-                        />
-                      </div>
-                      <div className='ml-4'>
-                        <div className='flex items-center'>
-                          <div className='text-sm font-medium text-gray-900'>
-                            {request.name}
-                          </div>
-                          <span className='ml-2 px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-700'>
-                            Pendiente
-                          </span>
-                        </div>
-                        {request.email && (
-                          <div className='text-sm text-gray-500'>
-                            {request.email}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className='flex space-x-2'>
-                      <button
-                        onClick={() =>
-                          handleMembershipRequest(request.userId, 'APPROVE')
-                        }
-                        className='inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 transition-colors'
-                      >
-                        <CheckCircleIcon className='h-4 w-4 mr-1' />
-                        Aprobar
-                      </button>
-                      <button
-                        onClick={() =>
-                          handleMembershipRequest(request.userId, 'REJECT')
-                        }
-                        className='inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 transition-colors'
-                      >
-                        <XCircleIcon className='h-4 w-4 mr-1' />
-                        Rechazar
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : (
-          <div className='bg-white rounded-lg p-6 text-center border border-gray-200 shadow-sm'>
-            <svg
-              xmlns='http://www.w3.org/2000/svg'
-              className='h-12 w-12 mx-auto text-gray-400 mb-4'
-              fill='none'
-              viewBox='0 0 24 24'
-              stroke='currentColor'
-            >
-              <path
-                strokeLinecap='round'
-                strokeLinejoin='round'
-                strokeWidth={1}
-                d='M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z'
-              />
-            </svg>
-            <h3 className='text-lg font-medium text-gray-900 mb-2'>
-              No hay solicitudes pendientes
-            </h3>
-            <p className='text-gray-500 max-w-md mx-auto'>
-              No tienes usuarios esperando aprobación para unirse al grupo en
-              este momento.
-            </p>
-          </div>
-        )}
-      </div>
+      <RequestsTab
+        pendingRequests={pendingRequests}
+        isLoading={isLoading}
+        handleMembershipRequest={handleMembershipRequest}
+      />
     </div>
   );
 };
@@ -655,19 +579,14 @@ const GroupContent = ({
     const tabParam = router.query.tab;
     if (tabParam && !isNaN(Number(tabParam))) {
       const tabIndex = Number(tabParam);
-      const maxTabs = currentUserIsAdmin ? 6 : 5;
+      // Corregir el maxTabs para incluir la pestaña de solicitudes cuando es admin
+      const maxTabs = currentUserIsAdmin ? 7 : 6;
 
-      if (tabIndex >= 0 && tabIndex < maxTabs && tabIndex !== selectedTab) {
+      if (tabIndex >= 0 && tabIndex < maxTabs) {
         setSelectedTab(tabIndex);
       }
     }
-  }, [
-    router.isReady,
-    router.query.tab,
-    currentUserIsAdmin,
-    selectedTab,
-    setSelectedTab,
-  ]);
+  }, [router.isReady, router.query.tab, currentUserIsAdmin, setSelectedTab]);
 
   // Función para copiar enlace de invitación
   const copyInviteLink = () => {
@@ -679,19 +598,52 @@ const GroupContent = ({
       ? `${baseUrl}/invite/${groupBasicData.inviteToken}`
       : `${baseUrl}/invite/${groupId}`;
 
-    navigator.clipboard
-      .writeText(urlToCopy)
-      .then(() => {
-        showSuccessToast('Enlace copiado al portapapeles');
-        setTimeout(() => {
+    // Try using the clipboard API first
+    try {
+      navigator.clipboard
+        .writeText(urlToCopy)
+        .then(() => {
+          showSuccessToast('Enlace copiado al portapapeles');
+          setTimeout(() => {
+            setIsCopying(false);
+          }, 2000);
+        })
+        .catch((err) => {
+          // If clipboard API fails, use fallback method
+          console.error('Error al copiar enlace:', err);
+
+          // Fallback: Create temporary input element
+          const tempInput = document.createElement('input');
+          tempInput.value = urlToCopy;
+          document.body.appendChild(tempInput);
+          tempInput.focus();
+          tempInput.select();
+
+          let success = false;
+          try {
+            // Execute copy command
+            success = document.execCommand('copy');
+          } catch (e) {
+            console.error('Fallback copy method failed:', e);
+          }
+
+          // Clean up
+          document.body.removeChild(tempInput);
+
+          if (success) {
+            showSuccessToast('Enlace copiado al portapapeles');
+          } else {
+            showErrorToast('Error al copiar enlace');
+          }
+
           setIsCopying(false);
-        }, 2000);
-      })
-      .catch((err) => {
-        console.error('Error al copiar enlace:', err);
-        showErrorToast('Error al copiar enlace');
-        setIsCopying(false);
-      });
+        });
+    } catch (err) {
+      // Handle any synchronous errors
+      console.error('Error al acceder al portapapeles:', err);
+      showErrorToast('Error al copiar enlace');
+      setIsCopying(false);
+    }
   };
 
   // Configuración de pestañas
@@ -726,10 +678,17 @@ const GroupContent = ({
         // Just update local state first for responsive UI
         setSelectedTab(index);
 
-        // Invalidate next match query when the user selects the "Próximo Partido" tab
+        // Invalidate appropriate queries based on selected tab
         if (index === 0 && groupId) {
           queryClient.invalidateQueries({
             queryKey: ['group', 'nextMatch', groupId],
+          });
+        }
+
+        // Invalidate members query when selecting the Requests tab (índice 6 para administradores)
+        if (index === 6 && groupId && currentUserIsAdmin) {
+          queryClient.invalidateQueries({
+            queryKey: ['group', 'members', groupId],
           });
         }
 
@@ -744,7 +703,7 @@ const GroupContent = ({
         );
       }
     },
-    [router, tabs.length, groupId, queryClient]
+    [router, tabs.length, groupId, queryClient, currentUserIsAdmin]
   );
 
   // Renderizar las pestañas disponibles según el rol del usuario
@@ -777,6 +736,9 @@ const GroupContent = ({
 
   // Renderizar el contenido de la pestaña seleccionada
   const renderTabContent = useMemo(() => {
+    // Agregar console log para depuración
+    console.log('Rendering tab content for tab:', selectedTab);
+
     switch (selectedTab) {
       case 0:
         return (
@@ -817,8 +779,10 @@ const GroupContent = ({
         return <LazyLogsTab groupId={groupId} />;
       case 6:
         if (currentUserIsAdmin) {
+          // Usar key con timestamp para forzar re-renderizado completo cuando se selecciona la pestaña
           return (
             <LazyRequestsTab
+              key={`requests-tab-${Date.now()}`}
               groupId={groupId}
               basicData={groupBasicData}
               handleMembershipRequest={handleMembershipRequest}
@@ -908,7 +872,11 @@ const GroupContent = ({
         onClose={() => setIsDrawerOpen(false)}
         tabs={tabs}
         selectedTab={selectedTab}
-        onTabChange={handleTabChange}
+        onTabChange={(index) => {
+          console.log('Mobile drawer - changing tab to:', index);
+          handleTabChange(index);
+          setIsDrawerOpen(false);
+        }}
       />
 
       {/* Área de contenido principal */}

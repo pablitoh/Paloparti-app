@@ -9,6 +9,7 @@ type Member = {
   birthdate: Date | null;
   age: number | null; // Calculated from birthdate
   role: string;
+  image: string | null;
 };
 
 export default async function handler(
@@ -142,16 +143,20 @@ export default async function handler(
 
     // Mapear miembros con sus datos
     const mappedMembers: Member[] = membersWithConfirmedAttendance.map(
-      (member: (typeof membersWithConfirmedAttendance)[0]) => ({
-        id: member.user.id,
-        name: member.user.name,
-        birthdate: member.user.birthdate,
-        // Calculate age from birthdate, or use random age as fallback
-        age:
-          calculateAge(member.user.birthdate) ||
-          Math.floor(Math.random() * 40) + 18,
-        role: member.role,
-      })
+      (member: (typeof membersWithConfirmedAttendance)[0]) => {
+        const birthdate = member.user.birthdate;
+        const calculatedAge = birthdate ? calculateAge(birthdate) : null;
+
+        return {
+          id: member.user.id,
+          name: member.user.name,
+          birthdate: member.user.birthdate,
+          // Only use calculated age from birthdate if available, otherwise leave as null
+          age: calculatedAge,
+          role: member.role,
+          image: member.user.image, // Incluir la imagen/avatar del usuario
+        };
+      }
     );
 
     console.log(
@@ -162,9 +167,20 @@ export default async function handler(
     const createBalancedTeams = (members: Member[]): [Member[], Member[]] => {
       // Ordenar miembros por edad, de mayor a menor
       const sortedMembers = [...members].sort((a, b) => {
-        const ageA = a.age || 30; // Valor por defecto si no hay edad
-        const ageB = b.age || 30;
-        return ageB - ageA; // De mayor a menor
+        // Si ambos jugadores tienen edad definida, compararlas
+        if (
+          a.age !== null &&
+          a.age !== undefined &&
+          b.age !== null &&
+          b.age !== undefined
+        ) {
+          return b.age - a.age; // De mayor a menor
+        }
+        // Si solo uno tiene edad definida, priorizarlo
+        if (a.age !== null && a.age !== undefined) return -1;
+        if (b.age !== null && b.age !== undefined) return 1;
+        // Si ninguno tiene edad, mantener el orden original
+        return 0;
       });
 
       const teamA: Member[] = [];
@@ -203,7 +219,9 @@ export default async function handler(
 
     // Calcular edad promedio por equipo
     const calculateAverageAge = (team: Member[]): number => {
-      const membersWithAge = team.filter((m: Member) => m.age !== null);
+      const membersWithAge = team.filter(
+        (m: Member) => m.age !== null && m.age !== undefined
+      );
       if (membersWithAge.length === 0) return 0;
 
       const sum = membersWithAge.reduce(
@@ -286,8 +304,14 @@ export default async function handler(
     // Retornar los equipos formados y el partido creado
     return res.status(200).json({
       message: 'Equipos creados correctamente',
-      teamA,
-      teamB,
+      teamA: teamA.map((player) => ({
+        ...player,
+        avatar: player.image, // Incluir avatar en la respuesta
+      })),
+      teamB: teamB.map((player) => ({
+        ...player,
+        avatar: player.image, // Incluir avatar en la respuesta
+      })),
       teamAAvgAge,
       teamBAvgAge,
       match: match,

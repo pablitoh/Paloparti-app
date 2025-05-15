@@ -5,15 +5,22 @@ import { GroupLogsResponse } from '../utils/logTypes';
  * @param groupId - ID del grupo
  * @param page - Número de página (empieza en 1)
  * @param pageSize - Tamaño de página
+ * @param actionType - Tipo de acción para filtrar (opcional)
  */
 export async function fetchGroupLogs(
   groupId: string,
   page: number = 1,
-  pageSize: number = 20
+  pageSize: number = 20,
+  actionType?: string
 ): Promise<GroupLogsResponse> {
-  const response = await fetch(
-    `/api/groups/${groupId}/logs?page=${page}&pageSize=${pageSize}`
-  );
+  let url = `/api/groups/${groupId}/logs?page=${page}&pageSize=${pageSize}`;
+
+  // Añadir filtro por tipo de acción si está especificado
+  if (actionType && actionType !== 'all') {
+    url += `&actionType=${actionType}`;
+  }
+
+  const response = await fetch(url);
 
   if (!response.ok) {
     const error = await response.json();

@@ -6,8 +6,21 @@ import {
   CheckIcon,
   XMarkIcon,
   ArrowRightOnRectangleIcon,
+  MagnifyingGlassIcon,
+  ChevronUpDownIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
 } from '@heroicons/react/24/outline';
 import RoleSelectionModal from '../modals/RoleSelectionModal';
+import StarRating from '../../StarRating';
+import { updateMemberRating } from '../../../services/groupService';
+import {
+  showSuccessToast,
+  showErrorToast,
+} from '../../../services/toastService';
+import { useQueryClient } from '@tanstack/react-query';
+import { createLogEntry } from '../../../services/logService';
+import { LogAction } from '../../../utils/logTypes';
 
 interface MembersTabProps {
   group: GroupWithRelations;
@@ -29,6 +42,10 @@ interface ActionButtonsProps {
   isCurrentUser: boolean | null;
   onOpenRoleModal: (member: Member) => void;
 }
+
+// Define sort options
+type SortField = 'name' | 'starRating';
+type SortDirection = 'asc' | 'desc';
 
 export default function MembersTab({
   group,
@@ -53,6 +70,14 @@ export default function MembersTab({
   // Estado para el modal de selección de roles
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+
+  // Estados para búsqueda y ordenamiento
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  // Get the queryClient instance at the component level
+  const queryClient = useQueryClient();
 
   // Inicializar el estado local con los datos del grupo
   useEffect(() => {
@@ -115,6 +140,149 @@ export default function MembersTab({
     }
   };
 
+  // Función para actualizar el star rating de un miembro
+  const handleUpdateRating = async (userId: string, rating: number) => {
+    if (!currentUserIsAdmin || !group.id || !user) return;
+
+    try {
+      // Encontrar el miembro para obtener su star rating actual y nombre
+      const member = group.members.find((m) => m.userId === userId);
+      if (!member) return;
+
+      const previousRating = member.starRating || 0;
+      const targetUserName = member.name || 'Miembro';
+
+      // Añadir mensaje de carga
+      showSuccessToast('Actualizando nivel de habilidad...');
+
+      // Crear una copia del miembro con el rating actualizado
+      const updatedMember = {
+        ...member,
+        starRating: rating,
+      };
+
+      // Crear una copia del grupo con los miembros actualizados
+      const updatedMembers = group.members.map((m) =>
+        m.userId === userId ? updatedMember : m
+      );
+
+      const updatedGroup = {
+        ...group,
+        members: updatedMembers,
+      };
+
+      // Actualizar el cache optimistamente (antes de la llamada a la API)
+      queryClient.setQueryData(['group', group.id], updatedGroup);
+
+      // Llamada a la API para persistir el cambio
+      const result = await updateMemberRating(group.id, userId, rating);
+
+      if (result.success) {
+        showSuccessToast('Nivel de habilidad actualizado correctamente');
+
+        // Registrar la acción en los logs
+        await createLogEntry({
+          groupId: group.id,
+          action: LogAction.STAR_RATING_UPDATED,
+          performedBy: user.id,
+          performedByName: user.name || user.email || 'Admin',
+          targetUserId: userId,
+          targetUserName: targetUserName,
+          details: {
+            previousRating,
+            newRating: rating,
+            message: `cambió el nivel de habilidad de **${targetUserName}** de ${previousRating} a ${rating} estrellas`,
+          },
+          timestamp: new Date().toISOString(),
+        });
+
+        // Si la API devolvió el miembro actualizado, actualizar la caché con estos datos
+        if (result.updatedMember) {
+          // Asegurarse de preservar la estructura del miembro
+          const serverUpdatedMember = {
+            ...member,
+            ...result.updatedMember,
+            starRating: rating, // Forzar el rating por si acaso
+          };
+
+          const serverUpdatedMembers = group.members.map((m) =>
+            m.userId === userId ? serverUpdatedMember : m
+          );
+
+          // Actualizar el cache con los datos del servidor
+          queryClient.setQueryData(['group', group.id], {
+            ...group,
+            members: serverUpdatedMembers,
+          });
+        }
+
+        // Forzar refresco de los datos para asegurar consistencia
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['group', group.id] });
+        }, 100);
+      } else {
+        showErrorToast('Error al actualizar nivel de habilidad');
+        // Revertir el cambio optimista
+        queryClient.setQueryData(['group', group.id], group);
+      }
+    } catch (error) {
+      console.error('Error al actualizar nivel de habilidad:', error);
+
+      // Mostrar mensaje de error más detallado
+      if (error instanceof Error) {
+        showErrorToast(`Error: ${error.message}`);
+      } else {
+        showErrorToast('Error al actualizar nivel de habilidad');
+      }
+
+      // Revertir el cambio optimista
+      queryClient.setQueryData(['group', group.id], group);
+    }
+  };
+
+  // Función para ordenar miembros
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Si ya estamos ordenando por este campo, cambiar dirección
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Si es un nuevo campo, establecer el campo y la dirección predeterminada
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  // Obtener y filtrar los miembros
+  const getFilteredAndSortedMembers = () => {
+    if (!group?.members) return [];
+
+    // Primero filtrar por término de búsqueda
+    let filteredMembers = searchTerm
+      ? group.members.filter((member) =>
+          member.name?.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      : [...group.members];
+
+    // Luego ordenar
+    return filteredMembers.sort((a, b) => {
+      if (sortField === 'name') {
+        const nameA = a.name?.toLowerCase() || '';
+        const nameB = b.name?.toLowerCase() || '';
+        return sortDirection === 'asc'
+          ? nameA.localeCompare(nameB)
+          : nameB.localeCompare(nameA);
+      } else if (sortField === 'starRating') {
+        const ratingA = a.starRating || 0;
+        const ratingB = b.starRating || 0;
+        return sortDirection === 'asc' ? ratingA - ratingB : ratingB - ratingA;
+      }
+      return 0;
+    });
+  };
+
+  // Obtener miembros filtrados y ordenados
+  const filteredAndSortedMembers = getFilteredAndSortedMembers();
+
   // Componente para los botones de acciones
   const ActionButtons: React.FC<ActionButtonsProps> = ({
     member,
@@ -137,11 +305,8 @@ export default function MembersTab({
     };
 
     if (isCurrentUser) {
-      return (
-        <span className='text-sm text-gray-500 italic block mt-1 md:mt-0 bg-gray-50 px-3 py-1.5 rounded-md border border-gray-100'>
-          Confirmar desde pestaña "Próximo Partido"
-        </span>
-      );
+      // No mostrar nada para el usuario actual (eliminar mensaje)
+      return null;
     }
 
     if (!currentUserIsAdmin) {
@@ -245,6 +410,18 @@ export default function MembersTab({
     );
   };
 
+  // Función para renderizar el ícono de ordenamiento
+  const renderSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ChevronUpDownIcon className='h-4 w-4' />;
+    }
+    return sortDirection === 'asc' ? (
+      <ChevronUpIcon className='h-4 w-4' />
+    ) : (
+      <ChevronDownIcon className='h-4 w-4' />
+    );
+  };
+
   return (
     <div className='space-y-4'>
       <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2'>
@@ -252,6 +429,21 @@ export default function MembersTab({
           Miembros ({localConfirmedCount} confirmados para el próximo partido)
         </h3>
       </div>
+
+      {/* Buscador */}
+      <div className='relative w-full md:w-64 mb-4'>
+        <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
+          <MagnifyingGlassIcon className='h-5 w-5 text-gray-400' />
+        </div>
+        <input
+          type='text'
+          className='block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm'
+          placeholder='Buscar miembro...'
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
       {isMaxPlayersReached && (
         <div className='bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4'>
           <p className='text-sm text-yellow-700'>
@@ -260,6 +452,7 @@ export default function MembersTab({
           </p>
         </div>
       )}
+
       {!group?.nextMatchId && (
         <div className='bg-amber-50 border border-amber-200 rounded-md p-3 mb-4'>
           <p className='text-sm text-amber-700'>
@@ -267,25 +460,45 @@ export default function MembersTab({
           </p>
         </div>
       )}
+
       {/* Vista de tabla para pantallas medianas y grandes */}
       <div className='hidden md:block'>
         <div className='overflow-x-auto'>
           <table className='min-w-full divide-y divide-gray-200'>
             <thead className='bg-gray-50'>
               <tr>
-                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                  Nombre
+                <th
+                  className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer'
+                  onClick={() => handleSort('name')}
+                >
+                  <div className='flex items-center'>
+                    Nombre
+                    <span className='ml-1'>{renderSortIcon('name')}</span>
+                  </div>
                 </th>
                 <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
                   Estado para el próximo partido
                 </th>
+                {currentUserIsAdmin && (
+                  <th
+                    className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer'
+                    onClick={() => handleSort('starRating')}
+                  >
+                    <div className='flex items-center'>
+                      Nivel de habilidad
+                      <span className='ml-1'>
+                        {renderSortIcon('starRating')}
+                      </span>
+                    </div>
+                  </th>
+                )}
                 <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
                   {currentUserIsAdmin ? 'Acciones' : ''}
                 </th>
               </tr>
             </thead>
             <tbody className='bg-white divide-y divide-gray-200'>
-              {group?.members?.map((member: Member) => {
+              {filteredAndSortedMembers.map((member: Member) => {
                 // Determinar el estado para el próximo partido específicamente
                 const isConfirmedForNextMatch =
                   membersConfirmationStatus[member.userId] ??
@@ -328,6 +541,21 @@ export default function MembersTab({
                         {isConfirmedForNextMatch ? 'Confirmado' : 'Pendiente'}
                       </span>
                     </td>
+                    {currentUserIsAdmin && (
+                      <td className='px-6 py-4 whitespace-nowrap'>
+                        <StarRating
+                          key={`desktop-rating-${member.userId}-${
+                            member.starRating
+                          }-${Date.now()}`}
+                          rating={member.starRating || 3}
+                          readOnly={!currentUserIsAdmin}
+                          onRatingChange={(rating) =>
+                            handleUpdateRating(member.userId, rating)
+                          }
+                          size='sm'
+                        />
+                      </td>
+                    )}
                     <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
                       <ActionButtons
                         member={member}
@@ -347,18 +575,45 @@ export default function MembersTab({
       {/* Vista móvil mejorada */}
       <div className='md:hidden space-y-3'>
         {/* Sección de estadísticas móvil */}
-        <div className='sticky top-0 z-10 bg-white pb-2'>
+        <div className='sticky top-0 z-[1] bg-white pb-2'>
           <div className='flex justify-between items-center mb-2 bg-gray-50 p-3 rounded-md shadow-sm'>
             <span className='text-sm font-medium text-gray-600'>
-              Total: {group?.members?.length || 0}
+              Total: {filteredAndSortedMembers.length || 0}
             </span>
             <span className='text-sm font-medium text-green-600'>
               {localConfirmedCount} confirmados
             </span>
           </div>
+
+          {/* Opciones de orden en móvil */}
+          <div className='flex gap-2 mb-2'>
+            <button
+              onClick={() => handleSort('name')}
+              className={`flex items-center text-xs px-3 py-1.5 rounded-md ${
+                sortField === 'name'
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-gray-100'
+              }`}
+            >
+              Nombre{' '}
+              {sortField === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
+            </button>
+            <button
+              onClick={() => handleSort('starRating')}
+              className={`flex items-center text-xs px-3 py-1.5 rounded-md ${
+                sortField === 'starRating'
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-gray-100'
+              }`}
+            >
+              Habilidad{' '}
+              {sortField === 'starRating' &&
+                (sortDirection === 'asc' ? '↑' : '↓')}
+            </button>
+          </div>
         </div>
 
-        {group?.members?.map((member: Member) => {
+        {filteredAndSortedMembers.map((member: Member) => {
           const isConfirmedForNextMatch =
             membersConfirmationStatus[member.userId] ??
             isMemberConfirmedForNextMatch(member.userId);
@@ -398,6 +653,24 @@ export default function MembersTab({
                         {isConfirmedForNextMatch ? 'Confirmado' : 'Pendiente'}
                       </span>
                     </div>
+                    {currentUserIsAdmin && (
+                      <div className='mt-2'>
+                        <div className='text-xs text-gray-500 mb-1'>
+                          Nivel de habilidad:
+                        </div>
+                        <StarRating
+                          key={`mobile-rating-${member.userId}-${
+                            member.starRating
+                          }-${Date.now()}`}
+                          rating={member.starRating || 3}
+                          readOnly={!currentUserIsAdmin}
+                          onRatingChange={(rating) =>
+                            handleUpdateRating(member.userId, rating)
+                          }
+                          size='sm'
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

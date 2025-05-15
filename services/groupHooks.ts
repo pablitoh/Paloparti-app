@@ -593,13 +593,14 @@ export function useGroupLogs(
   groupId: string,
   page: number = 1,
   pageSize: number = 20,
-  options = {}
+  options = {},
+  actionType?: string
 ) {
   return useQuery({
-    queryKey: ['group', 'logs', groupId, page, pageSize],
+    queryKey: ['group', 'logs', groupId, page, pageSize, actionType],
     queryFn: async () => {
       if (!groupId) return null;
-      return await fetchGroupLogs(groupId, page, pageSize);
+      return await fetchGroupLogs(groupId, page, pageSize, actionType);
     },
     ...options,
   });

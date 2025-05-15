@@ -267,6 +267,9 @@ interface RandomizeTeamsParams {
   groupId: string;
   balanceByAge?: boolean;
   balanceByRole?: boolean;
+  balanceByRating?: boolean;
+  allowTbdPlayers?: boolean;
+  useRandomAlgorithm?: boolean;
 }
 
 interface AttendanceMutationParams {
@@ -503,6 +506,15 @@ export const useRandomizeTeamsMutation = () => {
 
   return useMutation({
     mutationFn: async (params: RandomizeTeamsParams) => {
+      // Validate that we have required parameters
+      if (!params.groupId) {
+        throw new Error('Group ID is required');
+      }
+
+      if (!params.matchId) {
+        throw new Error('Match ID is required');
+      }
+
       // Añadir un timestamp aleatorio para evitar que se use una respuesta en caché
       const timestamp = Date.now() + Math.random();
       const response = await fetch(`/api/matches/create-match?t=${timestamp}`, {
@@ -520,6 +532,18 @@ export const useRandomizeTeamsMutation = () => {
             params.balanceByAge !== undefined ? params.balanceByAge : false, // Pasar el parámetro con valor por defecto false
           balanceByRole:
             params.balanceByRole !== undefined ? params.balanceByRole : true, // Pasar el parámetro con valor por defecto true
+          balanceByRating:
+            params.balanceByRating !== undefined
+              ? params.balanceByRating
+              : false, // Pasar el parámetro con valor por defecto false
+          allowTbdPlayers:
+            params.allowTbdPlayers !== undefined
+              ? params.allowTbdPlayers
+              : true, // Pasar el parámetro con valor por defecto true
+          useRandomAlgorithm:
+            params.useRandomAlgorithm !== undefined
+              ? params.useRandomAlgorithm
+              : false, // Pasar el parámetro con valor por defecto false
         }),
       });
       if (!response.ok) {

@@ -210,7 +210,9 @@ export const leaveGroup = async (groupId: string): Promise<Response> => {
 export const randomizeTeams = async (
   groupId: string,
   matchId: string,
-  balanceByAge: boolean = false
+  balanceByAge: boolean = false,
+  balanceByRole: boolean = true,
+  balanceByRating: boolean = false
 ): Promise<{ success: boolean; groupId: string }> => {
   const response = await fetch(`/api/matches/create-match`, {
     method: 'POST',
@@ -224,6 +226,8 @@ export const randomizeTeams = async (
       // Using the matchId indicates this is a re-sort of an existing match
       isResort: true,
       balanceByAge,
+      balanceByRole,
+      balanceByRating,
     }),
   });
 
@@ -356,4 +360,74 @@ export const resetAttendance = async (
   }
 
   return { success: true, groupId };
+};
+
+/**
+ * Actualiza el star rating de un miembro del grupo
+ */
+export const updateMemberRating = async (
+  groupId: string,
+  userId: string,
+  rating: number
+): Promise<{
+  success: boolean;
+  message?: string;
+  updatedMember?: any;
+}> => {
+  try {
+    console.log(
+      `Actualizando rating para usuario ${userId} en grupo ${groupId}: ${rating}`
+    );
+
+    const ratingInt = parseInt(rating.toString(), 10);
+
+    const response = await fetch(`/api/groups/${groupId}/member/rating`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId,
+        rating: ratingInt,
+      }),
+    });
+
+    // Registrar información de la respuesta para depuración
+    console.log(`Response status: ${response.status}`);
+
+    const data = await response.json();
+
+    // Registrar el cuerpo de la respuesta
+    console.log('Response data:', data);
+
+    if (!response.ok) {
+      throw new Error(
+        data.message ||
+          data.error ||
+          `Error ${response.status}: ${
+            response.statusText || 'Error desconocido'
+          }`
+      );
+    }
+
+    return {
+      success: true,
+      message: data.message || 'Rating actualizado correctamente',
+      updatedMember: data.updatedMember,
+    };
+  } catch (error) {
+    console.error('Error detallado al actualizar rating:', error);
+
+    if (error instanceof Error) {
+      return {
+        success: false,
+        message: `Error: ${error.message}`,
+      };
+    }
+
+    return {
+      success: false,
+      message: 'Error desconocido al actualizar el nivel de habilidad',
+    };
+  }
 };

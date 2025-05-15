@@ -125,6 +125,25 @@ export default async function handler(
       return res.status(404).json({ message: 'Partido no encontrado' });
     }
 
+    // Obtener todos los star ratings de los miembros del grupo en una sola consulta
+    const groupMembers = await prisma.groupMember.findMany({
+      where: {
+        groupId: match.groupId,
+      },
+      select: {
+        userId: true,
+        starRating: true,
+      },
+    });
+
+    // Crear un mapa para acceso rápido a los star ratings
+    const starRatingsMap: Record<string, number> = {};
+    groupMembers.forEach(
+      (member: { userId: string; starRating: number | null }) => {
+        starRatingsMap[member.userId] = member.starRating || 3;
+      }
+    );
+
     // Procesar los datos del partido
     const confirmedPlayers = match.attendance
       .filter(
@@ -161,8 +180,12 @@ export default async function handler(
           avatar: attendance.user?.image || null,
           age: calculateAge(attendance.user?.birthdate || null),
           playerRoles: playerRoles, // Roles elegidos por el usuario
+          starRating: starRatingsMap[attendance.userId] || 3,
         };
       });
+
+    // Resolver todas las promesas
+    const resolvedConfirmedPlayers = await Promise.all(confirmedPlayers);
 
     // Obtener la asistencia del usuario actual y sus roles
     const userAttendance = match.attendance.find(
@@ -227,6 +250,7 @@ export default async function handler(
           age: calculateAge(player.user?.birthdate || null),
           playerRoles: playerRoles, // Roles elegidos por el usuario
           assignedRole: assignedRole, // Rol asignado para la formación
+          starRating: starRatingsMap[player.userId] || 3,
         };
       });
 
@@ -265,6 +289,7 @@ export default async function handler(
           age: calculateAge(player.user?.birthdate || null),
           playerRoles: playerRoles, // Roles elegidos por el usuario
           assignedRole: assignedRole, // Rol asignado para la formación
+          starRating: starRatingsMap[player.userId] || 3,
         };
       });
 
@@ -394,7 +419,7 @@ export default async function handler(
       status: match.status,
       playersA: teamAPlayers,
       playersB: teamBPlayers,
-      confirmedPlayers,
+      confirmedPlayers: resolvedConfirmedPlayers,
       tbdPlayers,
       requiredPlayers: group.requiredPlayers,
       sortCount: match.sortCount,

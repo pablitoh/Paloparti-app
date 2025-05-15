@@ -15,6 +15,8 @@ interface TeamFormationNotificationProps {
   setBalanceByAge?: (value: boolean) => void;
   balanceByRole?: boolean;
   setBalanceByRole?: (value: boolean) => void;
+  balanceByRating?: boolean;
+  setBalanceByRating?: (value: boolean) => void;
 }
 
 const TeamFormationNotification = ({
@@ -31,6 +33,8 @@ const TeamFormationNotification = ({
   setBalanceByAge,
   balanceByRole = true,
   setBalanceByRole,
+  balanceByRating = false,
+  setBalanceByRating,
 }: TeamFormationNotificationProps) => {
   // Si no es admin, no mostrar nada
   if (!currentUserIsAdmin) return null;
@@ -230,6 +234,38 @@ const TeamFormationNotification = ({
             >
               Equilibrar equipos por edad
             </label>
+          </div>
+        </div>
+      )}
+
+      {/* Checkbox para equilibrar por nivel (star rating) - nuevo */}
+      {setBalanceByRating && (
+        <div className='flex flex-col gap-2 px-4'>
+          <div className='flex items-start'>
+            <input
+              type='checkbox'
+              id='balanceByRating'
+              className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-1'
+              checked={balanceByRating}
+              onChange={(e) => setBalanceByRating(e.target.checked)}
+            />
+            <label
+              htmlFor='balanceByRating'
+              className='ml-3 text-sm text-gray-700'
+            >
+              Equilibrar equipos por nivel de habilidad
+            </label>
+          </div>
+        </div>
+      )}
+
+      {/* Información sobre algoritmo aleatorio si no se selecciona ningún criterio */}
+      {setBalanceByAge && setBalanceByRole && setBalanceByRating && (
+        <div className='flex flex-col gap-2 px-4 mt-2'>
+          <div className='text-xs text-gray-500 italic'>
+            Nota: Si no seleccionas ningún criterio de balance, se utilizará un
+            algoritmo completamente aleatorio para formar los equipos con igual
+            número de jugadores.
           </div>
         </div>
       )}

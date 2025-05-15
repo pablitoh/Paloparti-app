@@ -35,7 +35,7 @@ const GroupHeader: React.FC<GroupHeaderProps> = ({
   onToggleDrawer,
 }) => {
   return (
-    <div className='sticky top-0 z-10 bg-white rounded-xl shadow-sm p-4 mb-0'>
+    <div className='sticky top-0 z-[2] bg-white rounded-xl shadow-sm p-4 mb-0'>
       <div className='flex items-center justify-between flex-wrap gap-3'>
         <div className='flex items-center gap-2'>
           {/* Icono de hamburguesa para el drawer */}

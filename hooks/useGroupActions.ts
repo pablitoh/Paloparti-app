@@ -544,11 +544,24 @@ export const useGroupActions = ({
           ? (window as any).__balanceByRole
           : true; // Por defecto true si no está definido
 
+      // Leer el valor balanceByRating del contexto global si está disponible
+      const balanceByRating =
+        typeof window !== 'undefined' &&
+        (window as any).__balanceByRating !== undefined
+          ? (window as any).__balanceByRating
+          : false; // Por defecto false si no está definido
+
+      // Check if we should use a completely random algorithm (when no criteria selected)
+      const useRandomAlgorithm =
+        !balanceByAge && !balanceByRole && !balanceByRating;
+
       console.log('Sending team formation request with:', {
         players,
         tbdPlayers: tbdPlayersData,
         balanceByAge,
         balanceByRole,
+        balanceByRating,
+        useRandomAlgorithm,
       });
 
       const response = await fetch(`/api/matches/create-match`, {
@@ -558,13 +571,15 @@ export const useGroupActions = ({
         },
         body: JSON.stringify({
           groupId,
-          matchId: nextMatchId,
+          matchId: nextMatchId || null,
           mode: 'auto',
-          isResort: true,
+          isResort: nextMatchId ? true : false,
           players,
           tbdPlayers: tbdPlayersData,
-          balanceByAge, // Pasar el parámetro de balance por edad
-          balanceByRole, // Activar balance por roles
+          balanceByAge,
+          balanceByRole,
+          balanceByRating,
+          useRandomAlgorithm,
         }),
       });
 

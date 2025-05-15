@@ -299,7 +299,12 @@ export default function Invitation() {
                   </p>
                 </div>
 
-                <Link href='/auth/signin' className='block w-full'>
+                <Link
+                  href={`/auth/signin?callbackUrl=${encodeURIComponent(
+                    `/invite/${token}`
+                  )}`}
+                  className='block w-full'
+                >
                   <Button variant='primary' fullWidth>
                     Iniciar sesión
                   </Button>
@@ -307,7 +312,12 @@ export default function Invitation() {
 
                 <div className='text-center text-gray-600 text-sm'>o</div>
 
-                <Link href='/register' className='block w-full'>
+                <Link
+                  href={`/register?callbackUrl=${encodeURIComponent(
+                    `/invite/${token}`
+                  )}`}
+                  className='block w-full'
+                >
                   <Button variant='outline' fullWidth>
                     Registrarme
                   </Button>

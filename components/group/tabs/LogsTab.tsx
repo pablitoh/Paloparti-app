@@ -1,13 +1,50 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useGroupLogs } from '../../../services/groupHooks';
 import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Avatar } from '@mui/material';
 import { LogAction } from '../../../utils/logTypes';
+import {
+  FunnelIcon,
+  AdjustmentsHorizontalIcon,
+} from '@heroicons/react/24/outline';
 
 interface LogsTabProps {
   groupId: string;
 }
+
+// Grupos de acciones para el filtro
+const actionGroups = {
+  all: 'Todas las acciones',
+  match: 'Partidos',
+  attendance: 'Asistencia',
+  members: 'Miembros',
+  teams: 'Equipos',
+};
+
+// Mapear acciones a sus grupos
+const actionToGroup: Record<string, string> = {
+  [LogAction.MATCH_CREATED]: 'match',
+  [LogAction.MATCH_EDITED]: 'match',
+  [LogAction.MATCH_DELETED]: 'match',
+  [LogAction.MATCH_COMPLETED]: 'match',
+  [LogAction.MATCH_RESULT_ADDED]: 'match',
+  [LogAction.MATCH_RESULT_EDITED]: 'match',
+
+  [LogAction.USER_ATTENDANCE_UPDATED]: 'attendance',
+  [LogAction.ADMIN_ATTENDANCE_UPDATED]: 'attendance',
+  [LogAction.ATTENDANCE_RESET]: 'attendance',
+
+  [LogAction.USER_JOINED]: 'members',
+  [LogAction.USER_LEFT]: 'members',
+  [LogAction.USER_ROLE_CHANGED]: 'members',
+  [LogAction.STAR_RATING_UPDATED]: 'members',
+  [LogAction.MEMBER_RATING_UPDATED]: 'members',
+
+  [LogAction.TEAM_SORTED]: 'teams',
+  [LogAction.TEAM_RESORTED]: 'teams',
+  [LogAction.PLAYER_REPLACED]: 'teams',
+};
 
 // Mapeo de tipos de acción a mensajes legibles
 const actionMessages: Record<string, (details: any) => string> = {
@@ -16,9 +53,9 @@ const actionMessages: Record<string, (details: any) => string> = {
   [LogAction.MATCH_DELETED]: () => 'eliminó un partido',
   [LogAction.MATCH_CREATED]: () => 'creó un nuevo partido',
   [LogAction.PLAYER_REPLACED]: (details) =>
-    `reemplazó a ${details.oldPlayer?.name || 'TBD'} por ${
+    `reemplazó a **${details.oldPlayer?.name || 'TBD'}** por **${
       details.newPlayer?.name || 'un jugador'
-    }`,
+    }**`,
   [LogAction.ATTENDANCE_RESET]: () => 'reinició la asistencia del partido',
   [LogAction.GROUP_EDITED]: () => 'editó la información del grupo',
   [LogAction.MATCH_EDITED]: () => 'editó la información del partido',
@@ -33,7 +70,7 @@ const actionMessages: Record<string, (details: any) => string> = {
         : 'Pendiente'
     }"`,
   [LogAction.ADMIN_ATTENDANCE_UPDATED]: (details) =>
-    `actualizó la asistencia de ${details.userName || 'un jugador'} a "${
+    `actualizó la asistencia de **${details.userName || 'un jugador'}** a "${
       details.status === 'CONFIRMED'
         ? 'Confirmado'
         : details.status === 'DECLINED'
@@ -41,21 +78,58 @@ const actionMessages: Record<string, (details: any) => string> = {
         : 'Pendiente'
     }"`,
   [LogAction.USER_ROLE_CHANGED]: (details) =>
-    `cambió el rol de ${details.targetUser?.name || 'un usuario'} a ${
+    `cambió el rol de **${details.targetUser?.name || 'un usuario'}** a ${
       details.newRole === 'ADMIN' ? 'Administrador' : 'Miembro'
     }`,
   [LogAction.MATCH_RESULT_ADDED]: () => 'añadió el resultado del partido',
   [LogAction.MATCH_RESULT_EDITED]: () => 'editó el resultado del partido',
   [LogAction.MATCH_COMPLETED]: (details) =>
-    `registró el resultado final del partido: ${details.teamAName} ${details.scoreA} - ${details.scoreB} ${details.teamBName}`,
+    `registró el resultado final del partido: **${details.teamAName}** ${details.scoreA} - ${details.scoreB} **${details.teamBName}**`,
+  [LogAction.STAR_RATING_UPDATED]: (details) =>
+    details.message ||
+    `cambió el nivel de habilidad de **${
+      details.targetUserName || 'un jugador'
+    }** de ${details.previousRating} a ${details.newRating} estrellas`,
+};
+
+// Función para renderizar texto con formato Markdown simple
+const renderFormattedText = (text: string) => {
+  // Procesar negrita: **texto** -> <strong>texto</strong>
+  const boldRegex = /\*\*(.*?)\*\*/g;
+  const formattedText = text.replace(boldRegex, '<strong>$1</strong>');
+
+  return <span dangerouslySetInnerHTML={{ __html: formattedText }} />;
 };
 
 const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
   const [page, setPage] = useState(1);
-  const { data, isLoading, isError, error } = useGroupLogs(groupId, page, 10, {
-    enabled: !!groupId,
-    staleTime: 1000 * 60, // 1 minuto
-  });
+  const [pageSize, setPageSize] = useState(10);
+  const [actionFilter, setActionFilter] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
+
+  const { data, isLoading, isError, error } = useGroupLogs(
+    groupId,
+    page,
+    pageSize,
+    {
+      enabled: !!groupId,
+      staleTime: 1000 * 60, // 1 minuto
+    },
+    actionFilter
+  );
+
+  // Filtrar logs por tipo de acción
+  const filteredLogs = useMemo(() => {
+    if (!data?.logs) return [];
+
+    if (actionFilter === 'all') return data.logs;
+
+    // Los logs ya están filtrados por el servidor cuando se usa la API directamente
+    // pero mantenemos este filtro por si hay cambios locales o para compatibilidad
+    return data.logs.filter(
+      (log: any) => actionToGroup[log.action] === actionFilter
+    );
+  }, [data?.logs, actionFilter]);
 
   const handlePreviousPage = () => {
     if (page > 1) {
@@ -67,6 +141,19 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
     if (data && page < data.pagination.totalPages) {
       setPage(page + 1);
     }
+  };
+
+  const handlePageSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newSize = parseInt(e.target.value);
+    setPageSize(newSize);
+    setPage(1); // Reset to first page when changing page size
+  };
+
+  const handleActionFilterChange = (
+    e: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    setActionFilter(e.target.value);
+    setPage(1); // Reset to first page when changing filter
   };
 
   if (isLoading) {
@@ -96,16 +183,75 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
   return (
     <div className='bg-white rounded-lg shadow overflow-hidden'>
       <div className='px-4 py-5 sm:px-6 border-b border-gray-200'>
-        <h3 className='text-lg leading-6 font-medium text-gray-900'>
-          Registro de actividad
-        </h3>
-        <p className='mt-1 max-w-2xl text-sm text-gray-500'>
-          Historial de acciones realizadas en el grupo
-        </p>
+        <div className='flex justify-between items-center'>
+          <div>
+            <h3 className='text-lg leading-6 font-medium text-gray-900'>
+              Registro de actividad
+            </h3>
+            <p className='mt-1 max-w-2xl text-sm text-gray-500'>
+              Historial de acciones realizadas en el grupo
+            </p>
+          </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className='flex items-center text-sm text-gray-600 hover:text-gray-900 px-3 py-1 rounded-md border border-gray-300 hover:bg-gray-50'
+          >
+            <FunnelIcon className='h-4 w-4 mr-1' />
+            Filtros
+          </button>
+        </div>
+
+        {/* Filtros */}
+        {showFilters && (
+          <div className='mt-4 p-3 bg-gray-50 rounded-md border border-gray-200'>
+            <div className='flex flex-col sm:flex-row items-start sm:items-center gap-3'>
+              <div className='w-full sm:w-auto'>
+                <label
+                  htmlFor='action-filter'
+                  className='block text-sm font-medium text-gray-700 mb-1'
+                >
+                  Tipo de actividad
+                </label>
+                <select
+                  id='action-filter'
+                  value={actionFilter}
+                  onChange={handleActionFilterChange}
+                  className='w-full sm:w-auto block py-1.5 px-3 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500'
+                >
+                  {Object.entries(actionGroups).map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className='w-full sm:w-auto'>
+                <label
+                  htmlFor='page-size'
+                  className='block text-sm font-medium text-gray-700 mb-1'
+                >
+                  Registros por página
+                </label>
+                <select
+                  id='page-size'
+                  value={pageSize}
+                  onChange={handlePageSizeChange}
+                  className='w-full sm:w-auto block py-1.5 px-3 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500'
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <ul className='divide-y divide-gray-200'>
-        {data.logs.map((log: any) => {
+        {filteredLogs.map((log: any) => {
           const date = new Date(log.createdAt);
           const timeAgo = formatDistanceToNow(date, {
             locale: es,
@@ -136,7 +282,9 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
                       <span className='font-medium text-gray-900'>
                         {log.user?.name || 'Usuario'}
                       </span>{' '}
-                      <span className='text-gray-600'>{message}</span>
+                      <span className='text-gray-600'>
+                        {renderFormattedText(message)}
+                      </span>
                     </p>
                   </div>
 
@@ -156,7 +304,14 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
                                 <ul className='list-disc pl-5'>
                                   {log.details.previousTeams.teamA.map(
                                     (player: any) => (
-                                      <li key={player.id}>{player.name}</li>
+                                      <li key={player.id}>
+                                        {player.name}
+                                        {player.role && (
+                                          <span className='text-gray-500 ml-1'>
+                                            ({player.role})
+                                          </span>
+                                        )}
+                                      </li>
                                     )
                                   )}
                                 </ul>
@@ -166,7 +321,14 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
                                 <ul className='list-disc pl-5'>
                                   {log.details.previousTeams.teamB.map(
                                     (player: any) => (
-                                      <li key={player.id}>{player.name}</li>
+                                      <li key={player.id}>
+                                        {player.name}
+                                        {player.role && (
+                                          <span className='text-gray-500 ml-1'>
+                                            ({player.role})
+                                          </span>
+                                        )}
+                                      </li>
                                     )
                                   )}
                                 </ul>
@@ -181,7 +343,14 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
                                 <ul className='list-disc pl-5'>
                                   {log.details.newTeams.teamA.map(
                                     (player: any) => (
-                                      <li key={player.id}>{player.name}</li>
+                                      <li key={player.id}>
+                                        {player.name}
+                                        {player.role && (
+                                          <span className='text-gray-500 ml-1'>
+                                            ({player.role})
+                                          </span>
+                                        )}
+                                      </li>
                                     )
                                   )}
                                 </ul>
@@ -191,12 +360,50 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
                                 <ul className='list-disc pl-5'>
                                   {log.details.newTeams.teamB.map(
                                     (player: any) => (
-                                      <li key={player.id}>{player.name}</li>
+                                      <li key={player.id}>
+                                        {player.name}
+                                        {player.role && (
+                                          <span className='text-gray-500 ml-1'>
+                                            ({player.role})
+                                          </span>
+                                        )}
+                                      </li>
                                     )
                                   )}
                                 </ul>
                               </div>
                             </div>
+                            {log.details.balancingCriteria && (
+                              <div className='mt-3 pt-2 border-t border-gray-200'>
+                                <p className='font-semibold text-xs'>
+                                  Criterios de balanceo:
+                                </p>
+                                <div className='mt-1 text-xs'>
+                                  {log.details.balancingCriteria.byAge && (
+                                    <span className='inline-block bg-blue-100 text-blue-800 rounded-full px-2 py-0.5 text-xs mr-2'>
+                                      Balanceo por edad
+                                    </span>
+                                  )}
+                                  {log.details.balancingCriteria.byRole && (
+                                    <span className='inline-block bg-green-100 text-green-800 rounded-full px-2 py-0.5 text-xs mr-2'>
+                                      Balanceo por posición
+                                    </span>
+                                  )}
+                                  {log.details.balancingCriteria.byRating && (
+                                    <span className='inline-block bg-purple-100 text-purple-800 rounded-full px-2 py-0.5 text-xs mr-2'>
+                                      Balanceo por habilidad
+                                    </span>
+                                  )}
+                                  {!log.details.balancingCriteria.byAge &&
+                                    !log.details.balancingCriteria.byRole &&
+                                    !log.details.balancingCriteria.byRating && (
+                                      <span className='inline-block bg-gray-100 text-gray-800 rounded-full px-2 py-0.5 text-xs'>
+                                        Aleatorio
+                                      </span>
+                                    )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </details>
                       </div>
@@ -216,7 +423,14 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
                                 <ul className='list-disc pl-5'>
                                   {log.details.newTeams.teamA.map(
                                     (player: any) => (
-                                      <li key={player.id}>{player.name}</li>
+                                      <li key={player.id}>
+                                        {player.name}
+                                        {player.role && (
+                                          <span className='text-gray-500 ml-1'>
+                                            ({player.role})
+                                          </span>
+                                        )}
+                                      </li>
                                     )
                                   )}
                                 </ul>
@@ -226,12 +440,50 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
                                 <ul className='list-disc pl-5'>
                                   {log.details.newTeams.teamB.map(
                                     (player: any) => (
-                                      <li key={player.id}>{player.name}</li>
+                                      <li key={player.id}>
+                                        {player.name}
+                                        {player.role && (
+                                          <span className='text-gray-500 ml-1'>
+                                            ({player.role})
+                                          </span>
+                                        )}
+                                      </li>
                                     )
                                   )}
                                 </ul>
                               </div>
                             </div>
+                            {log.details.balancingCriteria && (
+                              <div className='mt-3 pt-2 border-t border-gray-200'>
+                                <p className='font-semibold text-xs'>
+                                  Criterios de balanceo:
+                                </p>
+                                <div className='mt-1 text-xs'>
+                                  {log.details.balancingCriteria.byAge && (
+                                    <span className='inline-block bg-blue-100 text-blue-800 rounded-full px-2 py-0.5 text-xs mr-2'>
+                                      Balanceo por edad
+                                    </span>
+                                  )}
+                                  {log.details.balancingCriteria.byRole && (
+                                    <span className='inline-block bg-green-100 text-green-800 rounded-full px-2 py-0.5 text-xs mr-2'>
+                                      Balanceo por posición
+                                    </span>
+                                  )}
+                                  {log.details.balancingCriteria.byRating && (
+                                    <span className='inline-block bg-purple-100 text-purple-800 rounded-full px-2 py-0.5 text-xs mr-2'>
+                                      Balanceo por habilidad
+                                    </span>
+                                  )}
+                                  {!log.details.balancingCriteria.byAge &&
+                                    !log.details.balancingCriteria.byRole &&
+                                    !log.details.balancingCriteria.byRating && (
+                                      <span className='inline-block bg-gray-100 text-gray-800 rounded-full px-2 py-0.5 text-xs'>
+                                        Aleatorio
+                                      </span>
+                                    )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </details>
                       </div>
@@ -297,8 +549,8 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
       {data.pagination.totalPages > 1 && (
         <div className='px-4 py-3 bg-gray-50 text-right sm:px-6 flex justify-between items-center'>
           <div className='text-sm text-gray-700'>
-            Mostrando <span className='font-medium'>{data.logs.length}</span> de{' '}
-            <span className='font-medium'>{data.pagination.totalItems}</span>{' '}
+            Mostrando <span className='font-medium'>{filteredLogs.length}</span>{' '}
+            de <span className='font-medium'>{data.pagination.totalItems}</span>{' '}
             registros
           </div>
           <div className='flex-1 flex justify-end'>

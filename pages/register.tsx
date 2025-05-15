@@ -5,13 +5,54 @@ import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
 import Button from '../components/Button';
 import DatePickerField from '../components/DatePickerField';
-import { clearAuthState } from '../lib/authUtils';
+import { clearAuthState, getSafeCallbackUrl } from '../lib/authUtils';
+import { GetServerSideProps } from 'next';
+import { getSession } from 'next-auth/react';
 
 /**
  * Página de registro simplificada
  * Sin gestión compleja de redirects para evitar loops
  */
-export default function Register() {
+
+export const getServerSideProps: GetServerSideProps = async (context) => {
+  try {
+    // Verificar si hay sesión activa
+    const session = await getSession(context);
+
+    // Si el usuario ya está autenticado, redirigir según callbackUrl
+    if (session) {
+      const callbackUrl = context.query.callbackUrl as string | undefined;
+      const redirectUrl = getSafeCallbackUrl(callbackUrl, '/groups');
+
+      return {
+        redirect: {
+          destination: redirectUrl,
+          permanent: false,
+        },
+      };
+    }
+
+    // Si no hay sesión, mostrar página de registro
+    return {
+      props: {
+        callbackUrl: context.query.callbackUrl || null,
+      },
+    };
+  } catch (error) {
+    console.error('Error en getServerSideProps de register:', error);
+    return {
+      props: {
+        callbackUrl: null,
+      },
+    };
+  }
+};
+
+interface RegisterProps {
+  callbackUrl?: string | null;
+}
+
+export default function Register({ callbackUrl }: RegisterProps) {
   const router = useRouter();
   const { register, user, loading: authLoading } = useAuth();
 
@@ -31,11 +72,12 @@ export default function Register() {
   }, []);
 
   useEffect(() => {
-    // Si el usuario ya está autenticado, redirigir a /groups
+    // Si el usuario ya está autenticado, redirigir según callbackUrl
     if (user && !authLoading) {
-      router.push('/groups');
+      const redirectUrl = getSafeCallbackUrl(callbackUrl as string, '/groups');
+      router.push(redirectUrl);
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, callbackUrl]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -71,8 +113,9 @@ export default function Register() {
         formData.birthdate
       );
 
-      // Si el registro fue exitoso, redirigir a /groups
-      router.push('/groups');
+      // Redirigir según callbackUrl
+      const redirectUrl = getSafeCallbackUrl(callbackUrl as string, '/groups');
+      router.push(redirectUrl);
     } catch (err) {
       // Extraer mensaje de error
       let errorMessage =

@@ -96,6 +96,7 @@ export interface Member {
   avatar: string | null;
   role: string;
   status: string;
+  starRating?: number;
   user?: {
     id: string;
     name: string | null;

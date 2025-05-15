@@ -24,6 +24,15 @@ const MobileDrawer: React.FC<MobileDrawerProps> = ({
 }) => {
   if (!isOpen) return null;
 
+  // Manejar el cambio de pestaña y cerrar el drawer
+  const handleTabClick = (index: number) => {
+    console.log('MobileDrawer - handleTabClick:', index);
+    // Llamar al callback de cambio de pestaña
+    onTabChange(index);
+    // Cerrar el drawer después de cambiar la pestaña
+    onClose();
+  };
+
   return (
     <div className='fixed inset-0 z-50 overflow-hidden'>
       {/* Backdrop */}
@@ -49,10 +58,7 @@ const MobileDrawer: React.FC<MobileDrawerProps> = ({
             {tabs.map((tab, index) => (
               <button
                 key={index}
-                onClick={() => {
-                  onTabChange(index);
-                  onClose();
-                }}
+                onClick={() => handleTabClick(index)}
                 className={`${
                   selectedTab === index
                     ? 'bg-blue-50 text-blue-600 font-medium'
