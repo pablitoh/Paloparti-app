@@ -85,6 +85,8 @@ interface TeamsListProps {
   onReplaceTbd?: (playerId: string) => void;
   teamAAvgAge?: number; // Promedio de edad del equipo A
   teamBAvgAge?: number; // Promedio de edad del equipo B
+  teamAAvgRating?: number; // Promedio de star rating del equipo A
+  teamBAvgRating?: number; // Promedio de star rating del equipo B
 }
 
 interface PlayerItemProps {
@@ -99,6 +101,7 @@ interface TeamSectionProps {
   teamName: string;
   colorClass: string;
   avgAge?: number; // Promedio de edad del equipo
+  avgRating?: number; // Promedio de star rating del equipo
 }
 
 // Función para obtener el rol principal de un jugador (el de mayor prioridad)
@@ -118,19 +121,19 @@ const sortPlayersByRole = (
   players: (Player | TbdPlayer)[]
 ): (Player | TbdPlayer)[] => {
   return [...players].sort((a, b) => {
-    const roleA = getPrimaryRole(a.playerRoles);
-    const roleB = getPrimaryRole(b.playerRoles);
+    const roleA = getPrimaryRole(a.playerRoles) || a.assignedRole;
+    const roleB = getPrimaryRole(b.playerRoles) || b.assignedRole;
 
     // Si algún jugador no tiene rol, ponerlo al final
     if (!roleA && !roleB) return 0;
     if (!roleA) return 1;
     if (!roleB) return -1;
 
-    // Ordenar por prioridad de rol
-    return (
-      (ROLE_ICONS[roleA]?.priority ?? 999) -
-      (ROLE_ICONS[roleB]?.priority ?? 999)
-    );
+    // Ordenar estrictamente por tipo de posición (prioridad)
+    const priorityA = ROLE_ICONS[roleA]?.priority ?? 999;
+    const priorityB = ROLE_ICONS[roleB]?.priority ?? 999;
+
+    return priorityA - priorityB;
   });
 };
 
@@ -155,11 +158,15 @@ const TeamsList: React.FC<TeamsListProps> = ({
   onReplaceTbd,
   teamAAvgAge,
   teamBAvgAge,
+  teamAAvgRating,
+  teamBAvgRating,
 }) => {
   // Logs para depuración
   console.log('TeamsList renderizado con props:', {
     teamAAvgAge,
     teamBAvgAge,
+    teamAAvgRating,
+    teamBAvgRating,
     playersA: playersA?.length,
     playersB: playersB?.length,
     tbdPlayers: tbdPlayers?.length,
@@ -193,13 +200,47 @@ const TeamsList: React.FC<TeamsListProps> = ({
     return avg;
   };
 
+  // Calcular promedios de star rating localmente si no vienen en props
+  const calculateLocalAvgRating = (players: any[]): number | undefined => {
+    if (!players || players.length === 0) return undefined;
+
+    // Contar jugadores con rating definido
+    const playersWithRating = players.filter(
+      (p) => p.starRating !== undefined && p.starRating !== null
+    );
+
+    // Si no hay jugadores con rating, devolver undefined
+    if (playersWithRating.length === 0) {
+      console.log('No hay jugadores con star rating definido');
+      return undefined;
+    }
+
+    // Calcular la suma de ratings y el promedio
+    const sum = playersWithRating.reduce(
+      (acc, player) => acc + (player.starRating || 0),
+      0
+    );
+    const avg = (sum / playersWithRating.length).toFixed(1);
+
+    console.log(
+      `Calculado promedio de rating local: ${avg} basado en ${playersWithRating.length} jugadores`
+    );
+    return parseFloat(avg);
+  };
+
   // Usar valores de props o calcular localmente
   const effectiveTeamAAvgAge = teamAAvgAge ?? calculateLocalAvgAge(playersA);
   const effectiveTeamBAvgAge = teamBAvgAge ?? calculateLocalAvgAge(playersB);
+  const effectiveTeamAAvgRating =
+    teamAAvgRating ?? calculateLocalAvgRating(playersA);
+  const effectiveTeamBAvgRating =
+    teamBAvgRating ?? calculateLocalAvgRating(playersB);
 
   console.log('Promedios efectivos calculados:', {
     effectiveTeamAAvgAge,
     effectiveTeamBAvgAge,
+    effectiveTeamAAvgRating,
+    effectiveTeamBAvgRating,
   });
 
   // Filtrar TBD players por equipo
@@ -320,6 +361,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
     teamName,
     colorClass,
     avgAge,
+    avgRating,
   }) => {
     // Verificar si este equipo específico tiene promedio de edad
     console.log(`TeamSection "${teamName}" avgAge:`, avgAge);
@@ -331,6 +373,25 @@ const TeamsList: React.FC<TeamsListProps> = ({
     return (
       <div className='p-4 w-full'>
         <div className='text-center mb-4'>
+          {avgRating !== undefined && (
+            <div className='mb-1'>
+              <div className='inline-flex items-center bg-yellow-50 px-3 py-1 rounded-md'>
+                <span className='text-yellow-700 font-medium'>{avgRating}</span>
+                <svg
+                  xmlns='http://www.w3.org/2000/svg'
+                  viewBox='0 0 24 24'
+                  fill='currentColor'
+                  className='w-5 h-5 ml-1 text-yellow-500'
+                >
+                  <path
+                    fillRule='evenodd'
+                    d='M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z'
+                    clipRule='evenodd'
+                  />
+                </svg>
+              </div>
+            </div>
+          )}
           <h3 className={`text-lg sm:text-xl font-bold ${colorClass}`}>
             {teamName}
           </h3>
@@ -379,6 +440,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
             teamName={teamAName || 'Equipo A'}
             colorClass='text-blue-600'
             avgAge={effectiveTeamAAvgAge}
+            avgRating={effectiveTeamAAvgRating}
           />
         </div>
 
@@ -393,6 +455,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
             teamName={teamBName || 'Equipo B'}
             colorClass='text-red-600'
             avgAge={effectiveTeamBAvgAge}
+            avgRating={effectiveTeamBAvgRating}
           />
         </div>
       </div>

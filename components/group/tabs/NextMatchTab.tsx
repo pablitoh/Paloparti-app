@@ -34,6 +34,15 @@ import AttendanceConfirmation from '../AttendanceConfirmation';
 import TeamFormationNotification from '../TeamFormationNotification';
 import UnassignedPlayersManager from '../UnassignedPlayersManager';
 
+// Definición de roles de jugador para ordenar por posición
+const PLAYER_ROLE_PRIORITY = {
+  GOALKEEPER: 0,
+  DEFENDER: 1,
+  MIDFIELDER: 2,
+  FORWARD: 3,
+  WILDCARD: 4,
+};
+
 // Define types directly in the component
 interface Player {
   id: string;
@@ -122,6 +131,43 @@ interface NextMatchTabProps {
   setAllowFillIn: (value: boolean) => void;
   setShowManualTeamFormationModal: (value: boolean) => void;
 }
+
+// Función para obtener el rol principal de un jugador (el de mayor prioridad)
+const getPrimaryRole = (playerRoles?: string[]): string | undefined => {
+  if (!playerRoles || playerRoles.length === 0) return undefined;
+
+  // Encontrar el rol con la prioridad más alta (número más bajo tiene mayor prioridad)
+  return playerRoles.reduce((primaryRole, currentRole) => {
+    const primaryPriority =
+      PLAYER_ROLE_PRIORITY[primaryRole as keyof typeof PLAYER_ROLE_PRIORITY] ??
+      999;
+    const currentPriority =
+      PLAYER_ROLE_PRIORITY[currentRole as keyof typeof PLAYER_ROLE_PRIORITY] ??
+      999;
+    return currentPriority < primaryPriority ? currentRole : primaryRole;
+  }, playerRoles[0]);
+};
+
+// Función para ordenar jugadores por rol
+const sortPlayersByRole = (players: Player[]): Player[] => {
+  return [...players].sort((a, b) => {
+    const roleA = getPrimaryRole(a.playerRoles);
+    const roleB = getPrimaryRole(b.playerRoles);
+
+    // Si algún jugador no tiene rol, ponerlo al final
+    if (!roleA && !roleB) return 0;
+    if (!roleA) return 1;
+    if (!roleB) return -1;
+
+    // Ordenar por tipo de posición (prioridad)
+    const priorityA =
+      PLAYER_ROLE_PRIORITY[roleA as keyof typeof PLAYER_ROLE_PRIORITY] ?? 999;
+    const priorityB =
+      PLAYER_ROLE_PRIORITY[roleB as keyof typeof PLAYER_ROLE_PRIORITY] ?? 999;
+
+    return priorityA - priorityB;
+  });
+};
 
 export default function NextMatchTab({
   group,
@@ -634,13 +680,15 @@ export default function NextMatchTab({
         if (response?.teamA) {
           // Asegurar que todos los jugadores tengan edades
           const processedTeamA = ensurePlayerAges(response.teamA);
-          setForcedTeamA(processedTeamA);
+          // Ordenar los jugadores por posición
+          setForcedTeamA(sortPlayersByRole(processedTeamA));
         }
 
         if (response?.teamB) {
           // Asegurar que todos los jugadores tengan edades
           const processedTeamB = ensurePlayerAges(response.teamB);
-          setForcedTeamB(processedTeamB);
+          // Ordenar los jugadores por posición
+          setForcedTeamB(sortPlayersByRole(processedTeamB));
         }
 
         // Guardar los promedios de edad siempre que estén disponibles en la respuesta
@@ -711,6 +759,20 @@ export default function NextMatchTab({
             response?.teamBAvgAge
           );
 
+          // Ordenar los equipos antes de guardarlos en la caché
+          let sortedPlayersA =
+            response?.teamA || oldData.nextMatchDetails.playersA;
+          let sortedPlayersB =
+            response?.teamB || oldData.nextMatchDetails.playersB;
+
+          if (sortedPlayersA && sortedPlayersA.length > 0) {
+            sortedPlayersA = sortPlayersByRole(sortedPlayersA);
+          }
+
+          if (sortedPlayersB && sortedPlayersB.length > 0) {
+            sortedPlayersB = sortPlayersByRole(sortedPlayersB);
+          }
+
           // Crear una copia de los datos con sortCount incrementado
           return {
             ...oldData,
@@ -718,8 +780,8 @@ export default function NextMatchTab({
               ...oldData.nextMatchDetails,
               sortCount: 1, // Forzar a 1 explícitamente después de sortear
               // Si la respuesta incluye los equipos, actualizar también
-              playersA: response?.teamA || oldData.nextMatchDetails.playersA,
-              playersB: response?.teamB || oldData.nextMatchDetails.playersB,
+              playersA: sortedPlayersA,
+              playersB: sortedPlayersB,
               tbdPlayers: updatedTbdPlayers,
               teamAAvgAge: response?.teamAAvgAge,
               teamBAvgAge: response?.teamBAvgAge,
@@ -871,10 +933,12 @@ export default function NextMatchTab({
     // Si matchDetails tiene equipos y sortCount > 0, actualizar también los equipos forzados
     if (matchDetails?.sortCount && matchDetails.sortCount > 0) {
       if (matchDetails.playersA && matchDetails.playersA.length > 0) {
-        setForcedTeamA(matchDetails.playersA);
+        // Ordenar jugadores por posición antes de establecerlos
+        setForcedTeamA(sortPlayersByRole(matchDetails.playersA));
       }
       if (matchDetails.playersB && matchDetails.playersB.length > 0) {
-        setForcedTeamB(matchDetails.playersB);
+        // Ordenar jugadores por posición antes de establecerlos
+        setForcedTeamB(sortPlayersByRole(matchDetails.playersB));
       }
     }
   }, [matchDetails?.playersA, matchDetails?.playersB, matchDetails?.sortCount]);
@@ -909,8 +973,9 @@ export default function NextMatchTab({
   }, [playersA, playersB]);
 
   // Proceso de los equipos para asegurar que tengan edades definidas correctamente
-  const processedPlayersA = ensurePlayerAges(playersA);
-  const processedPlayersB = ensurePlayerAges(playersB);
+  // y ordenarlos por posición
+  const processedPlayersA = sortPlayersByRole(ensurePlayerAges(playersA));
+  const processedPlayersB = sortPlayersByRole(ensurePlayerAges(playersB));
 
   // Añadir un useEffect específico para observar cambios en los promedios de edad después de un sort
   useEffect(() => {

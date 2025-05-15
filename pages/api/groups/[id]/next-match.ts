@@ -6,6 +6,15 @@ import { Match, MatchPlayer, User } from '@prisma/client';
 import { calculateAge } from '../../../../lib/utils';
 import { PLAYER_ROLES } from '../../../../components/group/AttendanceConfirmation';
 
+// Valores de prioridad para roles (menor número = mayor prioridad)
+const ROLE_PRIORITY = {
+  [PLAYER_ROLES.GOALKEEPER]: 0,
+  [PLAYER_ROLES.DEFENDER]: 1,
+  [PLAYER_ROLES.MIDFIELDER]: 2,
+  [PLAYER_ROLES.FORWARD]: 3,
+  [PLAYER_ROLES.WILDCARD]: 4,
+};
+
 // Interfaces for type safety
 interface MatchWithRelations extends Match {
   matchPlayers: (MatchPlayer & {
@@ -32,6 +41,43 @@ interface TbdPlayer {
   isTeamA: boolean;
   playerType: 'TBD';
 }
+
+// Función para ordenar jugadores por rol
+const sortPlayersByRole = (players: any[]) => {
+  return [...players].sort((a, b) => {
+    // Obtener rol principal de cada jugador
+    const getRolePriority = (player: any) => {
+      // Priorizar el rol asignado si existe
+      if (
+        player.assignedRole &&
+        ROLE_PRIORITY[player.assignedRole] !== undefined
+      ) {
+        return ROLE_PRIORITY[player.assignedRole];
+      }
+
+      // Si no hay rol asignado, buscar en playerRoles
+      if (player.playerRoles && player.playerRoles.length > 0) {
+        // Encontrar el rol con mayor prioridad
+        return player.playerRoles.reduce(
+          (minPriority: number, role: string) => {
+            const priority = ROLE_PRIORITY[role] ?? 999;
+            return priority < minPriority ? priority : minPriority;
+          },
+          999
+        );
+      }
+
+      // Si no tiene roles, asignar prioridad baja
+      return 999;
+    };
+
+    const priorityA = getRolePriority(a);
+    const priorityB = getRolePriority(b);
+
+    // Ordenar por prioridad de rol
+    return priorityA - priorityB;
+  });
+};
 
 export default async function handler(
   req: NextApiRequest,
@@ -408,6 +454,11 @@ export default async function handler(
       })),
     });
 
+    // Ordenar los jugadores por rol
+    const sortedTeamAPlayers = sortPlayersByRole(teamAPlayers);
+    const sortedTeamBPlayers = sortPlayersByRole(teamBPlayers);
+    const sortedConfirmedPlayers = sortPlayersByRole(resolvedConfirmedPlayers);
+
     const nextMatchDetails = {
       id: match.id,
       date: match.date,
@@ -417,9 +468,9 @@ export default async function handler(
       scoreA: match.scoreA,
       scoreB: match.scoreB,
       status: match.status,
-      playersA: teamAPlayers,
-      playersB: teamBPlayers,
-      confirmedPlayers: resolvedConfirmedPlayers,
+      playersA: sortedTeamAPlayers,
+      playersB: sortedTeamBPlayers,
+      confirmedPlayers: sortedConfirmedPlayers,
       tbdPlayers,
       requiredPlayers: group.requiredPlayers,
       sortCount: match.sortCount,

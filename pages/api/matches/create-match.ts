@@ -4,6 +4,7 @@ import { getCurrentUser } from '../../../lib/auth';
 import { calculateAge } from '../../../lib/utils';
 import { logGroupEvent } from '../../../utils/serverLogEvents';
 import { LogAction } from '../../../utils/logTypes';
+import { TeamBuilder } from '../../../lib/teambuilder';
 
 // Interfaces tipo Member
 type Member = {
@@ -754,41 +755,80 @@ const createBalancedTeamsByMultiCriteria = (
   const distributeGoalkeepers = () => {
     const goalkeepers = playersByPosition[PLAYER_ROLES.GOALKEEPER] || [];
 
-    // Ordenar arqueros por habilidad
+    console.log(`🧤 Distribuyendo ${goalkeepers.length} arqueros disponibles`);
+
+    // Ordenar arqueros por habilidad (de mayor a menor)
     goalkeepers.sort((a, b) => (b.starRating || 3) - (a.starRating || 3));
 
-    // Distribuir un arquero a cada equipo primero (los mejores)
+    // Caso ideal: Hay al menos un arquero para cada equipo
     if (goalkeepers.length >= 2) {
-      teamA.push({ ...goalkeepers[0], assignedRole: PLAYER_ROLES.GOALKEEPER });
-      teamB.push({ ...goalkeepers[1], assignedRole: PLAYER_ROLES.GOALKEEPER });
+      // Asignar el mejor arquero al equipo con menor nivel general para equilibrar
+      const metricsA = calculateTeamMetrics(teamA);
+      const metricsB = calculateTeamMetrics(teamB);
 
-      // Reclasificar arqueros excedentes como comodines si hay más de 2
-      for (let i = 2; i < goalkeepers.length; i++) {
-        wildcards.push(goalkeepers[i]);
+      if (metricsA.skillAvg <= metricsB.skillAvg) {
+        // Equipo A tiene menor nivel, darle el mejor arquero
+        teamA.push({
+          ...goalkeepers[0],
+          assignedRole: PLAYER_ROLES.GOALKEEPER,
+        });
+        teamB.push({
+          ...goalkeepers[1],
+          assignedRole: PLAYER_ROLES.GOALKEEPER,
+        });
+      } else {
+        // Equipo B tiene menor nivel, darle el mejor arquero
+        teamB.push({
+          ...goalkeepers[0],
+          assignedRole: PLAYER_ROLES.GOALKEEPER,
+        });
+        teamA.push({
+          ...goalkeepers[1],
+          assignedRole: PLAYER_ROLES.GOALKEEPER,
+        });
       }
 
-      // Eliminamos los arqueros ya asignados
-      playersByPosition[PLAYER_ROLES.GOALKEEPER] = [];
+      console.log(`✅ Asignado un arquero a cada equipo`);
+
+      // Si hay arqueros adicionales, convertirlos en jugadores de campo
+      if (goalkeepers.length > 2) {
+        for (let i = 2; i < goalkeepers.length; i++) {
+          wildcards.push(goalkeepers[i]);
+        }
+        console.log(
+          `ℹ️ ${
+            goalkeepers.length - 2
+          } arqueros adicionales movidos a comodines`
+        );
+      }
     }
-    // Si solo hay un arquero, asignarlo al equipo que tenga menos nivel de habilidad
+    // Solo hay un arquero disponible
     else if (goalkeepers.length === 1) {
       const metricsA = calculateTeamMetrics(teamA);
       const metricsB = calculateTeamMetrics(teamB);
 
+      // Asignar el único arquero al equipo con menor nivel para equilibrar
       if (metricsA.skillAvg <= metricsB.skillAvg) {
         teamA.push({
           ...goalkeepers[0],
           assignedRole: PLAYER_ROLES.GOALKEEPER,
         });
+        console.log(`✅ Único arquero asignado al equipo A (menor nivel)`);
       } else {
         teamB.push({
           ...goalkeepers[0],
           assignedRole: PLAYER_ROLES.GOALKEEPER,
         });
+        console.log(`✅ Único arquero asignado al equipo B (menor nivel)`);
       }
-
-      playersByPosition[PLAYER_ROLES.GOALKEEPER] = [];
     }
+    // No hay arqueros disponibles
+    else {
+      console.log(`⚠️ No hay arqueros disponibles para distribuir`);
+    }
+
+    // Limpiar la lista de arqueros después de procesarlos
+    playersByPosition[PLAYER_ROLES.GOALKEEPER] = [];
   };
 
   // Ejecutar distribución de arqueros primero
@@ -959,27 +999,158 @@ const createBalancedTeamsByMultiCriteria = (
     const metricsA = calculateTeamMetrics(teamA);
     const metricsB = calculateTeamMetrics(teamB);
 
-    // 1. Verificar que cada equipo tenga al menos un arquero
+    // 1. PRIORIDAD MÁXIMA: Verificar que cada equipo tenga exactamente un arquero si hay suficientes
     const gkCountA = metricsA.roleCounts[PLAYER_ROLES.GOALKEEPER] || 0;
     const gkCountB = metricsB.roleCounts[PLAYER_ROLES.GOALKEEPER] || 0;
 
-    if (gkCountA > 1 && gkCountB === 0) {
-      // Trasladar un arquero del equipo A al B
+    // Caso crítico: un equipo tiene 2+ arqueros y el otro ninguno
+    if (gkCountA >= 2 && gkCountB === 0) {
+      console.log(
+        '🚨 Corrigiendo desbalance crítico de arqueros: Team A tiene varios, Team B ninguno'
+      );
+      // Mover un arquero del equipo A al B
       for (let i = 0; i < teamA.length; i++) {
         if (teamA[i].assignedRole === PLAYER_ROLES.GOALKEEPER) {
           const gk = teamA.splice(i, 1)[0];
           teamB.push(gk);
+          console.log(
+            `✅ Movido arquero ${
+              gk.name || 'sin nombre'
+            } de equipo A a equipo B`
+          );
           break;
         }
       }
-    } else if (gkCountB > 1 && gkCountA === 0) {
-      // Trasladar un arquero del equipo B al A
+    } else if (gkCountB >= 2 && gkCountA === 0) {
+      console.log(
+        '🚨 Corrigiendo desbalance crítico de arqueros: Team B tiene varios, Team A ninguno'
+      );
+      // Mover un arquero del equipo B al A
       for (let i = 0; i < teamB.length; i++) {
         if (teamB[i].assignedRole === PLAYER_ROLES.GOALKEEPER) {
           const gk = teamB.splice(i, 1)[0];
           teamA.push(gk);
+          console.log(
+            `✅ Movido arquero ${
+              gk.name || 'sin nombre'
+            } de equipo B a equipo A`
+          );
           break;
         }
+      }
+    }
+
+    // Caso secundario: un equipo tiene varios arqueros (pero el otro ya tiene al menos uno)
+    if (gkCountA > 1 && gkCountB >= 1) {
+      console.log('⚠️ Ajustando exceso de arqueros en equipo A');
+      // Mover arqueros excedentes a otra posición
+      let extraGKs = 0;
+      for (let i = 0; i < teamA.length && extraGKs < gkCountA - 1; i++) {
+        if (teamA[i].assignedRole === PLAYER_ROLES.GOALKEEPER) {
+          // Reasignar a una posición con menos jugadores
+          const counts = metricsA.roleCounts;
+          let newRole = PLAYER_ROLES.DEFENDER;
+
+          // Encontrar la posición con menos jugadores
+          if (
+            (counts[PLAYER_ROLES.MIDFIELDER] || 0) <
+            (counts[PLAYER_ROLES.DEFENDER] || 0)
+          ) {
+            newRole = PLAYER_ROLES.MIDFIELDER;
+          }
+          if ((counts[PLAYER_ROLES.FORWARD] || 0) < (counts[newRole] || 0)) {
+            newRole = PLAYER_ROLES.FORWARD;
+          }
+
+          teamA[i].assignedRole = newRole;
+          extraGKs++;
+          console.log(`🔄 Reasignado arquero extra de equipo A a ${newRole}`);
+        }
+      }
+    } else if (gkCountB > 1 && gkCountA >= 1) {
+      console.log('⚠️ Ajustando exceso de arqueros en equipo B');
+      // Mover arqueros excedentes a otra posición
+      let extraGKs = 0;
+      for (let i = 0; i < teamB.length && extraGKs < gkCountB - 1; i++) {
+        if (teamB[i].assignedRole === PLAYER_ROLES.GOALKEEPER) {
+          // Reasignar a una posición con menos jugadores
+          const counts = metricsB.roleCounts;
+          let newRole = PLAYER_ROLES.DEFENDER;
+
+          // Encontrar la posición con menos jugadores
+          if (
+            (counts[PLAYER_ROLES.MIDFIELDER] || 0) <
+            (counts[PLAYER_ROLES.DEFENDER] || 0)
+          ) {
+            newRole = PLAYER_ROLES.MIDFIELDER;
+          }
+          if ((counts[PLAYER_ROLES.FORWARD] || 0) < (counts[newRole] || 0)) {
+            newRole = PLAYER_ROLES.FORWARD;
+          }
+
+          teamB[i].assignedRole = newRole;
+          extraGKs++;
+          console.log(`🔄 Reasignado arquero extra de equipo B a ${newRole}`);
+        }
+      }
+    }
+
+    // Caso extremo: ningún equipo tiene arquero pero hay jugadores que podrían ser arqueros
+    if (gkCountA === 0 && gkCountB === 0) {
+      console.log(
+        '🚨 Ningún equipo tiene arquero, buscando jugadores para asignar'
+      );
+
+      // Buscar jugadores con rol de arquero en sus playerRoles pero no asignados como arqueros
+      const findPotentialGK = (team: Member[]) => {
+        return team.findIndex(
+          (p) =>
+            p.playerRoles?.includes(PLAYER_ROLES.GOALKEEPER) &&
+            p.assignedRole !== PLAYER_ROLES.GOALKEEPER
+        );
+      };
+
+      // Intentar primero con el equipo A
+      let gkIndex = findPotentialGK(teamA);
+      if (gkIndex !== -1) {
+        teamA[gkIndex].assignedRole = PLAYER_ROLES.GOALKEEPER;
+        console.log(
+          `✅ Asignado jugador de equipo A como arquero: ${
+            teamA[gkIndex].name || 'sin nombre'
+          }`
+        );
+      }
+
+      // Luego con el equipo B
+      gkIndex = findPotentialGK(teamB);
+      if (gkIndex !== -1) {
+        teamB[gkIndex].assignedRole = PLAYER_ROLES.GOALKEEPER;
+        console.log(
+          `✅ Asignado jugador de equipo B como arquero: ${
+            teamB[gkIndex].name || 'sin nombre'
+          }`
+        );
+      }
+
+      // Si aún no hay arqueros, asignar un jugador aleatorio de cada equipo
+      if (findPotentialGK(teamA) === -1 && teamA.length > 0) {
+        const randomIndex = Math.floor(Math.random() * teamA.length);
+        teamA[randomIndex].assignedRole = PLAYER_ROLES.GOALKEEPER;
+        console.log(
+          `⚠️ Asignado jugador aleatorio de equipo A como arquero: ${
+            teamA[randomIndex].name || 'sin nombre'
+          }`
+        );
+      }
+
+      if (findPotentialGK(teamB) === -1 && teamB.length > 0) {
+        const randomIndex = Math.floor(Math.random() * teamB.length);
+        teamB[randomIndex].assignedRole = PLAYER_ROLES.GOALKEEPER;
+        console.log(
+          `⚠️ Asignado jugador aleatorio de equipo B como arquero: ${
+            teamB[randomIndex].name || 'sin nombre'
+          }`
+        );
       }
     }
 
@@ -1179,6 +1350,98 @@ const createBalancedTeamsByMultiCriteria = (
   });
 
   return [teamA, teamB];
+};
+
+// Función para ordenar jugadores por rol (versión mejorada)
+const sortPlayersByRole = (players: any[]) => {
+  if (!players || !Array.isArray(players)) return players;
+
+  // Crear una copia para no modificar el original
+  const result = [...players];
+
+  // Agrupar jugadores por su rol asignado
+  const playersByRole: Record<string, any[]> = {
+    [PLAYER_ROLES.GOALKEEPER]: [],
+    [PLAYER_ROLES.DEFENDER]: [],
+    [PLAYER_ROLES.MIDFIELDER]: [],
+    [PLAYER_ROLES.FORWARD]: [],
+    other: [],
+  };
+
+  // Clasificar cada jugador en su grupo correspondiente
+  result.forEach((player) => {
+    // 1. Verificar si hay un rol asignado explícitamente
+    if (player.assignedRole) {
+      if (player.assignedRole === PLAYER_ROLES.GOALKEEPER) {
+        playersByRole[PLAYER_ROLES.GOALKEEPER].push(player);
+      } else if (player.assignedRole === PLAYER_ROLES.DEFENDER) {
+        playersByRole[PLAYER_ROLES.DEFENDER].push(player);
+      } else if (player.assignedRole === PLAYER_ROLES.MIDFIELDER) {
+        playersByRole[PLAYER_ROLES.MIDFIELDER].push(player);
+      } else if (player.assignedRole === PLAYER_ROLES.FORWARD) {
+        playersByRole[PLAYER_ROLES.FORWARD].push(player);
+      } else {
+        playersByRole.other.push(player);
+      }
+    }
+    // 2. Si no hay rol asignado pero hay roles preferidos, usar el principal
+    else if (
+      player.playerRoles &&
+      Array.isArray(player.playerRoles) &&
+      player.playerRoles.length > 0
+    ) {
+      const primaryRole = getPrimaryRole(player.playerRoles);
+
+      if (primaryRole === PLAYER_ROLES.GOALKEEPER) {
+        playersByRole[PLAYER_ROLES.GOALKEEPER].push({
+          ...player,
+          assignedRole: primaryRole,
+        });
+      } else if (primaryRole === PLAYER_ROLES.DEFENDER) {
+        playersByRole[PLAYER_ROLES.DEFENDER].push({
+          ...player,
+          assignedRole: primaryRole,
+        });
+      } else if (primaryRole === PLAYER_ROLES.MIDFIELDER) {
+        playersByRole[PLAYER_ROLES.MIDFIELDER].push({
+          ...player,
+          assignedRole: primaryRole,
+        });
+      } else if (primaryRole === PLAYER_ROLES.FORWARD) {
+        playersByRole[PLAYER_ROLES.FORWARD].push({
+          ...player,
+          assignedRole: primaryRole,
+        });
+      } else {
+        playersByRole.other.push(player);
+      }
+    }
+    // 3. Sin información de rol
+    else {
+      playersByRole.other.push(player);
+    }
+  });
+
+  // Combinar en el orden correcto: arquero, defensor, mediocampista, delantero
+  const sortedPlayers = [
+    ...playersByRole[PLAYER_ROLES.GOALKEEPER],
+    ...playersByRole[PLAYER_ROLES.DEFENDER],
+    ...playersByRole[PLAYER_ROLES.MIDFIELDER],
+    ...playersByRole[PLAYER_ROLES.FORWARD],
+    ...playersByRole.other,
+  ];
+
+  console.log(
+    '👥 Jugadores ordenados por posición:',
+    sortedPlayers.length,
+    'jugadores',
+    sortedPlayers.map((p) => ({
+      name: p.name,
+      assignedRole: p.assignedRole || 'sin rol',
+    }))
+  );
+
+  return sortedPlayers;
 };
 
 export default async function handler(
@@ -2988,13 +3251,69 @@ export default async function handler(
     // Registrar en logs
     await logGroupEvent(groupId, user.id, logAction, logData);
 
+    // Verificar una última vez que los roles de goalkeepers estén correctamente asignados
+    const verifyFinalTeams = (teamA: any[], teamB: any[]) => {
+      // Contar arqueros en cada equipo
+      const gkA = teamA.filter(
+        (p) => p && p.assignedRole === PLAYER_ROLES.GOALKEEPER
+      ).length;
+      const gkB = teamB.filter(
+        (p) => p && p.assignedRole === PLAYER_ROLES.GOALKEEPER
+      ).length;
+
+      console.log(
+        `📊 Verificación final - Arqueros: Equipo A (${gkA}), Equipo B (${gkB})`
+      );
+
+      // Si hay un desbalance importante, corregirlo
+      if (gkA >= 2 && gkB === 0 && teamA.length > 0 && teamB.length > 0) {
+        console.log('🚨 Corrigiendo desbalance final de arqueros (A→B)');
+        // Buscar un arquero en el equipo A
+        const gkIndex = teamA.findIndex(
+          (p) => p && p.assignedRole === PLAYER_ROLES.GOALKEEPER
+        );
+        if (gkIndex !== -1) {
+          const gk = teamA[gkIndex];
+          // Moverlo al equipo B
+          teamA.splice(gkIndex, 1);
+          teamB.push(gk);
+        }
+      } else if (
+        gkB >= 2 &&
+        gkA === 0 &&
+        teamB.length > 0 &&
+        teamA.length > 0
+      ) {
+        console.log('🚨 Corrigiendo desbalance final de arqueros (B→A)');
+        // Buscar un arquero en el equipo B
+        const gkIndex = teamB.findIndex(
+          (p) => p && p.assignedRole === PLAYER_ROLES.GOALKEEPER
+        );
+        if (gkIndex !== -1) {
+          const gk = teamB[gkIndex];
+          // Moverlo al equipo A
+          teamB.splice(gkIndex, 1);
+          teamA.push(gk);
+        }
+      }
+
+      return [teamA, teamB];
+    };
+
+    // En el código final antes de la respuesta:
+    [finalTeamA, finalTeamB] = verifyFinalTeams(finalTeamA, finalTeamB);
+
+    // Ordenar los equipos por posición antes de retornarlos
+    const sortedTeamA = sortPlayersByRole(finalTeamA);
+    const sortedTeamB = sortPlayersByRole(finalTeamB);
+
     // Retornar los equipos formados y el partido creado
     return res.status(200).json({
       message: isResort
         ? 'Equipos reorganizados correctamente'
         : 'Partido creado correctamente',
-      teamA: finalTeamA,
-      teamB: finalTeamB,
+      teamA: sortedTeamA,
+      teamB: sortedTeamB,
       teamAAvgAge,
       teamBAvgAge,
       match,
