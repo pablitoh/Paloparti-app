@@ -79,6 +79,22 @@ export default function Invitation() {
 
         setGroupInfo(data.group);
         setInvitationInfo(data.invitation);
+
+        // If user is already a member, redirect to the group page
+        if (user && data.group) {
+          const membershipResponse = await fetch(
+            `/api/groups/${data.group.id}/members`
+          );
+          if (membershipResponse.ok) {
+            const membershipData = await membershipResponse.json();
+            const isMember = membershipData.members.some(
+              (member: any) => member.userId === user.id
+            );
+            if (isMember) {
+              router.push(`/group/${data.group.id}`);
+            }
+          }
+        }
       } catch (error) {
         console.error('Error al cargar la invitación:', error);
         setError(
@@ -94,7 +110,7 @@ export default function Invitation() {
     };
 
     fetchInvitationDetails();
-  }, [token]);
+  }, [token, user, router]);
 
   // Handle join group action for authenticated users
   const handleJoinGroup = async () => {
