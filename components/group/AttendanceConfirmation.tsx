@@ -107,12 +107,15 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
 
   // Manejar la confirmación de asistencia
   const handleConfirmAttendance = async () => {
+    if (selectedRoles.length < 2) {
+      // No permitir confirmar si hay menos de dos posiciones
+      return;
+    }
     try {
       setIsLoading(true);
 
-      // Asegurar que haya al menos un rol seleccionado, usando Comodín como predeterminado
-      const rolesParaEnviar =
-        selectedRoles.length > 0 ? [...selectedRoles] : [PLAYER_ROLES.WILDCARD];
+      // Asegurar que haya al menos dos roles seleccionados
+      const rolesParaEnviar = [...selectedRoles];
 
       // Almacenar los roles en localStorage para que el hook los pueda recuperar
       localStorage.setItem(
@@ -223,12 +226,12 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
             disabled ||
             isLoading ||
             (allSpotsFilled && !isConfirmed) ||
-            (!isConfirmed && selectedRoles.length === 0)
+            (!isConfirmed && selectedRoles.length < 2)
           }
           className={`w-full py-2 px-3 rounded-lg flex items-center justify-center text-base font-medium transition-all ${
             isConfirmed
               ? 'bg-red-500 text-white hover:bg-red-600'
-              : selectedRoles.length === 0
+              : selectedRoles.length < 2
               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
               : allSpotsFilled && !isConfirmed
               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
@@ -248,9 +251,9 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
           )}
         </button>
 
-        {selectedRoles.length === 0 && !isConfirmed && (
+        {selectedRoles.length < 2 && !isConfirmed && (
           <div className='mt-1 text-xs text-red-500'>
-            Selecciona al menos una posición para confirmar asistencia
+            Selecciona al menos <b>dos</b> posiciones para confirmar asistencia
           </div>
         )}
       </div>

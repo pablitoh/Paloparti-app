@@ -1,8 +1,11 @@
 import {
   ArrowPathIcon,
   PlusIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
+  UserGroupIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  InformationCircleIcon,
+  ExclamationCircleIcon,
 } from '@heroicons/react/24/outline';
 import Button from '../Button';
 import { useState } from 'react';
@@ -12,6 +15,7 @@ interface TeamFormationNotificationProps {
   requiredPlayers: number;
   sortCount: number;
   unassignedCount?: number;
+  cancelledFromTeamsCount?: number;
   onRandomizeTeams: () => Promise<void>;
   isLoading?: boolean;
   currentUserIsAdmin: boolean;
@@ -30,6 +34,7 @@ const TeamFormationNotification = ({
   requiredPlayers,
   sortCount,
   unassignedCount = 0,
+  cancelledFromTeamsCount = 0,
   onRandomizeTeams,
   isLoading = false,
   currentUserIsAdmin,
@@ -42,21 +47,23 @@ const TeamFormationNotification = ({
   balanceByRating = false,
   setBalanceByRating,
 }: TeamFormationNotificationProps) => {
-  const [isAdvancedOptionsOpen, setIsAdvancedOptionsOpen] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Si no es admin, no mostrar nada
   if (!currentUserIsAdmin) return null;
 
-  // Determinar colores y mensaje según el estado
-  let backgroundColor = 'bg-blue-50';
-  let borderColor = 'border-blue-400';
-  let textColor = 'text-blue-700';
-  let iconColor = 'text-blue-400';
+  // Determinar colores, iconos y mensaje según el estado
+  let backgroundColor = 'bg-gradient-to-r from-blue-50 to-indigo-50';
+  let borderColor = 'border-blue-200';
+  let textColor = 'text-blue-800';
+  let iconColor = 'text-blue-500';
   let message = '';
+  let emoji = '⚽';
+  let StatusIcon = InformationCircleIcon;
 
   // Condición para mostrar el botón de sortear
-  const canCreateTeams =
-    confirmedCount > 1 && (allowFillIn || confirmedCount >= requiredPlayers);
+  const canCreateTeams = confirmedCount > 1;
+  const hasAllRequiredPlayers = confirmedCount >= requiredPlayers;
 
   // Si hay equipos formados pero sortCount = 0, significa que es un partido recién creado pero ya tiene equipos
   // Esto es para manejar partidos nuevos con sortCount=0 pero que ya tienen equipos
@@ -66,133 +73,211 @@ const TeamFormationNotification = ({
   if (isInitialTeamFormation) {
     // Mensaje para cuando se acumulan jugadores pero aún no se sortean equipos
     if (confirmedCount === 0) {
-      message = 'Aún no hay jugadores confirmados para este partido.';
-      backgroundColor = 'bg-gray-50';
-      borderColor = 'border-gray-400';
+      message = '¡Esperando jugadores! Aún no hay confirmaciones.';
+      backgroundColor = 'bg-gradient-to-r from-gray-50 to-slate-50';
+      borderColor = 'border-gray-200';
       textColor = 'text-gray-700';
       iconColor = 'text-gray-400';
+      emoji = '⏳';
+      StatusIcon = UserGroupIcon;
     } else if (confirmedCount < requiredPlayers) {
-      message = `Hay ${confirmedCount} ${
-        confirmedCount === 1 ? 'jugador confirmado' : 'jugadores confirmados'
-      } de ${requiredPlayers} requeridos.`;
-      backgroundColor = 'bg-yellow-50';
-      borderColor = 'border-yellow-400';
-      textColor = 'text-yellow-700';
-      iconColor = 'text-yellow-400';
+      message = `¡Vamos bien! ${confirmedCount}/${requiredPlayers} jugadores confirmados.`;
+      backgroundColor = 'bg-gradient-to-r from-yellow-50 to-amber-50';
+      borderColor = 'border-yellow-200';
+      textColor = 'text-yellow-800';
+      iconColor = 'text-yellow-500';
+      emoji = '🔥';
+      StatusIcon = ExclamationTriangleIcon;
     } else {
-      message = `¡Ya están todos los jugadores confirmados! Puedes sortear los equipos.`;
-      backgroundColor = 'bg-green-50';
-      borderColor = 'border-green-400';
-      textColor = 'text-green-700';
-      iconColor = 'text-green-400';
+      message = `¡Perfecto! Todos confirmados. ¡Hora de sortear!`;
+      backgroundColor = 'bg-gradient-to-r from-green-50 to-emerald-50';
+      borderColor = 'border-green-200';
+      textColor = 'text-green-800';
+      iconColor = 'text-green-500';
+      emoji = '🎉';
+      StatusIcon = CheckCircleIcon;
     }
   } else {
-    // Si ya se sortearon equipos (sortCount > 0), mostrar mensaje sobre jugadores sin asignar
-    if (unassignedCount > 0) {
-      message = `Hay ${unassignedCount} ${
-        unassignedCount === 1 ? 'jugador confirmado' : 'jugadores confirmados'
-      } que no ${
-        unassignedCount === 1 ? 'está asignado' : 'están asignados'
-      } a ningún equipo.`;
-      backgroundColor = 'bg-yellow-50';
-      borderColor = 'border-yellow-400';
-      textColor = 'text-yellow-700';
-      iconColor = 'text-yellow-400';
+    // Si ya se sortearon equipos (sortCount > 0), mostrar mensaje sobre jugadores sin asignar y cancelaciones
+    if (cancelledFromTeamsCount > 0 && unassignedCount > 0) {
+      // Caso: hay jugadores que cancelaron desde equipos Y jugadores sin asignar
+      message = `¡Atención! ${cancelledFromTeamsCount} cancelaron + ${unassignedCount} nuevos sin asignar.`;
+      backgroundColor = 'bg-gradient-to-r from-orange-50 to-red-50';
+      borderColor = 'border-orange-200';
+      textColor = 'text-orange-800';
+      iconColor = 'text-orange-500';
+      emoji = '⚠️';
+      StatusIcon = ExclamationTriangleIcon;
+    } else if (cancelledFromTeamsCount > 0) {
+      // Caso: solo hay jugadores que cancelaron desde equipos
+      message = `${cancelledFromTeamsCount} ${
+        cancelledFromTeamsCount === 1
+          ? 'jugador canceló'
+          : 'jugadores cancelaron'
+      } y ${
+        cancelledFromTeamsCount === 1
+          ? 'fue reemplazado'
+          : 'fueron reemplazados'
+      } con TBD. ¡Considera re-sortear!`;
+      backgroundColor = 'bg-gradient-to-r from-orange-50 to-amber-50';
+      borderColor = 'border-orange-200';
+      textColor = 'text-orange-800';
+      iconColor = 'text-orange-500';
+      emoji = '🔄';
+      StatusIcon = ArrowPathIcon;
+    } else if (unassignedCount > 0) {
+      // Caso: solo hay jugadores sin asignar (comportamiento original)
+      message = `¡Nuevos jugadores! ${unassignedCount} ${
+        unassignedCount === 1 ? 'jugador necesita' : 'jugadores necesitan'
+      } asignación.`;
+      backgroundColor = 'bg-gradient-to-r from-yellow-50 to-orange-50';
+      borderColor = 'border-yellow-200';
+      textColor = 'text-yellow-800';
+      iconColor = 'text-yellow-500';
+      emoji = '➕';
+      StatusIcon = PlusIcon;
     } else {
-      message = 'Todos los jugadores confirmados están asignados a equipos.';
-      backgroundColor = 'bg-green-50';
-      borderColor = 'border-green-400';
-      textColor = 'text-green-700';
-      iconColor = 'text-green-400';
+      // Caso: todo está bien
+      message = '¡Excelente! Todos asignados a equipos.';
+      backgroundColor = 'bg-gradient-to-r from-green-50 to-teal-50';
+      borderColor = 'border-green-200';
+      textColor = 'text-green-800';
+      iconColor = 'text-green-500';
+      emoji = '✅';
+      StatusIcon = CheckCircleIcon;
     }
   }
 
-  // Función para renderizar una opción toggleable
-  const renderToggleOption = (
-    id: string,
+  // Función para manejar el click del botón sortear
+  const handleSortClick = () => {
+    if (hasAllRequiredPlayers) {
+      // Si tiene todos los jugadores, sortear directamente
+      onRandomizeTeams();
+    } else {
+      // Si no tiene todos los jugadores, mostrar modal de confirmación
+      setShowConfirmModal(true);
+    }
+  };
+
+  // Función para confirmar el sorteo con jugadores faltantes
+  const handleConfirmSort = () => {
+    setShowConfirmModal(false);
+    // Temporalmente activar allowFillIn para este sorteo
+    if (setAllowFillIn) {
+      setAllowFillIn(true);
+    }
+    onRandomizeTeams();
+  };
+
+  // Función para renderizar un botón toggle
+  const renderToggleButton = (
     checked: boolean,
     onChange: (checked: boolean) => void,
     title: string,
-    description: string
+    icon: string
   ) => (
-    <div
-      className={`p-4 rounded-lg border transition-all duration-200 cursor-pointer ${
-        checked
-          ? 'bg-blue-50 border-blue-200 shadow-sm'
-          : 'bg-white border-gray-200 hover:border-blue-200'
-      }`}
+    <button
       onClick={() => onChange(!checked)}
+      className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 border ${
+        checked
+          ? 'bg-blue-500 text-white border-blue-500 shadow-md hover:bg-blue-600'
+          : 'bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50'
+      }`}
     >
-      <div className='flex items-start'>
-        <div className='flex-shrink-0'>
-          <div
-            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors duration-200 ${
-              checked
-                ? 'bg-blue-500 border-blue-500'
-                : 'bg-white border-gray-300'
-            }`}
-          >
-            {checked && (
-              <svg
-                className='w-4 h-4 text-white'
-                fill='none'
-                stroke='currentColor'
-                viewBox='0 0 24 24'
-              >
-                <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  strokeWidth='2'
-                  d='M5 13l4 4L19 7'
-                />
-              </svg>
-            )}
-          </div>
-        </div>
-        <div className='ml-3'>
-          <h3 className='text-sm font-medium text-gray-900'>{title}</h3>
-          <p className='mt-1 text-sm text-gray-500'>{description}</p>
-        </div>
-      </div>
-    </div>
+      <span className='flex items-center'>
+        <span className='mr-1.5'>{icon}</span>
+        {title}
+      </span>
+    </button>
   );
 
   return (
-    <div className='space-y-3'>
-      <div
-        className={`${backgroundColor} border-l-4 ${borderColor} p-4 mb-2 rounded-md`}
-      >
-        <div className='flex items-start'>
-          <div className='flex-shrink-0'>
-            <svg
-              className={`h-6 w-6 ${iconColor}`}
-              viewBox='0 0 20 20'
-              fill='currentColor'
-            >
-              {backgroundColor.includes('yellow') ? (
-                <path
-                  fillRule='evenodd'
-                  d='M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z'
-                  clipRule='evenodd'
-                />
-              ) : (
-                <path
-                  fillRule='evenodd'
-                  d='M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z'
-                  clipRule='evenodd'
-                />
-              )}
-            </svg>
-          </div>
-          <div className='ml-3 flex-1'>
-            <p className={`text-base font-medium ${textColor}`}>{message}</p>
-            <div className='mt-3'>
+    <>
+      <div className='space-y-3'>
+        <div
+          className={`${backgroundColor} border ${borderColor} p-4 rounded-lg shadow-md`}
+        >
+          {/* Layout principal con flex para poner el botón a la derecha */}
+          <div className='flex items-start justify-between'>
+            {/* Contenido principal a la izquierda */}
+            <div className='flex items-start flex-1 mr-4'>
+              <div className='flex-shrink-0'>
+                <div
+                  className={`p-1.5 rounded-full ${
+                    backgroundColor
+                      .replace('from-', 'bg-')
+                      .replace('to-', '')
+                      .split(' ')[0]
+                  }`}
+                >
+                  <StatusIcon className={`h-5 w-5 ${iconColor}`} />
+                </div>
+              </div>
+              <div className='ml-3 flex-1'>
+                <div className='flex items-center mb-2'>
+                  <span className='text-lg mr-2'>{emoji}</span>
+                  <h3 className={`text-sm font-bold ${textColor}`}>
+                    Formación de Equipos
+                  </h3>
+                </div>
+                <p className={`text-sm ${textColor} mb-3`}>{message}</p>
+
+                {/* Opciones como botones toggle */}
+                <div className='mb-3'>
+                  <div className='flex flex-wrap gap-2'>
+                    {/* Opción para equilibrar por rol */}
+                    {setBalanceByRole &&
+                      renderToggleButton(
+                        balanceByRole,
+                        setBalanceByRole,
+                        'Por posición',
+                        '⚽'
+                      )}
+
+                    {/* Opción para equilibrar por edad */}
+                    {setBalanceByAge &&
+                      renderToggleButton(
+                        balanceByAge,
+                        setBalanceByAge,
+                        'Por edad',
+                        '👥'
+                      )}
+
+                    {/* Opción para equilibrar por nivel */}
+                    {setBalanceByRating &&
+                      renderToggleButton(
+                        balanceByRating,
+                        setBalanceByRating,
+                        'Por nivel',
+                        '⭐'
+                      )}
+                  </div>
+
+                  {/* Nota informativa compacta con asterisco */}
+                  {setBalanceByAge &&
+                    setBalanceByRole &&
+                    setBalanceByRating && (
+                      <div className='mt-2'>
+                        <p className='text-xs text-gray-500'>
+                          * Sin criterios = sorteo aleatorio
+                        </p>
+                      </div>
+                    )}
+                </div>
+              </div>
+            </div>
+
+            {/* Botón de sortear - A la derecha centrado verticalmente */}
+            <div className='flex items-center'>
               <Button
-                onClick={onRandomizeTeams}
+                onClick={handleSortClick}
                 disabled={isLoading || !canCreateTeams}
-                className='w-full sm:w-auto inline-flex items-center justify-center'
+                className={`px-4 py-2 text-sm font-semibold rounded-lg shadow-md transform transition-all duration-200 hover:scale-105 ${
+                  isInitialTeamFormation
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700'
+                    : 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700'
+                } text-white border-0`}
                 size='sm'
-                variant={isInitialTeamFormation ? 'primary' : 'outline'}
               >
                 {isLoading ? (
                   <span className='flex items-center'>
@@ -216,19 +301,22 @@ const TeamFormationNotification = ({
                         d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
                       ></path>
                     </svg>
-                    Procesando...
+                    ⚡ Procesando...
                   </span>
                 ) : (
-                  <>
+                  <span className='flex items-center'>
                     {isInitialTeamFormation ? (
-                      <PlusIcon className='mr-1 h-5 w-5' />
+                      <>
+                        <PlusIcon className='mr-1.5 h-4 w-4' />
+                        🎲 Sortear
+                      </>
                     ) : (
-                      <ArrowPathIcon className='h-4 w-4 mr-1' />
+                      <>
+                        <ArrowPathIcon className='h-4 w-4 mr-1.5' />
+                        🔄 Re-sortear
+                      </>
                     )}
-                    {isInitialTeamFormation
-                      ? 'Sortear equipos'
-                      : 'Re-sortear equipos'}
-                  </>
+                  </span>
                 )}
               </Button>
             </div>
@@ -236,74 +324,60 @@ const TeamFormationNotification = ({
         </div>
       </div>
 
-      {/* Sección de opciones avanzadas */}
-      <div className='mt-4'>
-        <button
-          onClick={() => setIsAdvancedOptionsOpen(!isAdvancedOptionsOpen)}
-          className='flex items-center text-sm font-medium text-gray-700 hover:text-gray-900'
-        >
-          <span className='mr-2'>⚙️ Opciones avanzadas</span>
-          {isAdvancedOptionsOpen ? (
-            <ChevronUpIcon className='h-5 w-5' />
-          ) : (
-            <ChevronDownIcon className='h-5 w-5' />
-          )}
-        </button>
-
-        {isAdvancedOptionsOpen && (
-          <div className='mt-3 space-y-3'>
-            {/* Opción para completar equipos */}
-            {setAllowFillIn &&
-              renderToggleOption(
-                'allowFillIn',
-                allowFillIn,
-                setAllowFillIn,
-                'Completar equipos automáticamente',
-                'Permite completar los equipos con jugadores TBD cuando no hay suficientes jugadores confirmados'
-              )}
-
-            {/* Opción para equilibrar por rol */}
-            {setBalanceByRole &&
-              renderToggleOption(
-                'balanceByRole',
-                balanceByRole,
-                setBalanceByRole,
-                'Equilibrar por posición',
-                'Distribuye los jugadores de manera que cada equipo tenga una mezcla similar de posiciones'
-              )}
-
-            {/* Opción para equilibrar por edad */}
-            {setBalanceByAge &&
-              renderToggleOption(
-                'balanceByAge',
-                balanceByAge,
-                setBalanceByAge,
-                'Equilibrar por edad',
-                'Distribuye los jugadores para que los equipos tengan una edad promedio similar'
-              )}
-
-            {/* Opción para equilibrar por nivel */}
-            {setBalanceByRating &&
-              renderToggleOption(
-                'balanceByRating',
-                balanceByRating,
-                setBalanceByRating,
-                'Equilibrar por nivel',
-                'Distribuye los jugadores según su nivel de habilidad para crear equipos equilibrados'
-              )}
-
-            {/* Nota informativa */}
-            {setBalanceByAge && setBalanceByRole && setBalanceByRating && (
-              <div className='mt-2 text-xs text-gray-500 italic'>
-                Nota: Si no seleccionas ningún criterio de balance, se utilizará
-                un algoritmo completamente aleatorio para formar los equipos con
-                igual número de jugadores.
+      {/* Modal de confirmación */}
+      {showConfirmModal && (
+        <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'>
+          <div className='bg-white rounded-xl shadow-2xl max-w-md w-full p-6'>
+            <div className='flex items-center mb-4'>
+              <div className='flex-shrink-0'>
+                <ExclamationCircleIcon className='h-8 w-8 text-amber-500' />
               </div>
-            )}
+              <div className='ml-3'>
+                <h3 className='text-lg font-semibold text-gray-900'>
+                  ⚠️ Confirmar sorteo
+                </h3>
+              </div>
+            </div>
+
+            <div className='mb-6'>
+              <p className='text-sm text-gray-600 mb-3'>
+                Solo tienes{' '}
+                <span className='font-semibold text-amber-600'>
+                  {confirmedCount} jugadores confirmados
+                </span>{' '}
+                de los{' '}
+                <span className='font-semibold'>
+                  {requiredPlayers} requeridos
+                </span>
+                .
+              </p>
+              <p className='text-sm text-gray-600'>
+                ¿Estás seguro que querés sortear los equipos sin todos los
+                jugadores requeridos? Se completarán automáticamente con
+                jugadores TBD.
+              </p>
+            </div>
+
+            <div className='flex gap-3 justify-end'>
+              <Button
+                onClick={() => setShowConfirmModal(false)}
+                className='px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors'
+                size='sm'
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleConfirmSort}
+                className='px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 rounded-lg shadow-md transition-all duration-200'
+                size='sm'
+              >
+                🎲 Sortear de todas formas
+              </Button>
+            </div>
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 };
 

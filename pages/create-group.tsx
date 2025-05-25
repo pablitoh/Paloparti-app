@@ -4,6 +4,8 @@ import Button from '../components/Button';
 import Layout from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
 import { RecurrenceType } from '../types/match';
+import Link from 'next/link';
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 export default function CreateGroup() {
   const router = useRouter();
@@ -12,15 +14,15 @@ export default function CreateGroup() {
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    sport: 'Fútbol',
     description: '',
     location: '',
+    sport: 'Fútbol',
     teamAName: 'Equipo A',
     teamBName: 'Equipo B',
     recurrenceType: 'NONE',
     recurrenceDays: [] as number[],
     recurrenceTime: '18:00',
-    requiredPlayers: 10,
+    requiredPlayers: 5,
   });
 
   // Redirect to login if not authenticated
@@ -52,15 +54,15 @@ export default function CreateGroup() {
       setError(null);
 
       // Validar que los campos requeridos estén completos
-      if (!formData.name || !formData.sport || !formData.location) {
+      if (!formData.name || !formData.location) {
         setError('Todos los campos obligatorios deben estar completos');
         setIsSubmitting(false);
         return;
       }
 
-      // Validar que requiredPlayers sea un número par
-      if (formData.requiredPlayers % 2 !== 0) {
-        setError('El número de jugadores requeridos debe ser par');
+      // Validar que jugadores por equipo sea mayor a 0
+      if (formData.requiredPlayers < 1) {
+        setError('Debe haber al menos 1 jugador por equipo');
         setIsSubmitting(false);
         return;
       }
@@ -70,6 +72,7 @@ export default function CreateGroup() {
 
       const dataToSend = {
         ...formData,
+        requiredPlayers: formData.requiredPlayers * 2,
         nextMatch: nextMatch ? nextMatch.toISOString() : null,
       };
 
@@ -104,19 +107,10 @@ export default function CreateGroup() {
     >
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => {
-      const newData = {
-        ...prev,
-        [name]: value,
-      };
-
-      // If sport changes, update requiredPlayers
-      if (name === 'sport') {
-        newData.requiredPlayers = getDefaultRequiredPlayers(value);
-      }
-
-      return newData;
-    });
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === 'requiredPlayers' ? Number(value) : value,
+    }));
   };
 
   const handleDayChange = (day: number) => {
@@ -204,25 +198,13 @@ export default function CreateGroup() {
       <div className='max-w-2xl mx-auto px-4 py-8'>
         <div className='bg-white rounded-xl shadow-md p-6'>
           <div className='flex items-center gap-4 mb-6'>
-            <Button
-              variant='outline'
-              onClick={() => router.back()}
-              className='flex items-center gap-2'
+            <Link
+              href='/groups'
+              className='inline-flex items-center text-sm text-blue-600 hover:text-blue-800 transition-colors'
             >
-              <svg
-                xmlns='http://www.w3.org/2000/svg'
-                className='h-5 w-5'
-                viewBox='0 0 20 20'
-                fill='currentColor'
-              >
-                <path
-                  fillRule='evenodd'
-                  d='M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z'
-                  clipRule='evenodd'
-                />
-              </svg>
-              Volver
-            </Button>
+              <ArrowLeftIcon className='h-4 w-4 mr-1' />
+              Volver a grupos
+            </Link>
             <h1 className='text-2xl font-bold text-gray-800'>
               Crear Nuevo Grupo
             </h1>
@@ -252,29 +234,6 @@ export default function CreateGroup() {
                 className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                 placeholder='Ej: Fútbol Los Domingos'
               />
-            </div>
-
-            <div>
-              <label
-                htmlFor='sport'
-                className='block text-sm font-medium text-gray-700 mb-1'
-              >
-                Deporte
-              </label>
-              <select
-                id='sport'
-                name='sport'
-                value={formData.sport}
-                onChange={handleChange}
-                className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-              >
-                <option value='Fútbol'>Fútbol</option>
-                <option value='Baloncesto'>Baloncesto</option>
-                <option value='Pádel'>Pádel</option>
-                <option value='Tenis'>Tenis</option>
-                <option value='Voleibol'>Voleibol</option>
-                <option value='Otros'>Otros</option>
-              </select>
             </div>
 
             <div>
@@ -356,7 +315,7 @@ export default function CreateGroup() {
                 htmlFor='requiredPlayers'
                 className='block text-sm font-medium text-gray-700 mb-1'
               >
-                Cantidad de jugadores
+                Jugadores por equipo
               </label>
               <input
                 type='number'
@@ -364,13 +323,12 @@ export default function CreateGroup() {
                 name='requiredPlayers'
                 value={formData.requiredPlayers}
                 onChange={handleChange}
-                min={2}
+                min={1}
                 required
                 className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
               />
               <p className='mt-1 text-sm text-gray-500'>
-                Número total de jugadores que participarán en el partido (debe
-                ser par)
+                Número de jugadores por equipo
               </p>
             </div>
 

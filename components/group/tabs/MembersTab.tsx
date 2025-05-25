@@ -12,6 +12,7 @@ import {
   ChevronUpIcon,
 } from '@heroicons/react/24/outline';
 import RoleSelectionModal from '../modals/RoleSelectionModal';
+import LeaveGroupModal from '../modals/LeaveGroupModal';
 import StarRating from '../../StarRating';
 import { updateMemberRating } from '../../../services/groupService';
 import {
@@ -76,6 +77,10 @@ export default function MembersTab({
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
+  // Estado para el modal de salir del grupo
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [isLocalLeaving, setIsLocalLeaving] = useState(false);
+
   // Get the queryClient instance at the component level
   const queryClient = useQueryClient();
 
@@ -115,6 +120,22 @@ export default function MembersTab({
       return;
     setSelectedMember(member);
     setIsRoleModalOpen(true);
+  };
+
+  // Función para manejar la confirmación de salir del grupo
+  const handleLeaveConfirm = async () => {
+    if (handleLeaveGroup) {
+      try {
+        setIsLocalLeaving(true);
+        await handleLeaveGroup();
+        setShowLeaveModal(false);
+      } catch (error) {
+        // Error handling is done in the parent component
+        setShowLeaveModal(false);
+      } finally {
+        setIsLocalLeaving(false);
+      }
+    }
   };
 
   // Función para manejar la confirmación después de seleccionar roles
@@ -479,19 +500,25 @@ export default function MembersTab({
                 <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
                   Estado para el próximo partido
                 </th>
-                {currentUserIsAdmin && (
-                  <th
-                    className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer'
-                    onClick={() => handleSort('starRating')}
-                  >
-                    <div className='flex items-center'>
-                      Nivel de habilidad
+                <th
+                  className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                    currentUserIsAdmin ? 'cursor-pointer' : ''
+                  }`}
+                  onClick={
+                    currentUserIsAdmin
+                      ? () => handleSort('starRating')
+                      : undefined
+                  }
+                >
+                  <div className='flex items-center'>
+                    Nivel de habilidad
+                    {currentUserIsAdmin && (
                       <span className='ml-1'>
                         {renderSortIcon('starRating')}
                       </span>
-                    </div>
-                  </th>
-                )}
+                    )}
+                  </div>
+                </th>
                 <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
                   {currentUserIsAdmin ? 'Acciones' : ''}
                 </th>
@@ -541,21 +568,22 @@ export default function MembersTab({
                         {isConfirmedForNextMatch ? 'Confirmado' : 'Pendiente'}
                       </span>
                     </td>
-                    {currentUserIsAdmin && (
-                      <td className='px-6 py-4 whitespace-nowrap'>
-                        <StarRating
-                          key={`desktop-rating-${member.userId}-${
-                            member.starRating
-                          }-${Date.now()}`}
-                          rating={member.starRating || 3}
-                          readOnly={!currentUserIsAdmin}
-                          onRatingChange={(rating) =>
-                            handleUpdateRating(member.userId, rating)
-                          }
-                          size='sm'
-                        />
-                      </td>
-                    )}
+                    <td className='px-6 py-4 whitespace-nowrap'>
+                      <StarRating
+                        key={`desktop-rating-${member.userId}-${
+                          member.starRating
+                        }-${Date.now()}`}
+                        rating={member.starRating || 3}
+                        readOnly={!currentUserIsAdmin}
+                        onRatingChange={
+                          currentUserIsAdmin
+                            ? (rating) =>
+                                handleUpdateRating(member.userId, rating)
+                            : undefined
+                        }
+                        size='sm'
+                      />
+                    </td>
                     <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
                       <ActionButtons
                         member={member}
@@ -653,24 +681,25 @@ export default function MembersTab({
                         {isConfirmedForNextMatch ? 'Confirmado' : 'Pendiente'}
                       </span>
                     </div>
-                    {currentUserIsAdmin && (
-                      <div className='mt-2'>
-                        <div className='text-xs text-gray-500 mb-1'>
-                          Nivel de habilidad:
-                        </div>
-                        <StarRating
-                          key={`mobile-rating-${member.userId}-${
-                            member.starRating
-                          }-${Date.now()}`}
-                          rating={member.starRating || 3}
-                          readOnly={!currentUserIsAdmin}
-                          onRatingChange={(rating) =>
-                            handleUpdateRating(member.userId, rating)
-                          }
-                          size='sm'
-                        />
+                    <div className='mt-2'>
+                      <div className='text-xs text-gray-500 mb-1'>
+                        Nivel de habilidad:
                       </div>
-                    )}
+                      <StarRating
+                        key={`mobile-rating-${member.userId}-${
+                          member.starRating
+                        }-${Date.now()}`}
+                        rating={member.starRating || 3}
+                        readOnly={!currentUserIsAdmin}
+                        onRatingChange={
+                          currentUserIsAdmin
+                            ? (rating) =>
+                                handleUpdateRating(member.userId, rating)
+                            : undefined
+                        }
+                        size='sm'
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -693,15 +722,7 @@ export default function MembersTab({
       {handleLeaveGroup && user && (
         <div className='pt-4 border-t border-gray-200 mt-6'>
           <button
-            onClick={() => {
-              if (
-                window.confirm(
-                  '¿Estás seguro de que quieres salir de este grupo?'
-                )
-              ) {
-                handleLeaveGroup();
-              }
-            }}
+            onClick={() => setShowLeaveModal(true)}
             className='w-full flex items-center justify-center px-4 py-3 border border-red-600 rounded-md shadow-sm text-sm font-medium text-red-600 hover:text-white hover:bg-red-600 transition-all duration-200 md:py-2 md:w-auto'
           >
             <ArrowRightOnRectangleIcon className='h-5 w-5 mr-2' />
@@ -723,6 +744,15 @@ export default function MembersTab({
           initialRoles={[]}
         />
       )}
+
+      {/* Modal de salir del grupo */}
+      <LeaveGroupModal
+        isOpen={showLeaveModal}
+        onClose={() => setShowLeaveModal(false)}
+        onConfirm={handleLeaveConfirm}
+        groupName={group.name}
+        isLeaving={isLocalLeaving}
+      />
     </div>
   );
 }

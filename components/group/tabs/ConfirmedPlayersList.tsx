@@ -73,7 +73,16 @@ const ConfirmedPlayersList: React.FC<ConfirmedPlayersListProps> = ({
                       src={player.avatar || ''}
                       alt={player.name || 'Jugador'}
                       className='h-10 w-10 rounded-full'
-                    />
+                    >
+                      {player.name
+                        ? player.name
+                            .split(' ')
+                            .map((n) => n[0])
+                            .filter((char) => /[A-Za-z]/.test(char))
+                            .join('')
+                            .toUpperCase() || 'J'
+                        : 'J'}
+                    </Avatar>
                     <span className='font-medium text-gray-800'>
                       {player.name || 'Jugador sin nombre'}
                     </span>
@@ -130,7 +139,16 @@ const ConfirmedPlayersList: React.FC<ConfirmedPlayersListProps> = ({
                       src={player.avatar || ''}
                       alt={player.name || 'Jugador'}
                       className='h-10 w-10 rounded-full'
-                    />
+                    >
+                      {player.name
+                        ? player.name
+                            .split(' ')
+                            .map((n) => n[0])
+                            .filter((char) => /[A-Za-z]/.test(char))
+                            .join('')
+                            .toUpperCase() || 'J'
+                        : 'J'}
+                    </Avatar>
                     <span className='font-medium text-gray-800'>
                       {player.name || 'Jugador sin nombre'}
                     </span>
@@ -185,7 +203,16 @@ const ConfirmedPlayersList: React.FC<ConfirmedPlayersListProps> = ({
                       src={player.avatar || ''}
                       alt={player.name || 'Jugador'}
                       className='h-10 w-10 rounded-full'
-                    />
+                    >
+                      {player.name
+                        ? player.name
+                            .split(' ')
+                            .map((n) => n[0])
+                            .filter((char) => /[A-Za-z]/.test(char))
+                            .join('')
+                            .toUpperCase() || 'J'
+                        : 'J'}
+                    </Avatar>
                     <span className='font-medium text-gray-500'>
                       {player.name || 'Jugador sin nombre'}
                     </span>

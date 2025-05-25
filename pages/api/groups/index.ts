@@ -228,6 +228,7 @@ export default async function handler(
           recurrenceTime,
           nextMatch: nextMatchDate,
           inviteToken, // Guardar el token de invitación
+          requiredPlayers,
           members: {
             create: {
               userId: userId,

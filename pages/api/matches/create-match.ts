@@ -1160,6 +1160,91 @@ const createBalancedTeamsByMultiCriteria = (
     // No hay arqueros disponibles
     else {
       console.log(`⚠️ No hay arqueros disponibles para distribuir`);
+
+      // Buscar comodines que puedan ser asignados como arqueros
+      const availableWildcards = wildcards.filter((player) =>
+        player.playerRoles?.includes(PLAYER_ROLES.WILDCARD)
+      );
+
+      if (availableWildcards.length >= 2) {
+        // Asignar dos comodines como arqueros
+        const metricsA = calculateTeamMetrics(teamA);
+        const metricsB = calculateTeamMetrics(teamB);
+
+        // Ordenar comodines por habilidad
+        availableWildcards.sort(
+          (a, b) => (b.starRating || 3) - (a.starRating || 3)
+        );
+
+        if (metricsA.skillAvg <= metricsB.skillAvg) {
+          // Equipo A tiene menor nivel, darle el mejor comodín como arquero
+          teamA.push({
+            ...availableWildcards[0],
+            assignedRole: PLAYER_ROLES.GOALKEEPER,
+          });
+          teamB.push({
+            ...availableWildcards[1],
+            assignedRole: PLAYER_ROLES.GOALKEEPER,
+          });
+        } else {
+          // Equipo B tiene menor nivel, darle el mejor comodín como arquero
+          teamB.push({
+            ...availableWildcards[0],
+            assignedRole: PLAYER_ROLES.GOALKEEPER,
+          });
+          teamA.push({
+            ...availableWildcards[1],
+            assignedRole: PLAYER_ROLES.GOALKEEPER,
+          });
+        }
+
+        // Remover los comodines asignados como arqueros de la lista de wildcards
+        const assignedIds = [
+          availableWildcards[0].id,
+          availableWildcards[1].id,
+        ];
+        for (let i = wildcards.length - 1; i >= 0; i--) {
+          if (assignedIds.includes(wildcards[i].id)) {
+            wildcards.splice(i, 1);
+          }
+        }
+
+        console.log(`✅ Asignados 2 comodines como arqueros (uno por equipo)`);
+      } else if (availableWildcards.length === 1) {
+        // Solo hay un comodín disponible
+        const metricsA = calculateTeamMetrics(teamA);
+        const metricsB = calculateTeamMetrics(teamB);
+
+        if (metricsA.skillAvg <= metricsB.skillAvg) {
+          teamA.push({
+            ...availableWildcards[0],
+            assignedRole: PLAYER_ROLES.GOALKEEPER,
+          });
+          console.log(
+            `✅ Único comodín asignado como arquero al equipo A (menor nivel)`
+          );
+        } else {
+          teamB.push({
+            ...availableWildcards[0],
+            assignedRole: PLAYER_ROLES.GOALKEEPER,
+          });
+          console.log(
+            `✅ Único comodín asignado como arquero al equipo B (menor nivel)`
+          );
+        }
+
+        // Remover el comodín asignado de la lista de wildcards
+        const assignedIndex = wildcards.findIndex(
+          (w) => w.id === availableWildcards[0].id
+        );
+        if (assignedIndex !== -1) {
+          wildcards.splice(assignedIndex, 1);
+        }
+      } else {
+        console.log(
+          `⚠️ No hay comodines disponibles para asignar como arqueros`
+        );
+      }
     }
 
     // Limpiar la lista de arqueros después de procesarlos
@@ -1483,6 +1568,15 @@ const createBalancedTeamsByMultiCriteria = (
         );
       };
 
+      // Buscar jugadores comodín que puedan ser asignados como arqueros
+      const findWildcardForGK = (team: Member[]) => {
+        return team.findIndex(
+          (p) =>
+            p.playerRoles?.includes(PLAYER_ROLES.WILDCARD) &&
+            p.assignedRole !== PLAYER_ROLES.GOALKEEPER
+        );
+      };
+
       // Intentar primero con el equipo A
       let gkIndex = findPotentialGK(teamA);
       if (gkIndex !== -1) {
@@ -1492,6 +1586,17 @@ const createBalancedTeamsByMultiCriteria = (
             teamA[gkIndex].name || 'sin nombre'
           }`
         );
+      } else {
+        // Si no hay arqueros específicos, buscar comodines
+        gkIndex = findWildcardForGK(teamA);
+        if (gkIndex !== -1) {
+          teamA[gkIndex].assignedRole = PLAYER_ROLES.GOALKEEPER;
+          console.log(
+            `✅ Asignado comodín de equipo A como arquero: ${
+              teamA[gkIndex].name || 'sin nombre'
+            }`
+          );
+        }
       }
 
       // Luego con el equipo B
@@ -1503,10 +1608,29 @@ const createBalancedTeamsByMultiCriteria = (
             teamB[gkIndex].name || 'sin nombre'
           }`
         );
+      } else {
+        // Si no hay arqueros específicos, buscar comodines
+        gkIndex = findWildcardForGK(teamB);
+        if (gkIndex !== -1) {
+          teamB[gkIndex].assignedRole = PLAYER_ROLES.GOALKEEPER;
+          console.log(
+            `✅ Asignado comodín de equipo B como arquero: ${
+              teamB[gkIndex].name || 'sin nombre'
+            }`
+          );
+        }
       }
 
+      // Verificar si aún faltan arqueros después de buscar específicos y comodines
+      const teamAHasGK = teamA.some(
+        (p) => p.assignedRole === PLAYER_ROLES.GOALKEEPER
+      );
+      const teamBHasGK = teamB.some(
+        (p) => p.assignedRole === PLAYER_ROLES.GOALKEEPER
+      );
+
       // Si aún no hay arqueros, asignar un jugador aleatorio de cada equipo
-      if (findPotentialGK(teamA) === -1 && teamA.length > 0) {
+      if (!teamAHasGK && teamA.length > 0) {
         const randomIndex = Math.floor(Math.random() * teamA.length);
         teamA[randomIndex].assignedRole = PLAYER_ROLES.GOALKEEPER;
         console.log(
@@ -1516,7 +1640,7 @@ const createBalancedTeamsByMultiCriteria = (
         );
       }
 
-      if (findPotentialGK(teamB) === -1 && teamB.length > 0) {
+      if (!teamBHasGK && teamB.length > 0) {
         const randomIndex = Math.floor(Math.random() * teamB.length);
         teamB[randomIndex].assignedRole = PLAYER_ROLES.GOALKEEPER;
         console.log(
@@ -2737,6 +2861,28 @@ export default async function handler(
         let teamA: Member[] = [];
         let teamB: Member[] = [];
 
+        // Función para verificar si un jugador ya está en un equipo
+        const isPlayerInTeam = (playerId: string, team: Member[]): boolean => {
+          return team.some((player) => player.id === playerId);
+        };
+
+        // Función para añadir jugador solo si no está duplicado
+        const addPlayerToTeam = (
+          player: Member,
+          team: Member[],
+          assignedRole: string
+        ): boolean => {
+          if (
+            !isPlayerInTeam(player.id, team) &&
+            !isPlayerInTeam(player.id, teamA) &&
+            !isPlayerInTeam(player.id, teamB)
+          ) {
+            team.push({ ...player, assignedRole });
+            return true;
+          }
+          return false;
+        };
+
         // Separar jugadores por su rol principal
         const playersByRole: Record<string, Member[]> = {};
 
@@ -2758,19 +2904,17 @@ export default async function handler(
 
         // Distribuir arqueros (más importantes)
         const goalkeepers = playersByRole[PLAYER_ROLES.GOALKEEPER] || [];
+        const availableWildcards = [
+          ...(playersByRole[PLAYER_ROLES.WILDCARD] || []),
+        ]; // Crear copia para evitar mutaciones
+
         if (goalkeepers.length >= 2) {
           // Si hay al menos 2 arqueros, distribuir uno a cada equipo
           const sortedGoalkeepers = [...goalkeepers].sort(
             () => Math.random() - 0.5
           );
-          teamA.push({
-            ...sortedGoalkeepers[0],
-            assignedRole: PLAYER_ROLES.GOALKEEPER,
-          });
-          teamB.push({
-            ...sortedGoalkeepers[1],
-            assignedRole: PLAYER_ROLES.GOALKEEPER,
-          });
+          addPlayerToTeam(sortedGoalkeepers[0], teamA, PLAYER_ROLES.GOALKEEPER);
+          addPlayerToTeam(sortedGoalkeepers[1], teamB, PLAYER_ROLES.GOALKEEPER);
 
           // Si hay más arqueros, añadirlos a la lista de sin rol para distribuirlos después
           if (goalkeepers.length > 2) {
@@ -2779,15 +2923,75 @@ export default async function handler(
         } else if (goalkeepers.length === 1) {
           // Si solo hay un arquero, usar una moneda para decidir a qué equipo va
           if (Math.random() > 0.5) {
-            teamA.push({
-              ...goalkeepers[0],
-              assignedRole: PLAYER_ROLES.GOALKEEPER,
-            });
+            addPlayerToTeam(goalkeepers[0], teamA, PLAYER_ROLES.GOALKEEPER);
           } else {
-            teamB.push({
-              ...goalkeepers[0],
-              assignedRole: PLAYER_ROLES.GOALKEEPER,
-            });
+            addPlayerToTeam(goalkeepers[0], teamB, PLAYER_ROLES.GOALKEEPER);
+          }
+
+          // Si hay comodines disponibles, usar uno como arquero para el otro equipo
+          if (availableWildcards.length > 0) {
+            const wildcardForGK = availableWildcards.shift(); // Tomar el primer comodín
+            if (wildcardForGK) {
+              // Asignar al equipo que no tiene arquero
+              const teamAHasGK = teamA.some(
+                (p) => p.assignedRole === PLAYER_ROLES.GOALKEEPER
+              );
+              if (teamAHasGK) {
+                if (
+                  addPlayerToTeam(wildcardForGK, teamB, PLAYER_ROLES.GOALKEEPER)
+                ) {
+                  console.log(`✅ Comodín asignado como arquero al equipo B`);
+                }
+              } else {
+                if (
+                  addPlayerToTeam(wildcardForGK, teamA, PLAYER_ROLES.GOALKEEPER)
+                ) {
+                  console.log(`✅ Comodín asignado como arquero al equipo A`);
+                }
+              }
+            }
+          }
+        } else if (goalkeepers.length === 0 && availableWildcards.length >= 2) {
+          // No hay arqueros específicos, pero hay al menos 2 comodines
+          const sortedWildcards = [...availableWildcards].sort(
+            () => Math.random() - 0.5
+          );
+
+          // Asignar los primeros 2 comodines como arqueros
+          addPlayerToTeam(sortedWildcards[0], teamA, PLAYER_ROLES.GOALKEEPER);
+          addPlayerToTeam(sortedWildcards[1], teamB, PLAYER_ROLES.GOALKEEPER);
+
+          console.log(
+            `✅ Asignados 2 comodines como arqueros (uno por equipo)`
+          );
+
+          // Remover los comodines asignados como arqueros de la lista
+          availableWildcards.splice(0, 2);
+        } else if (
+          goalkeepers.length === 0 &&
+          availableWildcards.length === 1
+        ) {
+          // No hay arqueros específicos, solo 1 comodín
+          const wildcardForGK = availableWildcards.shift();
+          if (wildcardForGK) {
+            // Asignar aleatoriamente a un equipo
+            if (Math.random() > 0.5) {
+              if (
+                addPlayerToTeam(wildcardForGK, teamA, PLAYER_ROLES.GOALKEEPER)
+              ) {
+                console.log(
+                  `✅ Único comodín asignado como arquero al equipo A`
+                );
+              }
+            } else {
+              if (
+                addPlayerToTeam(wildcardForGK, teamB, PLAYER_ROLES.GOALKEEPER)
+              ) {
+                console.log(
+                  `✅ Único comodín asignado como arquero al equipo B`
+                );
+              }
+            }
           }
         }
 
@@ -2798,15 +3002,9 @@ export default async function handler(
         // Distribuir defensores de manera equilibrada entre equipos
         sortedDefenders.forEach((defender, index) => {
           if (index % 2 === 0) {
-            teamA.push({
-              ...defender,
-              assignedRole: PLAYER_ROLES.DEFENDER,
-            });
+            addPlayerToTeam(defender, teamA, PLAYER_ROLES.DEFENDER);
           } else {
-            teamB.push({
-              ...defender,
-              assignedRole: PLAYER_ROLES.DEFENDER,
-            });
+            addPlayerToTeam(defender, teamB, PLAYER_ROLES.DEFENDER);
           }
         });
 
@@ -2819,15 +3017,9 @@ export default async function handler(
         // Distribuir mediocampistas de manera equilibrada entre equipos
         sortedMidfielders.forEach((midfielder, index) => {
           if (index % 2 === 0) {
-            teamA.push({
-              ...midfielder,
-              assignedRole: PLAYER_ROLES.MIDFIELDER,
-            });
+            addPlayerToTeam(midfielder, teamA, PLAYER_ROLES.MIDFIELDER);
           } else {
-            teamB.push({
-              ...midfielder,
-              assignedRole: PLAYER_ROLES.MIDFIELDER,
-            });
+            addPlayerToTeam(midfielder, teamB, PLAYER_ROLES.MIDFIELDER);
           }
         });
 
@@ -2838,22 +3030,15 @@ export default async function handler(
         // Distribuir delanteros de manera equilibrada entre equipos
         sortedForwards.forEach((forward, index) => {
           if (index % 2 === 0) {
-            teamA.push({
-              ...forward,
-              assignedRole: PLAYER_ROLES.FORWARD,
-            });
+            addPlayerToTeam(forward, teamA, PLAYER_ROLES.FORWARD);
           } else {
-            teamB.push({
-              ...forward,
-              assignedRole: PLAYER_ROLES.FORWARD,
-            });
+            addPlayerToTeam(forward, teamB, PLAYER_ROLES.FORWARD);
           }
         });
 
         // Distribuir comodines y jugadores sobrantes
-        // Combinar comodines con jugadores sin rol
-        const wildcards = playersByRole[PLAYER_ROLES.WILDCARD] || [];
-        const remainingPlayers = [...playersWithoutRole, ...wildcards];
+        // Combinar comodines restantes con jugadores sin rol
+        const remainingPlayers = [...playersWithoutRole, ...availableWildcards];
         const sortedRemaining = [...remainingPlayers].sort(
           () => Math.random() - 0.5
         );
@@ -2893,7 +3078,13 @@ export default async function handler(
             ];
             const assignedRole = assignFlexibleRole(result, availableRoles);
 
-            result.push({ ...player, assignedRole });
+            // Verificar que el jugador no esté ya en ningún equipo antes de añadirlo
+            if (
+              !isPlayerInTeam(player.id, teamA) &&
+              !isPlayerInTeam(player.id, teamB)
+            ) {
+              result.push({ ...player, assignedRole });
+            }
           }
 
           return result;
@@ -2989,6 +3180,45 @@ export default async function handler(
         // Aplicar balance final de posiciones a ambos equipos
         teamA = balanceTeamPositions(teamA);
         teamB = balanceTeamPositions(teamB);
+
+        // Verificación final: eliminar duplicados si los hay
+        const removeDuplicates = (team: Member[]): Member[] => {
+          const seen = new Set<string>();
+          return team.filter((player) => {
+            if (seen.has(player.id)) {
+              console.log(
+                `⚠️ Jugador duplicado eliminado: ${player.name} (${player.id})`
+              );
+              return false;
+            }
+            seen.add(player.id);
+            return true;
+          });
+        };
+
+        teamA = removeDuplicates(teamA);
+        teamB = removeDuplicates(teamB);
+
+        // Verificar que no hay jugadores en ambos equipos
+        const teamAIds = new Set(teamA.map((p) => p.id));
+        const teamBIds = new Set(teamB.map((p) => p.id));
+        const intersection = [...teamAIds].filter((id) => teamBIds.has(id));
+
+        if (intersection.length > 0) {
+          console.log(
+            `🚨 Jugadores encontrados en ambos equipos: ${intersection.join(
+              ', '
+            )}`
+          );
+          // Remover duplicados del equipo B (mantener en equipo A)
+          teamB = teamB.filter((player) => !teamAIds.has(player.id));
+        }
+
+        console.log(
+          `✅ Verificación final: Equipo A (${teamA.length}), Equipo B (${
+            teamB.length
+          }), Total: ${teamA.length + teamB.length}`
+        );
 
         return [teamA, teamB];
       };
@@ -3374,6 +3604,8 @@ export default async function handler(
       console.log('Equipos formados:', {
         teamAAvgAge,
         teamBAvgAge,
+        totalPlayers: finalTeamA.length + finalTeamB.length,
+        originalPlayers: mappedMembers.length,
         teamAPlayers: finalTeamA.map((p) => ({
           id: p.id,
           name: p.name,
@@ -3385,6 +3617,94 @@ export default async function handler(
           age: p.age,
         })),
       });
+
+      // Verificar si se perdieron jugadores durante el proceso
+      const allAssignedPlayerIds = [...finalTeamA, ...finalTeamB].map(
+        (p) => p.id
+      );
+      const originalPlayerIds = mappedMembers.map((p) => p.id);
+      const missingPlayerIds = originalPlayerIds.filter(
+        (id) => !allAssignedPlayerIds.includes(id)
+      );
+
+      if (missingPlayerIds.length > 0) {
+        console.log(
+          `🚨 JUGADORES PERDIDOS DURANTE EL PROCESO: ${missingPlayerIds.length}`
+        );
+        console.log('IDs perdidos:', missingPlayerIds);
+
+        // Encontrar los jugadores perdidos y agregarlos al equipo más pequeño
+        const missingPlayers = mappedMembers.filter((p) =>
+          missingPlayerIds.includes(p.id)
+        );
+        console.log(
+          'Jugadores perdidos:',
+          missingPlayers.map((p) => ({ id: p.id, name: p.name }))
+        );
+
+        // Agregar jugadores perdidos al equipo más pequeño con formato correcto
+        missingPlayers.forEach((player) => {
+          // Buscar datos de usuario para obtener la imagen/avatar
+          const userData = allUsersData.find(
+            (u: { id: string }) => u.id === player.id
+          );
+
+          // Determinar el rol asignado usando la función assignFlexibleRole
+          const targetTeam =
+            finalTeamA.length <= finalTeamB.length ? finalTeamA : finalTeamB;
+          const availableRoles = [
+            PLAYER_ROLES.DEFENDER,
+            PLAYER_ROLES.MIDFIELDER,
+            PLAYER_ROLES.FORWARD,
+          ];
+
+          // Si el jugador ya tiene un rol asignado, usarlo; si no, asignar uno flexible
+          let assignedRole = player.assignedRole;
+          if (!assignedRole) {
+            // Obtener el rol principal del jugador si tiene roles definidos
+            const primaryRole = getPrimaryRole(player.playerRoles);
+            if (primaryRole && primaryRole !== PLAYER_ROLES.WILDCARD) {
+              assignedRole = primaryRole;
+            } else {
+              // Usar la función flexible para asignar rol
+              assignedRole = assignFlexibleRole(targetTeam, availableRoles);
+            }
+          }
+
+          const formattedPlayer = {
+            id: player.id,
+            name: player.name,
+            avatar: userData?.image,
+            playerType: 'TEAM',
+            age:
+              player.age !== null && player.age !== undefined
+                ? player.age
+                : null,
+            playerRoles: player.playerRoles || [PLAYER_ROLES.WILDCARD],
+            assignedRole: assignedRole,
+            starRating: player.starRating !== undefined ? player.starRating : 3,
+          };
+
+          if (finalTeamA.length <= finalTeamB.length) {
+            finalTeamA.push(formattedPlayer);
+            console.log(
+              `✅ Jugador recuperado agregado al equipo A: ${player.name} (${assignedRole})`
+            );
+          } else {
+            finalTeamB.push(formattedPlayer);
+            console.log(
+              `✅ Jugador recuperado agregado al equipo B: ${player.name} (${assignedRole})`
+            );
+          }
+        });
+
+        console.log(
+          `✅ Recuperados ${missingPlayers.length} jugadores perdidos`
+        );
+        console.log(
+          `Nuevos totales: Equipo A (${finalTeamA.length}), Equipo B (${finalTeamB.length})`
+        );
+      }
     }
 
     // Añadir jugadores TBD si es necesario
@@ -3458,10 +3778,9 @@ export default async function handler(
       return generatedTbdPlayers;
     };
 
-    const tbdPlayersTeamA = addTbdPlayers(finalTeamA, true);
-    const tbdPlayersTeamB = addTbdPlayers(finalTeamB, false);
+    // Mover la llamada a addTbdPlayers después de la verificación final
 
-    let match;
+    let match: any;
 
     // Crear un objeto para almacenar roles de jugadores
     const playerRolesMap: Record<string, string[]> = {};
@@ -3508,104 +3827,7 @@ export default async function handler(
       }
     }
 
-    // Preparar los datos para la respuesta
-    const tbdPlayers = {
-      teamA: tbdPlayersTeamA,
-      teamB: tbdPlayersTeamB,
-      playerRoles: playerRolesMap, // Todos los roles elegidos
-      assignedRoles: assignedRolesMap, // Roles asignados para la formación
-    };
-
-    // Si es un re-sorteo, actualizar el partido existente; si no, crear uno nuevo
-    if (isResort && existingMatch) {
-      // Primero eliminar los jugadores actuales
-      await prisma.matchPlayer.deleteMany({
-        where: { matchId: existingMatch.id },
-      });
-
-      // Actualizar el partido existente
-      match = await prisma.match.update({
-        where: { id: existingMatch.id },
-        data: {
-          // No actualizamos date ni location en un re-sorteo
-          teamA: teamAName,
-          teamB: teamBName,
-          tbdPlayers: JSON.stringify(tbdPlayers), // Guardar tbdPlayers completo con playerRoles
-          sortCount: { increment: 1 },
-        },
-      });
-    } else {
-      // Crear un nuevo partido
-      match = await prisma.match.create({
-        data: {
-          date: matchDate,
-          location: matchLocation,
-          groupId,
-          teamA: teamAName,
-          teamB: teamBName,
-          scoreA: 0,
-          scoreB: 0,
-          status: 'PENDING',
-          tbdPlayers: JSON.stringify(tbdPlayers), // Guardar tbdPlayers completo con playerRoles
-          sortCount: 0,
-        },
-      });
-
-      // Actualizar el grupo con la información del nuevo partido
-      await prisma.group.update({
-        where: { id: groupId },
-        data: {
-          totalMatches: { increment: 1 },
-          nextMatch: matchDate,
-        },
-      });
-    }
-
-    // Registrar jugadores del equipo A
-    for (const player of finalTeamA) {
-      // Skip invalid player IDs or TBD players which have special ID formats
-      if (!player.id || player.id.toString().startsWith('tbd-')) {
-        continue;
-      }
-
-      try {
-        await prisma.matchPlayer.create({
-          data: {
-            matchId: match.id,
-            userId: player.id,
-            isTeamA: true,
-          },
-        });
-      } catch (error) {
-        console.error(
-          `Error registering player ${player.id} to team A:`,
-          error
-        );
-      }
-    }
-
-    // Registrar jugadores del equipo B
-    for (const player of finalTeamB) {
-      // Skip invalid player IDs or TBD players which have special ID formats
-      if (!player.id || player.id.toString().startsWith('tbd-')) {
-        continue;
-      }
-
-      try {
-        await prisma.matchPlayer.create({
-          data: {
-            matchId: match.id,
-            userId: player.id,
-            isTeamA: false,
-          },
-        });
-      } catch (error) {
-        console.error(
-          `Error registering player ${player.id} to team B:`,
-          error
-        );
-      }
-    }
+    // Mover la creación de matchPlayers después de la actualización del match
 
     // Registrar acción en el log
     const logAction = isResort
@@ -3710,6 +3932,154 @@ export default async function handler(
 
     // En el código final antes de la respuesta:
     [finalTeamA, finalTeamB] = verifyFinalTeams(finalTeamA, finalTeamB);
+
+    // Verificación final de duplicados antes de retornar
+    const finalRemoveDuplicates = (team: any[]): any[] => {
+      const seen = new Set<string>();
+      return team.filter((player) => {
+        if (!player || !player.id) return false;
+        if (seen.has(player.id)) {
+          console.log(
+            `⚠️ Jugador duplicado eliminado en verificación final: ${player.name} (${player.id})`
+          );
+          return false;
+        }
+        seen.add(player.id);
+        return true;
+      });
+    };
+
+    finalTeamA = finalRemoveDuplicates(finalTeamA);
+    finalTeamB = finalRemoveDuplicates(finalTeamB);
+
+    // Verificar que no hay jugadores en ambos equipos finales
+    const finalTeamAIds = new Set(finalTeamA.map((p) => p.id));
+    const finalTeamBIds = new Set(finalTeamB.map((p) => p.id));
+    const finalIntersection = [...finalTeamAIds].filter((id) =>
+      finalTeamBIds.has(id)
+    );
+
+    if (finalIntersection.length > 0) {
+      console.log(
+        `🚨 Jugadores encontrados en ambos equipos finales: ${finalIntersection.join(
+          ', '
+        )}`
+      );
+      // Remover duplicados del equipo B (mantener en equipo A)
+      finalTeamB = finalTeamB.filter((player) => !finalTeamAIds.has(player.id));
+    }
+
+    console.log(
+      `✅ Verificación final completa: Equipo A (${
+        finalTeamA.length
+      }), Equipo B (${finalTeamB.length}), Total: ${
+        finalTeamA.length + finalTeamB.length
+      }`
+    );
+
+    // Ahora sí, agregar TBD players si es necesario (después de todas las verificaciones)
+    const tbdPlayersTeamA = addTbdPlayers(finalTeamA, true);
+    const tbdPlayersTeamB = addTbdPlayers(finalTeamB, false);
+
+    // Preparar los datos para la respuesta (ahora que tenemos tbdPlayersTeamA y tbdPlayersTeamB)
+    const tbdPlayers = {
+      teamA: tbdPlayersTeamA,
+      teamB: tbdPlayersTeamB,
+      playerRoles: playerRolesMap, // Todos los roles elegidos
+      assignedRoles: assignedRolesMap, // Roles asignados para la formación
+    };
+
+    // Ahora crear/actualizar el match con los datos completos
+    if (isResort && existingMatch) {
+      // Primero eliminar los jugadores actuales
+      await prisma.matchPlayer.deleteMany({
+        where: { matchId: existingMatch.id },
+      });
+
+      // Actualizar el partido existente
+      match = await prisma.match.update({
+        where: { id: existingMatch.id },
+        data: {
+          // No actualizamos date ni location en un re-sorteo
+          teamA: teamAName,
+          teamB: teamBName,
+          tbdPlayers: JSON.stringify(tbdPlayers), // Guardar tbdPlayers completo con playerRoles
+          sortCount: { increment: 1 },
+        },
+      });
+    } else {
+      // Crear un nuevo partido
+      match = await prisma.match.create({
+        data: {
+          date: matchDate,
+          location: matchLocation,
+          groupId,
+          teamA: teamAName,
+          teamB: teamBName,
+          scoreA: 0,
+          scoreB: 0,
+          status: 'PENDING',
+          tbdPlayers: JSON.stringify(tbdPlayers), // Guardar tbdPlayers completo con playerRoles
+          sortCount: 0,
+        },
+      });
+
+      // Actualizar el grupo con la información del nuevo partido
+      await prisma.group.update({
+        where: { id: groupId },
+        data: {
+          totalMatches: { increment: 1 },
+          nextMatch: matchDate,
+        },
+      });
+    }
+
+    // AHORA crear los matchPlayers después de tener el match actualizado
+    // Registrar jugadores del equipo A
+    for (const player of finalTeamA) {
+      // Skip invalid player IDs or TBD players which have special ID formats
+      if (!player.id || player.id.toString().startsWith('tbd-')) {
+        continue;
+      }
+
+      try {
+        await prisma.matchPlayer.create({
+          data: {
+            matchId: match.id,
+            userId: player.id,
+            isTeamA: true,
+          },
+        });
+      } catch (error) {
+        console.error(
+          `Error registering player ${player.id} to team A:`,
+          error
+        );
+      }
+    }
+
+    // Registrar jugadores del equipo B
+    for (const player of finalTeamB) {
+      // Skip invalid player IDs or TBD players which have special ID formats
+      if (!player.id || player.id.toString().startsWith('tbd-')) {
+        continue;
+      }
+
+      try {
+        await prisma.matchPlayer.create({
+          data: {
+            matchId: match.id,
+            userId: player.id,
+            isTeamA: false,
+          },
+        });
+      } catch (error) {
+        console.error(
+          `Error registering player ${player.id} to team B:`,
+          error
+        );
+      }
+    }
 
     // Ordenar los equipos por posición antes de retornarlos
     const sortedTeamA = sortPlayersByRole(finalTeamA);

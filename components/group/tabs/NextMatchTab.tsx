@@ -33,6 +33,7 @@ import ReplaceTbdPlayerModal from '../modals/ReplaceTbdPlayerModal';
 import AttendanceConfirmation from '../AttendanceConfirmation';
 import TeamFormationNotification from '../TeamFormationNotification';
 import UnassignedPlayersManager from '../UnassignedPlayersManager';
+import DeleteMatchModal from '../modals/DeleteMatchModal';
 
 // Definición de roles de jugador para ordenar por posición
 const PLAYER_ROLE_PRIORITY = {
@@ -203,6 +204,9 @@ export default function NextMatchTab({
   const [balanceByRole, setBalanceByRole] = useState(true);
   // Estado para balance por star rating
   const [balanceByRating, setBalanceByRating] = useState(false);
+
+  // Estado para el modal de eliminar partido
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Local state to track attendance status
   const [localUserAttendanceStatus, setLocalUserAttendanceStatus] = useState<
@@ -753,7 +757,7 @@ export default function NextMatchTab({
           }
 
           console.log(
-            'Actualizando caché después de sortear, setting sortCount=1, con promedios de edad:',
+            'Actualizando caché después de sortear, incrementando sortCount, con promedios de edad:',
             response?.teamAAvgAge,
             response?.teamBAvgAge
           );
@@ -772,12 +776,16 @@ export default function NextMatchTab({
             sortedPlayersB = sortPlayersByRole(sortedPlayersB);
           }
 
+          // Incrementar sortCount en lugar de forzarlo a 1
+          const currentSortCount = oldData.nextMatchDetails.sortCount || 0;
+          const newSortCount = currentSortCount + 1;
+
           // Crear una copia de los datos con sortCount incrementado
           return {
             ...oldData,
             nextMatchDetails: {
               ...oldData.nextMatchDetails,
-              sortCount: 1, // Forzar a 1 explícitamente después de sortear
+              sortCount: newSortCount, // Incrementar sortCount correctamente
               // Si la respuesta incluye los equipos, actualizar también
               playersA: sortedPlayersA,
               playersB: sortedPlayersB,
@@ -838,12 +846,6 @@ export default function NextMatchTab({
   const onDeleteMatch = async () => {
     if (!matchDetails?.id) return;
 
-    if (
-      !window.confirm('¿Estás seguro de que quieres eliminar este partido?')
-    ) {
-      return;
-    }
-
     setDeleteLoading(true);
     try {
       // Si tenemos un handler personalizado, lo usamos
@@ -879,12 +881,14 @@ export default function NextMatchTab({
       // Reset local state
       setForceTeamsFormed(false);
       setLocalUserAttendanceStatus(undefined);
+      setShowDeleteModal(false);
 
       // No need to invalidate queries here as the mutation already does that
       showSuccessToast('Partido eliminado correctamente');
     } catch (error) {
       console.error('Error deleting match:', error);
       showErrorToast('Error al eliminar el partido');
+      setShowDeleteModal(false);
     } finally {
       setDeleteLoading(false);
     }
@@ -912,6 +916,37 @@ export default function NextMatchTab({
       (player) => !assignedPlayerIds.includes(player.id)
     );
   }, [confirmedPlayers, playersA, playersB]);
+
+  // Calcular jugadores que cancelaron desde equipos (representados por jugadores TBD)
+  const cancelledFromTeamsCount = useMemo(() => {
+    // Solo contar si ya se sortearon equipos (sortCount > 0)
+    if (!matchDetails?.sortCount || matchDetails.sortCount === 0) {
+      return 0;
+    }
+
+    // Si sortCount es 1 (primer sorteo o re-sorteo reciente), no contar como cancelaciones
+    // porque los TBD pueden estar ahí por falta de jugadores confirmados
+    if (matchDetails.sortCount === 1) {
+      return 0;
+    }
+
+    // Solo contar jugadores TBD como cancelaciones si sortCount > 1
+    // y hay suficientes jugadores confirmados para llenar los equipos
+    const hasEnoughPlayers = confirmedCount >= requiredPlayers;
+
+    if (hasEnoughPlayers) {
+      // Si hay suficientes jugadores pero aún hay TBD, son cancelaciones
+      return normalizedTbdPlayers.length;
+    } else {
+      // Si no hay suficientes jugadores, los TBD no son cancelaciones
+      return 0;
+    }
+  }, [
+    matchDetails?.sortCount,
+    normalizedTbdPlayers,
+    confirmedCount,
+    requiredPlayers,
+  ]);
 
   // Actualizar el estado solo cuando el cálculo cambie
   useEffect(() => {
@@ -1107,83 +1142,89 @@ export default function NextMatchTab({
               )}
             </div>
 
-            <div className='p-4'>
-              <div className='grid grid-cols-1 gap-4'>
-                {/* Estado de la asistencia */}
-                <div className='bg-gray-50 rounded-lg p-4 w-full'>
-                  <h4 className='text-lg font-medium text-gray-800 mb-4'>
-                    Estado
-                  </h4>
+            {/* Estado de la asistencia */}
+            <div className='bg-gray-50 rounded-lg p-4 w-full mb-6'>
+              <h4 className='text-lg font-medium text-gray-800 mb-4'>Estado</h4>
 
-                  <div className='flex flex-col sm:flex-row gap-4'>
-                    {/* Barra de progreso */}
-                    <div className='flex-1'>
-                      <div className='flex justify-between items-center text-sm font-medium text-gray-700 mb-2'>
-                        <div className='flex items-center'>
-                          <UserGroupIcon className='h-5 w-5 mr-2 text-gray-500' />
-                          <span>
-                            {confirmedCount}/{requiredPlayers} jugadores
-                          </span>
-                        </div>
-                        <span className='bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm'>
-                          {progressPercentage}%
-                        </span>
-                      </div>
-                      <div className='bg-gray-200 rounded-full h-4 mt-1.5 relative w-full'>
-                        <div
-                          className='bg-green-500 h-4 rounded-full transition-all duration-500 flex items-center justify-center w-full'
-                          style={{ width: `${progressPercentage}%` }}
-                        >
-                          <span className='text-xs font-medium text-white'>
-                            {confirmedCount}/{requiredPlayers}
-                          </span>
-                        </div>
-                      </div>
+              <div className='flex flex-col sm:flex-row gap-4'>
+                {/* Barra de progreso */}
+                <div className='flex-1'>
+                  <div className='flex justify-between items-end mb-2'>
+                    <div className='flex items-center text-base font-semibold text-gray-800'>
+                      <UserGroupIcon className='h-5 w-5 mr-2 text-gray-500' />
+                      <span>
+                        {confirmedCount}/{requiredPlayers} jugadores
+                      </span>
                     </div>
-
-                    {/* Toggle de asistencia */}
-                    {isUserInGroup && (
-                      <div className='flex-1'>
-                        <AttendanceConfirmation
-                          userAttendanceStatus={normalizeStatus(
-                            localUserAttendanceStatus
-                          )}
-                          handleGroupAttendance={handleAttendance}
-                          disabled={attendanceLoading || !matchDetails?.id}
-                          confirmedCount={confirmedCount}
-                          requiredPlayers={requiredPlayers}
-                          matchId={matchDetails?.id}
-                          initialPlayerRoles={userRoles || []}
-                        />
-                      </div>
-                    )}
+                    <span className='ml-2 text-sm font-medium text-blue-700'>
+                      {progressPercentage}%
+                    </span>
+                  </div>
+                  <div className='relative w-full h-6 bg-gray-100 rounded-full overflow-hidden shadow-sm border border-gray-200'>
+                    <div
+                      className='absolute left-0 top-0 h-full rounded-full transition-all duration-500'
+                      style={{
+                        width: `${progressPercentage}%`,
+                        background:
+                          'linear-gradient(90deg, #43e97b 0%, #38f9d7 100%)',
+                      }}
+                    ></div>
+                    {/* Porcentaje centrado y legible dentro de la barra */}
+                    <span
+                      className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-sm font-bold text-black drop-shadow-md select-none pointer-events-none'
+                      style={{
+                        textShadow: '0 1px 4px rgba(255,255,255,0.5)',
+                      }}
+                    >
+                      {progressPercentage}%
+                    </span>
                   </div>
                 </div>
+
+                {/* Toggle de asistencia */}
+                {isUserInGroup && (
+                  <div className='flex-1'>
+                    <AttendanceConfirmation
+                      userAttendanceStatus={normalizeStatus(
+                        localUserAttendanceStatus
+                      )}
+                      handleGroupAttendance={handleAttendance}
+                      disabled={attendanceLoading || !matchDetails?.id}
+                      confirmedCount={confirmedCount}
+                      requiredPlayers={requiredPlayers}
+                      matchId={matchDetails?.id}
+                      initialPlayerRoles={userRoles || []}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
           {/* Notificación de formación de equipos - Se muestra siempre que el usuario sea admin */}
           {currentUserIsAdmin && (
-            <TeamFormationNotification
-              confirmedCount={
-                matchDetails?.confirmedPlayers?.length || confirmedCount || 0
-              }
-              requiredPlayers={group?.requiredPlayers || 10}
-              sortCount={matchDetails?.sortCount || 0}
-              unassignedCount={unassignedPlayers.length}
-              onRandomizeTeams={handleSortTeamsClick}
-              isLoading={sortTeamsLoading}
-              currentUserIsAdmin={currentUserIsAdmin}
-              allowFillIn={allowFillIn}
-              setAllowFillIn={setAllowFillIn}
-              balanceByAge={balanceByAge}
-              setBalanceByAge={setBalanceByAge}
-              balanceByRole={balanceByRole}
-              setBalanceByRole={setBalanceByRole}
-              balanceByRating={balanceByRating}
-              setBalanceByRating={setBalanceByRating}
-            />
+            <div className='mb-6'>
+              <TeamFormationNotification
+                confirmedCount={
+                  matchDetails?.confirmedPlayers?.length || confirmedCount || 0
+                }
+                requiredPlayers={group?.requiredPlayers || 10}
+                sortCount={matchDetails?.sortCount || 0}
+                unassignedCount={unassignedPlayers.length}
+                cancelledFromTeamsCount={cancelledFromTeamsCount}
+                onRandomizeTeams={handleSortTeamsClick}
+                isLoading={sortTeamsLoading}
+                currentUserIsAdmin={currentUserIsAdmin}
+                allowFillIn={allowFillIn}
+                setAllowFillIn={setAllowFillIn}
+                balanceByAge={balanceByAge}
+                setBalanceByAge={setBalanceByAge}
+                balanceByRole={balanceByRole}
+                setBalanceByRole={setBalanceByRole}
+                balanceByRating={balanceByRating}
+                setBalanceByRating={setBalanceByRating}
+              />
+            </div>
           )}
 
           {/* Sección de jugadores confirmados - Solo mostrar cuando no hay equipos formados (sortCount = 0) */}
@@ -1209,9 +1250,9 @@ export default function NextMatchTab({
           <div className='hidden'></div>
 
           {/* Sección de equipos formados - Solo mostrar cuando sortCount > 0 o se forzó la formación de equipos */}
-          {(forceTeamsFormed ||
-            (matchDetails?.sortCount && matchDetails.sortCount > 0)) && (
-            <div className='bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200'>
+          {forceTeamsFormed ||
+          (matchDetails?.sortCount && matchDetails.sortCount > 0) ? (
+            <div className='bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200 mb-6'>
               <div className='px-3 py-4 sm:px-4 border-b border-gray-200 flex justify-between items-center'>
                 <div>
                   <h3 className='text-md font-medium leading-6 text-gray-900'>
@@ -1241,12 +1282,11 @@ export default function NextMatchTab({
 
                     <Button
                       variant='danger'
-                      onClick={() =>
-                        handleDeleteMatch && handleDeleteMatch(matchDetails.id)
-                      }
+                      onClick={() => setShowDeleteModal(true)}
                       className='p-1.5 rounded-full'
                       size='sm'
                       title='Eliminar partido'
+                      disabled={deleteLoading}
                     >
                       <TrashIcon className='h-5 w-5' />
                     </Button>
@@ -1273,24 +1313,24 @@ export default function NextMatchTab({
                 />
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* Mostrar el gestor de jugadores sin asignar solo si sortCount > 0 */}
           {matchDetails?.sortCount &&
-            matchDetails.sortCount > 0 &&
-            unassignedPlayers.length > 0 && (
-              <div className='mt-4'>
-                <UnassignedPlayersManager
-                  confirmedPlayers={confirmedPlayers}
-                  playersA={playersA}
-                  playersB={playersB}
-                  teamsFormed={teamsFormed}
-                  currentUserIsAdmin={currentUserIsAdmin}
-                  onRandomizeTeams={handleSortTeamsClick}
-                  isLoading={sortTeamsLoading}
-                />
-              </div>
-            )}
+          matchDetails.sortCount > 0 &&
+          unassignedPlayers.length > 0 ? (
+            <div className='mt-4'>
+              <UnassignedPlayersManager
+                confirmedPlayers={confirmedPlayers}
+                playersA={playersA}
+                playersB={playersB}
+                teamsFormed={teamsFormed}
+                currentUserIsAdmin={currentUserIsAdmin}
+                onRandomizeTeams={handleSortTeamsClick}
+                isLoading={sortTeamsLoading}
+              />
+            </div>
+          ) : null}
         </>
       ) : (
         <div className='bg-white rounded-lg p-8 text-center'>
@@ -1330,6 +1370,19 @@ export default function NextMatchTab({
           )}
         </div>
       )}
+
+      {/* Modal de eliminar partido */}
+      <DeleteMatchModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={onDeleteMatch}
+        matchDate={
+          matchDetails?.date
+            ? formatNextMatchDate(matchDetails.date)
+            : undefined
+        }
+        isDeleting={deleteLoading}
+      />
     </div>
   );
 }

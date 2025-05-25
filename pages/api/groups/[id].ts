@@ -343,6 +343,103 @@ export default async function handler(
       console.error('Error al actualizar el grupo:', error);
       return res.status(500).json({ message: 'Error interno del servidor' });
     }
+  }
+  // DELETE: Eliminar grupo
+  else if (req.method === 'DELETE') {
+    try {
+      // Verificar que el usuario es administrador o creador del grupo
+      const group = await prisma.group.findUnique({
+        where: { id },
+        select: {
+          createdBy: true,
+          name: true,
+        },
+      });
+
+      if (!group) {
+        return res.status(404).json({ message: 'Grupo no encontrado' });
+      }
+
+      const userMembership = await prisma.groupMember.findFirst({
+        where: {
+          groupId: id,
+          userId: user.id,
+        },
+      });
+
+      // Determinar si el usuario es administrador o creador
+      const isAdmin =
+        userMembership?.role === 'ADMIN' || group.createdBy === user.id;
+
+      if (!isAdmin) {
+        return res
+          .status(403)
+          .json({ message: 'No tienes permisos para eliminar este grupo' });
+      }
+
+      // Eliminar en orden para evitar problemas de foreign key constraints
+      // 1. Eliminar goals de todos los matches del grupo
+      await prisma.goal.deleteMany({
+        where: {
+          match: {
+            groupId: id,
+          },
+        },
+      });
+
+      // 2. Eliminar match players de todos los matches del grupo
+      await prisma.matchPlayer.deleteMany({
+        where: {
+          match: {
+            groupId: id,
+          },
+        },
+      });
+
+      // 3. Eliminar match attendance de todos los matches del grupo
+      await prisma.matchAttendance.deleteMany({
+        where: {
+          groupId: id,
+        },
+      });
+
+      // 4. Eliminar todos los matches del grupo
+      await prisma.match.deleteMany({
+        where: {
+          groupId: id,
+        },
+      });
+
+      // 5. Eliminar todos los logs del grupo
+      await prisma.groupLog.deleteMany({
+        where: {
+          groupId: id,
+        },
+      });
+
+      // 6. Eliminar todos los miembros del grupo
+      await prisma.groupMember.deleteMany({
+        where: {
+          groupId: id,
+        },
+      });
+
+      // 7. Finalmente, eliminar el grupo
+      await prisma.group.delete({
+        where: { id },
+      });
+
+      // Registrar en el log antes de eliminar (si queremos mantener un registro)
+      // Note: Como estamos eliminando el grupo, este log también se eliminará
+      // pero podríamos crear un log global si fuera necesario
+
+      return res.status(200).json({
+        message: 'Grupo eliminado correctamente',
+      });
+    } catch (error) {
+      console.error('Error al eliminar el grupo:', error);
+      return res.status(500).json({ message: 'Error interno del servidor' });
+    }
   } else {
     return res.status(405).json({ message: 'Método no permitido' });
   }

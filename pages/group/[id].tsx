@@ -166,7 +166,7 @@ const LazyNextMatchTab = ({
     enabled: !!groupId,
     staleTime: isTeamsSorting ? 0 : 30 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    refetchOnMount: true, // Permitir refetch al montar para cargar datos al recargar la página
   });
 
   // Construct the group object expected by NextMatchTab
@@ -818,7 +818,7 @@ const GroupContent = ({
     enabled: !!groupId,
     staleTime: 30 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    refetchOnMount: true, // Permitir refetch al montar para cargar datos al recargar la página
   });
 
   // Ensure nextMatchId is always up to date

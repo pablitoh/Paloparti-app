@@ -4,6 +4,7 @@ import Button from '../../components/Button';
 import Layout from '../../components/Layout';
 import { useSession } from 'next-auth/react';
 import { RecurrenceType } from '../../types/match';
+import DeleteGroupModal from '../../components/group/modals/DeleteGroupModal';
 
 interface Member {
   id: string;
@@ -40,6 +41,7 @@ export default function EditGroup() {
   const [isLoading, setIsLoading] = useState(true);
   const [members, setMembers] = useState<Member[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     sport: '',
@@ -110,7 +112,7 @@ export default function EditGroup() {
           recurrenceType: data.recurrenceType || 'NONE',
           recurrenceDays: data.recurrenceDays || [],
           recurrenceTime: data.recurrenceTime || '18:00',
-          requiredPlayers: data.requiredPlayers || 10,
+          requiredPlayers: (data.requiredPlayers || 10) / 2, // Convert total players to players per team
           teamAName: data.teamAName || 'Equipo A',
           teamBName: data.teamBName || 'Equipo B',
         });
@@ -152,9 +154,9 @@ export default function EditGroup() {
       setError(null);
       setSuccess(null);
 
-      // Validar que requiredPlayers sea un número par
-      if (formData.requiredPlayers % 2 !== 0) {
-        setError('El número de jugadores requeridos debe ser par');
+      // Validar que jugadores por equipo sea mayor a 0
+      if (formData.requiredPlayers < 1) {
+        setError('Debe haber al menos 1 jugador por equipo');
         setIsSubmitting(false);
         return;
       }
@@ -180,7 +182,7 @@ export default function EditGroup() {
         teamAName: validatedTeamAName,
         teamBName: validatedTeamBName,
         nextMatch: nextMatch ? nextMatch.toISOString() : null,
-        requiredPlayers: Number(formData.requiredPlayers),
+        requiredPlayers: Number(formData.requiredPlayers) * 2, // Convert players per team to total players
       };
 
       console.log(
@@ -231,19 +233,10 @@ export default function EditGroup() {
     >
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => {
-      const newData = {
-        ...prev,
-        [name]: name === 'requiredPlayers' ? Number(value) : value,
-      };
-
-      // If sport changes, update requiredPlayers
-      if (name === 'sport') {
-        newData.requiredPlayers = getDefaultRequiredPlayers(value);
-      }
-
-      return newData;
-    });
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === 'requiredPlayers' ? Number(value) : value,
+    }));
   };
 
   // Función para manejar cambios en los checkbox de días
@@ -391,16 +384,15 @@ export default function EditGroup() {
     }
   };
 
+  // Función para manejar la confirmación del modal
+  const handleDeleteConfirm = async () => {
+    await handleDeleteGroup();
+    setShowDeleteModal(false);
+  };
+
   // Función para eliminar grupo
   const handleDeleteGroup = async () => {
     if (!isAdmin || !group || !id) return;
-
-    // Mostrar confirmación adicional
-    const confirmDelete = window.confirm(
-      '¿ESTÁS ABSOLUTAMENTE SEGURO? Esta acción eliminará permanentemente el grupo, todos sus partidos, historial y no se puede deshacer.'
-    );
-
-    if (!confirmDelete) return;
 
     try {
       setIsDeleting(true);
@@ -567,29 +559,6 @@ export default function EditGroup() {
 
               <div>
                 <label
-                  htmlFor='sport'
-                  className='block text-sm font-medium text-gray-700 mb-1'
-                >
-                  Deporte
-                </label>
-                <select
-                  id='sport'
-                  name='sport'
-                  value={formData.sport}
-                  onChange={handleChange}
-                  className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                >
-                  <option value='Fútbol'>Fútbol</option>
-                  <option value='Baloncesto'>Baloncesto</option>
-                  <option value='Pádel'>Pádel</option>
-                  <option value='Tenis'>Tenis</option>
-                  <option value='Voleibol'>Voleibol</option>
-                  <option value='Otros'>Otros</option>
-                </select>
-              </div>
-
-              <div>
-                <label
                   htmlFor='description'
                   className='block text-sm font-medium text-gray-700 mb-1'
                 >
@@ -629,7 +598,7 @@ export default function EditGroup() {
                   htmlFor='requiredPlayers'
                   className='block text-sm font-medium text-gray-700 mb-1'
                 >
-                  Jugadores requeridos para sortear
+                  Jugadores por equipo
                 </label>
                 <input
                   type='number'
@@ -637,13 +606,12 @@ export default function EditGroup() {
                   name='requiredPlayers'
                   value={formData.requiredPlayers}
                   onChange={handleChange}
-                  min={2}
+                  min={1}
                   required
                   className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                 />
                 <p className='mt-1 text-sm text-gray-500'>
-                  Número mínimo de jugadores confirmados necesarios para sortear
-                  los equipos (debe ser par)
+                  Número de jugadores por equipo
                 </p>
               </div>
 
@@ -893,7 +861,7 @@ export default function EditGroup() {
             <div className='flex justify-end'>
               <Button
                 variant='danger'
-                onClick={handleDeleteGroup}
+                onClick={() => setShowDeleteModal(true)}
                 disabled={isDeleting}
                 className='bg-red-600 hover:bg-red-700 text-white flex items-center'
               >
@@ -944,6 +912,15 @@ export default function EditGroup() {
             </div>
           </div>
         </div>
+
+        {/* Delete Group Modal */}
+        <DeleteGroupModal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={handleDeleteConfirm}
+          groupName={group?.name || ''}
+          isDeleting={isDeleting}
+        />
       </div>
     </Layout>
   );

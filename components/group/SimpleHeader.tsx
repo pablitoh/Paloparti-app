@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { NextRouter } from 'next/router';
 import {
@@ -8,6 +8,8 @@ import {
   ClipboardIcon,
   Bars3Icon,
 } from '@heroicons/react/24/outline';
+import DeleteGroupModal from './modals/DeleteGroupModal';
+import LeaveGroupModal from './modals/LeaveGroupModal';
 
 interface SimpleHeaderProps {
   group: any;
@@ -21,6 +23,7 @@ interface SimpleHeaderProps {
   isCopying: boolean;
   router: NextRouter;
   onToggleDrawer?: () => void;
+  isDeleting?: boolean;
 }
 
 const SimpleHeader: React.FC<SimpleHeaderProps> = ({
@@ -35,7 +38,39 @@ const SimpleHeader: React.FC<SimpleHeaderProps> = ({
   isCopying,
   router,
   onToggleDrawer,
+  isDeleting = false,
 }) => {
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [isLocalDeleting, setIsLocalDeleting] = useState(false);
+  const [isLocalLeaving, setIsLocalLeaving] = useState(false);
+
+  const handleDeleteConfirm = async () => {
+    try {
+      setIsLocalDeleting(true);
+      await handleLeaveGroup();
+      setShowDeleteModal(false);
+    } catch (error) {
+      // Error handling is done in the parent component
+      setShowDeleteModal(false);
+    } finally {
+      setIsLocalDeleting(false);
+    }
+  };
+
+  const handleLeaveConfirm = async () => {
+    try {
+      setIsLocalLeaving(true);
+      await handleLeaveGroup();
+      setShowLeaveModal(false);
+    } catch (error) {
+      // Error handling is done in the parent component
+      setShowLeaveModal(false);
+    } finally {
+      setIsLocalLeaving(false);
+    }
+  };
+
   return (
     <div className='sticky top-0 z-10 bg-white rounded-xl shadow-sm p-4 mb-0'>
       <div className='flex items-center justify-between flex-wrap gap-3'>
@@ -92,15 +127,7 @@ const SimpleHeader: React.FC<SimpleHeaderProps> = ({
           ) : (
             isUserInGroup && (
               <button
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      '¿Estás seguro de que quieres salir de este grupo?'
-                    )
-                  ) {
-                    handleLeaveGroup();
-                  }
-                }}
+                onClick={() => setShowLeaveModal(true)}
                 className='hidden sm:inline-flex px-3 py-1.5 text-sm text-red-600 hover:text-white hover:bg-red-600 border border-red-600 rounded-lg transition-all duration-200'
               >
                 Salir del grupo
@@ -119,17 +146,10 @@ const SimpleHeader: React.FC<SimpleHeaderProps> = ({
                 <PencilIcon className='h-5 w-5' />
               </button>
               <button
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      '¿Estás seguro de que quieres eliminar este grupo? Esta acción no se puede deshacer.'
-                    )
-                  ) {
-                    handleLeaveGroup();
-                  }
-                }}
+                onClick={() => setShowDeleteModal(true)}
                 className='hidden sm:flex p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all'
                 title='Eliminar grupo'
+                disabled={isDeleting}
               >
                 <TrashIcon className='h-5 w-5' />
               </button>
@@ -137,6 +157,24 @@ const SimpleHeader: React.FC<SimpleHeaderProps> = ({
           )}
         </div>
       </div>
+
+      {/* Delete Group Modal */}
+      <DeleteGroupModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteConfirm}
+        groupName={group.name}
+        isDeleting={isDeleting || isLocalDeleting}
+      />
+
+      {/* Leave Group Modal */}
+      <LeaveGroupModal
+        isOpen={showLeaveModal}
+        onClose={() => setShowLeaveModal(false)}
+        onConfirm={handleLeaveConfirm}
+        groupName={group.name}
+        isLeaving={isLocalLeaving}
+      />
     </div>
   );
 };
