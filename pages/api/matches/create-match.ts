@@ -1185,13 +1185,39 @@ const createBalancedTeamsByMultiCriteria = (
     const metricsA = calculateTeamMetrics(teamA);
     const metricsB = calculateTeamMetrics(teamB);
 
-    // Distribuir para equilibrar nivel de habilidad
-    if (metricsA.skillAvg <= metricsB.skillAvg) {
-      teamA.push({ ...topPlayers[0], assignedRole: position });
-      teamB.push({ ...topPlayers[1], assignedRole: position });
+    // Distribuir para equilibrar nivel de habilidad de manera más inteligente
+    // Considerar tanto habilidad como edad en la distribución inicial
+    const playerA_Score =
+      (topPlayers[0].starRating || 3) * 0.7 +
+      ((topPlayers[0].age || 30) / 50) * 0.3;
+    const playerB_Score =
+      (topPlayers[1].starRating || 3) * 0.7 +
+      ((topPlayers[1].age || 30) / 50) * 0.3;
+
+    // Asignar el mejor jugador al equipo que más lo necesite
+    const teamA_NeedScore =
+      (5 - metricsA.skillAvg) * 0.6 + ((40 - metricsA.ageAvg) / 40) * 0.4;
+    const teamB_NeedScore =
+      (5 - metricsB.skillAvg) * 0.6 + ((40 - metricsB.ageAvg) / 40) * 0.4;
+
+    if (teamA_NeedScore >= teamB_NeedScore) {
+      // Equipo A necesita más refuerzo
+      if (playerA_Score >= playerB_Score) {
+        teamA.push({ ...topPlayers[0], assignedRole: position });
+        teamB.push({ ...topPlayers[1], assignedRole: position });
+      } else {
+        teamA.push({ ...topPlayers[1], assignedRole: position });
+        teamB.push({ ...topPlayers[0], assignedRole: position });
+      }
     } else {
-      teamB.push({ ...topPlayers[0], assignedRole: position });
-      teamA.push({ ...topPlayers[1], assignedRole: position });
+      // Equipo B necesita más refuerzo
+      if (playerA_Score >= playerB_Score) {
+        teamB.push({ ...topPlayers[0], assignedRole: position });
+        teamA.push({ ...topPlayers[1], assignedRole: position });
+      } else {
+        teamB.push({ ...topPlayers[1], assignedRole: position });
+        teamA.push({ ...topPlayers[0], assignedRole: position });
+      }
     }
 
     // Eliminar los jugadores asignados del pool
@@ -1242,10 +1268,10 @@ const createBalancedTeamsByMultiCriteria = (
       const scoreA = skillDiff * 0.6 + ageDiff * 0.25 + positionDiff * 0.15;
 
       // MEJORA 4: Evitar que la diferencia de edad sea muy grande
-      const isBigAgeDiff = Math.abs(ageDiff) > 7; // Si hay más de 7 años de diferencia promedio
+      const isBigAgeDiff = Math.abs(ageDiff) > 4; // Reducido de 7 a 4 años
 
       // MEJORA 5: Evitar diferencias extremas de habilidad
-      const hasSkillImbalance = Math.abs(skillDiff) > 0.8;
+      const hasSkillImbalance = Math.abs(skillDiff) > 0.5; // Reducido de 0.8 a 0.5
 
       // Decisión final - asignar al equipo más necesitado
       if (isBigAgeDiff) {
@@ -1304,18 +1330,28 @@ const createBalancedTeamsByMultiCriteria = (
       return assignFlexibleRole(team, availableRoles);
     };
 
-    // Calcular puntajes de necesidad
+    // Calcular puntajes de necesidad con pesos ajustados
     const skillDiff = metricsA.skillAvg - metricsB.skillAvg;
     const ageDiff = metricsA.ageAvg - metricsB.ageAvg;
     const teamSizeDiff = teamA.length - teamB.length;
 
-    // Puntaje compuesto (mayor valor favorece al equipo B)
-    const compositeScore = skillDiff * 0.5 + ageDiff * 0.3 + teamSizeDiff * 0.2;
+    // Puntaje compuesto mejorado (mayor valor favorece al equipo B)
+    // Aumentamos el peso de habilidad y edad para mejor balance
+    const compositeScore = skillDiff * 0.6 + ageDiff * 0.3 + teamSizeDiff * 0.1;
 
-    // Asignar al equipo más necesitado
+    // Factor de corrección adicional para evitar desbalances extremos
+    const skillImbalanceFactor =
+      Math.abs(skillDiff) > 0.3 ? Math.sign(skillDiff) * 0.5 : 0;
+    const ageImbalanceFactor =
+      Math.abs(ageDiff) > 3 ? Math.sign(ageDiff) * 0.3 : 0;
+
+    const adjustedScore =
+      compositeScore + skillImbalanceFactor + ageImbalanceFactor;
+
+    // Asignar al equipo más necesitado usando el puntaje ajustado
     if (
-      compositeScore > 0.1 ||
-      (Math.abs(compositeScore) <= 0.1 && teamA.length > teamB.length)
+      adjustedScore > 0.05 ||
+      (Math.abs(adjustedScore) <= 0.05 && teamA.length > teamB.length)
     ) {
       // Favorecer equipo B
       const roleToAssign = determineRole(teamB);
@@ -1668,6 +1704,138 @@ const createBalancedTeamsByMultiCriteria = (
   // Ejecutar corrección de desbalances críticos
   fixCriticalImbalances();
 
+  // NUEVA MEJORA: Verificación y corrección final de desbalances extremos
+  const performFinalBalanceCheck = () => {
+    let attempts = 0;
+    const maxAttempts = 5;
+
+    while (attempts < maxAttempts) {
+      const metricsA = calculateTeamMetrics(teamA);
+      const metricsB = calculateTeamMetrics(teamB);
+
+      const skillDiff = Math.abs(metricsA.skillAvg - metricsB.skillAvg);
+      const ageDiff = Math.abs(metricsA.ageAvg - metricsB.ageAvg);
+
+      console.log(
+        `🔍 Verificación final ${attempts + 1}: Skill diff: ${skillDiff.toFixed(
+          2
+        )}, Age diff: ${ageDiff.toFixed(1)}`
+      );
+
+      // Umbrales más estrictos para la verificación final
+      const skillThreshold = 0.4; // Máximo 0.4 puntos de diferencia en rating
+      const ageThreshold = 3.5; // Máximo 3.5 años de diferencia promedio
+
+      if (skillDiff <= skillThreshold && ageDiff <= ageThreshold) {
+        console.log('✅ Balance final aceptable alcanzado');
+        break;
+      }
+
+      // Identificar el tipo de desbalance más crítico
+      const skillImbalanceRatio = skillDiff / skillThreshold;
+      const ageImbalanceRatio = ageDiff / ageThreshold;
+
+      if (skillImbalanceRatio > ageImbalanceRatio) {
+        // Priorizar corrección de habilidad
+        console.log(
+          `🔧 Corrigiendo desbalance de habilidad (${skillDiff.toFixed(2)})`
+        );
+
+        // Encontrar el mejor jugador del equipo con mayor rating
+        const strongerTeam =
+          metricsA.skillAvg > metricsB.skillAvg ? teamA : teamB;
+        const weakerTeam =
+          metricsA.skillAvg > metricsB.skillAvg ? teamB : teamA;
+
+        // Buscar jugador de alto rating en el equipo fuerte (excluyendo arqueros)
+        const highRatedPlayer = strongerTeam
+          .filter((p) => p.assignedRole !== PLAYER_ROLES.GOALKEEPER)
+          .sort((a, b) => (b.starRating || 3) - (a.starRating || 3))[0];
+
+        // Buscar jugador de bajo rating en el equipo débil (excluyendo arqueros)
+        const lowRatedPlayer = weakerTeam
+          .filter((p) => p.assignedRole !== PLAYER_ROLES.GOALKEEPER)
+          .sort((a, b) => (a.starRating || 3) - (b.starRating || 3))[0];
+
+        if (highRatedPlayer && lowRatedPlayer) {
+          // Intercambiar jugadores
+          const highIndex = strongerTeam.findIndex(
+            (p) => p.id === highRatedPlayer.id
+          );
+          const lowIndex = weakerTeam.findIndex(
+            (p) => p.id === lowRatedPlayer.id
+          );
+
+          if (highIndex !== -1 && lowIndex !== -1) {
+            // Mantener las posiciones asignadas
+            const tempRole = highRatedPlayer.assignedRole;
+            highRatedPlayer.assignedRole = lowRatedPlayer.assignedRole;
+            lowRatedPlayer.assignedRole = tempRole;
+
+            // Intercambiar
+            strongerTeam[highIndex] = lowRatedPlayer;
+            weakerTeam[lowIndex] = highRatedPlayer;
+
+            console.log(
+              `🔄 Intercambiado ${highRatedPlayer.name} (${highRatedPlayer.starRating}) ↔ ${lowRatedPlayer.name} (${lowRatedPlayer.starRating})`
+            );
+          }
+        }
+      } else {
+        // Priorizar corrección de edad
+        console.log(
+          `🔧 Corrigiendo desbalance de edad (${ageDiff.toFixed(1)} años)`
+        );
+
+        // Encontrar el equipo con mayor edad promedio
+        const olderTeam = metricsA.ageAvg > metricsB.ageAvg ? teamA : teamB;
+        const youngerTeam = metricsA.ageAvg > metricsB.ageAvg ? teamB : teamA;
+
+        // Buscar jugador mayor en el equipo viejo (excluyendo arqueros)
+        const oldPlayer = olderTeam
+          .filter((p) => p.assignedRole !== PLAYER_ROLES.GOALKEEPER && p.age)
+          .sort((a, b) => (b.age || 0) - (a.age || 0))[0];
+
+        // Buscar jugador joven en el equipo joven (excluyendo arqueros)
+        const youngPlayer = youngerTeam
+          .filter((p) => p.assignedRole !== PLAYER_ROLES.GOALKEEPER && p.age)
+          .sort((a, b) => (a.age || 99) - (b.age || 99))[0];
+
+        if (oldPlayer && youngPlayer) {
+          // Intercambiar jugadores
+          const oldIndex = olderTeam.findIndex((p) => p.id === oldPlayer.id);
+          const youngIndex = youngerTeam.findIndex(
+            (p) => p.id === youngPlayer.id
+          );
+
+          if (oldIndex !== -1 && youngIndex !== -1) {
+            // Mantener las posiciones asignadas
+            const tempRole = oldPlayer.assignedRole;
+            oldPlayer.assignedRole = youngPlayer.assignedRole;
+            youngPlayer.assignedRole = tempRole;
+
+            // Intercambiar
+            olderTeam[oldIndex] = youngPlayer;
+            youngerTeam[youngIndex] = oldPlayer;
+
+            console.log(
+              `🔄 Intercambiado ${oldPlayer.name} (${oldPlayer.age} años) ↔ ${youngPlayer.name} (${youngPlayer.age} años)`
+            );
+          }
+        }
+      }
+
+      attempts++;
+    }
+
+    if (attempts >= maxAttempts) {
+      console.log('⚠️ Se alcanzó el máximo de intentos de corrección final');
+    }
+  };
+
+  // Ejecutar verificación y corrección final
+  performFinalBalanceCheck();
+
   // Final: Calcular y mostrar métricas
   const finalMetricsA = calculateTeamMetrics(teamA);
   const finalMetricsB = calculateTeamMetrics(teamB);
@@ -1684,6 +1852,18 @@ const createBalancedTeamsByMultiCriteria = (
     promedioEdad: finalMetricsB.ageAvg.toFixed(1),
     promedioHabilidad: finalMetricsB.skillAvg.toFixed(2),
     roles: finalMetricsB.roleCounts,
+  });
+
+  // Mostrar diferencias finales para verificación
+  const finalSkillDiff = Math.abs(
+    finalMetricsA.skillAvg - finalMetricsB.skillAvg
+  );
+  const finalAgeDiff = Math.abs(finalMetricsA.ageAvg - finalMetricsB.ageAvg);
+  console.log('📊 DIFERENCIAS FINALES:', {
+    habilidad: finalSkillDiff.toFixed(2),
+    edad: finalAgeDiff.toFixed(1),
+    balanceAceptable:
+      finalSkillDiff <= 0.4 && finalAgeDiff <= 3.5 ? '✅' : '⚠️',
   });
 
   // Aplicar balance final de posiciones a ambos equipos

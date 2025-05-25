@@ -11,6 +11,9 @@
     "start": "next start",
     "export": "next export",
     "postexport": "cp out/index.html out/200.html",
+    "db:reset": "node scripts/reset-db.js",
+    "db:generate": "npx prisma generate",
+    "db:migrate": "npx prisma migrate deploy",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"

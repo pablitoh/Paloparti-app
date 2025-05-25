@@ -12,7 +12,7 @@ import {
   UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import Button from '../../../components/Button';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useRandomizeTeamsMutation,
@@ -210,8 +210,7 @@ export default function NextMatchTab({
   >(userAttendanceStatus);
 
   // Estados para almacenar promedios de edad después de un sorteo
-  const [teamAAvgAge, setTeamAAvgAge] = useState<number | undefined>(undefined);
-  const [teamBAvgAge, setTeamBAvgAge] = useState<number | undefined>(undefined);
+  // Las edades promedio ahora se calculan directamente con useMemo
 
   // Añadir un estado para la clave de renderizado del componente TeamsList
   const [teamsListKey, setTeamsListKey] = useState<number>(0);
@@ -324,15 +323,19 @@ export default function NextMatchTab({
   const confirmedPlayers = matchDetails?.confirmedPlayers || [];
   const pendingPlayers = matchDetails?.pendingPlayers || [];
   const declinedPlayers = matchDetails?.declinedPlayers || [];
-  // Usar los equipos forzados si están disponibles, de lo contrario usar los del matchDetails
-  const playersA =
-    forcedTeamA.length > 0 && forceTeamsFormed
+
+  // Usar useMemo para estabilizar playersA y playersB y evitar bucles infinitos
+  const playersA = useMemo(() => {
+    return forcedTeamA.length > 0 && forceTeamsFormed
       ? forcedTeamA
       : matchDetails?.playersA || [];
-  const playersB =
-    forcedTeamB.length > 0 && forceTeamsFormed
+  }, [forcedTeamA, forceTeamsFormed, matchDetails?.playersA]);
+
+  const playersB = useMemo(() => {
+    return forcedTeamB.length > 0 && forceTeamsFormed
       ? forcedTeamB
       : matchDetails?.playersB || [];
+  }, [forcedTeamB, forceTeamsFormed, matchDetails?.playersB]);
   const requiredPlayers = group?.requiredPlayers || 10;
   const confirmedCount = confirmedPlayers.length;
   const teamsHavePlayers = playersA.length > 0 || playersB.length > 0;
@@ -692,15 +695,11 @@ export default function NextMatchTab({
         }
 
         // Guardar los promedios de edad siempre que estén disponibles en la respuesta
-        if (response?.teamAAvgAge !== undefined) {
-          console.log('Estableciendo teamAAvgAge:', response.teamAAvgAge);
-          setTeamAAvgAge(response.teamAAvgAge);
-        }
-
-        if (response?.teamBAvgAge !== undefined) {
-          console.log('Estableciendo teamBAvgAge:', response.teamBAvgAge);
-          setTeamBAvgAge(response.teamBAvgAge);
-        }
+        // Las edades promedio se calculan automáticamente
+        console.log('Edades promedio del sorteo:', {
+          teamAAvgAge: response?.teamAAvgAge,
+          teamBAvgAge: response?.teamBAvgAge,
+        });
 
         // Incrementar la clave para forzar un nuevo renderizado del componente TeamsList
         setTeamsListKey((prevKey) => prevKey + 1);
@@ -897,11 +896,10 @@ export default function NextMatchTab({
     100
   );
 
-  // Calcular jugadores sin asignar
-  useEffect(() => {
+  // Calcular jugadores sin asignar usando useMemo para evitar recálculos innecesarios
+  const unassignedPlayersCalculated = useMemo(() => {
     if (!confirmedPlayers || !playersA || !playersB) {
-      setUnassignedPlayers([]);
-      return;
+      return [];
     }
 
     // Obtener todos los IDs de jugadores asignados a equipos
@@ -910,12 +908,15 @@ export default function NextMatchTab({
     );
 
     // Filtrar jugadores confirmados que no estén en ningún equipo
-    const unassignedPlayersArr = confirmedPlayers.filter(
+    return confirmedPlayers.filter(
       (player) => !assignedPlayerIds.includes(player.id)
     );
-
-    setUnassignedPlayers(unassignedPlayersArr);
   }, [confirmedPlayers, playersA, playersB]);
+
+  // Actualizar el estado solo cuando el cálculo cambie
+  useEffect(() => {
+    setUnassignedPlayers(unassignedPlayersCalculated);
+  }, [unassignedPlayersCalculated]);
 
   // Reset forceTeamsFormed when matchDetails.id changes
   useEffect(() => {
@@ -933,49 +934,75 @@ export default function NextMatchTab({
     // Si matchDetails tiene equipos y sortCount > 0, actualizar también los equipos forzados
     if (matchDetails?.sortCount && matchDetails.sortCount > 0) {
       if (matchDetails.playersA && matchDetails.playersA.length > 0) {
-        // Ordenar jugadores por posición antes de establecerlos
-        setForcedTeamA(sortPlayersByRole(matchDetails.playersA));
+        // Solo actualizar si realmente ha cambiado
+        setForcedTeamA((prevTeam) => {
+          const newTeam = sortPlayersByRole(matchDetails.playersA || []);
+          // Comparar si realmente cambió
+          if (JSON.stringify(prevTeam) !== JSON.stringify(newTeam)) {
+            return newTeam;
+          }
+          return prevTeam;
+        });
       }
       if (matchDetails.playersB && matchDetails.playersB.length > 0) {
-        // Ordenar jugadores por posición antes de establecerlos
-        setForcedTeamB(sortPlayersByRole(matchDetails.playersB));
+        // Solo actualizar si realmente ha cambiado
+        setForcedTeamB((prevTeam) => {
+          const newTeam = sortPlayersByRole(matchDetails.playersB || []);
+          // Comparar si realmente cambió
+          if (JSON.stringify(prevTeam) !== JSON.stringify(newTeam)) {
+            return newTeam;
+          }
+          return prevTeam;
+        });
       }
+    } else {
+      // Si no hay sortCount, limpiar los equipos forzados solo si no están ya vacíos
+      setForcedTeamA((prevTeam) => (prevTeam.length > 0 ? [] : prevTeam));
+      setForcedTeamB((prevTeam) => (prevTeam.length > 0 ? [] : prevTeam));
     }
   }, [matchDetails?.playersA, matchDetails?.playersB, matchDetails?.sortCount]);
 
-  // Efecto para sincronizar promedios de edad cuando cambia matchDetails
-  useEffect(() => {
-    if (matchDetails) {
-      if (matchDetails.teamAAvgAge !== undefined) {
-        setTeamAAvgAge(matchDetails.teamAAvgAge);
-      }
-      if (matchDetails.teamBAvgAge !== undefined) {
-        setTeamBAvgAge(matchDetails.teamBAvgAge);
-      }
-    }
-  }, [matchDetails?.teamAAvgAge, matchDetails?.teamBAvgAge]);
+  // Las edades promedio ahora se calculan directamente usando useMemo
 
-  // Process player ages in useEffect
-  useEffect(() => {
+  // Calcular edades promedio usando useMemo para evitar bucles infinitos
+  const calculatedTeamAAvgAge = useMemo(() => {
     if (playersA && playersA.length > 0) {
-      // Usar any[] para evitar conflictos de tipo
       const avgA = calculateApproximateAge(playersA as any[]);
       console.log('Calculando edad promedio para equipo A:', avgA);
-      setTeamAAvgAge(avgA);
+      return avgA;
     }
+    return undefined;
+  }, [playersA]);
 
+  const calculatedTeamBAvgAge = useMemo(() => {
     if (playersB && playersB.length > 0) {
-      // Usar any[] para evitar conflictos de tipo
       const avgB = calculateApproximateAge(playersB as any[]);
       console.log('Calculando edad promedio para equipo B:', avgB);
-      setTeamBAvgAge(avgB);
+      return avgB;
     }
-  }, [playersA, playersB]);
+    return undefined;
+  }, [playersB]);
+
+  // Usar las edades calculadas directamente o las del matchDetails si están disponibles
+  const finalTeamAAvgAge =
+    matchDetails?.teamAAvgAge !== undefined
+      ? matchDetails.teamAAvgAge
+      : calculatedTeamAAvgAge;
+
+  const finalTeamBAvgAge =
+    matchDetails?.teamBAvgAge !== undefined
+      ? matchDetails.teamBAvgAge
+      : calculatedTeamBAvgAge;
 
   // Proceso de los equipos para asegurar que tengan edades definidas correctamente
-  // y ordenarlos por posición
-  const processedPlayersA = sortPlayersByRole(ensurePlayerAges(playersA));
-  const processedPlayersB = sortPlayersByRole(ensurePlayerAges(playersB));
+  // y ordenarlos por posición - usando useMemo para evitar recálculos innecesarios
+  const processedPlayersA = useMemo(() => {
+    return sortPlayersByRole(ensurePlayerAges(playersA));
+  }, [playersA]);
+
+  const processedPlayersB = useMemo(() => {
+    return sortPlayersByRole(ensurePlayerAges(playersB));
+  }, [playersB]);
 
   // Añadir un useEffect específico para observar cambios en los promedios de edad después de un sort
   useEffect(() => {
@@ -989,13 +1016,8 @@ export default function NextMatchTab({
           teamBAvgAge: newTeamBAvgAge,
         });
 
-        if (newTeamAAvgAge !== undefined) {
-          setTeamAAvgAge(newTeamAAvgAge);
-        }
-
-        if (newTeamBAvgAge !== undefined) {
-          setTeamBAvgAge(newTeamBAvgAge);
-        }
+        // Las edades promedio ahora se calculan automáticamente
+        // No necesitamos actualizar el estado manualmente
       }
     };
 
@@ -1246,8 +1268,8 @@ export default function NextMatchTab({
                   teamBName={group.teamBName || 'Equipo B'}
                   currentUserIsAdmin={currentUserIsAdmin}
                   onReplaceTbd={(playerId) => setShowReplaceTbdModal(playerId)}
-                  teamAAvgAge={teamAAvgAge}
-                  teamBAvgAge={teamBAvgAge}
+                  teamAAvgAge={finalTeamAAvgAge}
+                  teamBAvgAge={finalTeamBAvgAge}
                 />
               </div>
             </div>

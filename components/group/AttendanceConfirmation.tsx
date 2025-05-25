@@ -169,18 +169,30 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
         </div>
       )}
 
-      {/* Selector de roles cuando no está confirmado aún o ya está confirmado */}
+      {/* Selector de roles */}
       <div className='mt-2 mb-4'>
-        <p className='text-sm font-medium text-gray-700 mb-1.5'>Posición</p>
+        <p className='text-sm font-medium text-gray-700 mb-1.5'>
+          Posición
+          {isConfirmed && (
+            <span className='ml-2 text-xs text-gray-500'>
+              (bloqueado - cancela asistencia para cambiar)
+            </span>
+          )}
+        </p>
         <div className='grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5'>
           {Object.entries(PLAYER_ROLES).map(
             ([key, role]) =>
               key !== 'WILDCARD' && (
                 <button
                   key={role}
-                  onClick={() => toggleRole(role)}
+                  onClick={() => !isConfirmed && toggleRole(role)}
+                  disabled={isConfirmed}
                   className={`px-2 py-1.5 text-sm rounded-md transition flex items-center justify-center ${
-                    selectedRoles.includes(role)
+                    isConfirmed
+                      ? selectedRoles.includes(role)
+                        ? 'bg-blue-300 text-white border-2 border-blue-400 cursor-not-allowed opacity-75'
+                        : 'bg-gray-200 text-gray-500 border-2 border-transparent cursor-not-allowed opacity-75'
+                      : selectedRoles.includes(role)
                       ? 'bg-blue-500 text-white border-2 border-blue-600'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-transparent'
                   }`}
@@ -194,6 +206,11 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
               )
           )}
         </div>
+        {isConfirmed && (
+          <div className='mt-2 text-xs text-blue-600'>
+            Roles confirmados: {selectedRoles.join(', ') || 'Comodín'}
+          </div>
+        )}
       </div>
 
       {/* Botón de asistencia */}
