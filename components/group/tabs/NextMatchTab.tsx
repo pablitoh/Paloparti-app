@@ -1033,27 +1033,34 @@ export default function NextMatchTab({
         <>
           {/* Cabecera con información del partido */}
           <div className='bg-white rounded-lg overflow-hidden'>
-            <div className='bg-blue-600 px-4 py-3 flex justify-between items-center'>
-              <div>
-                <h3 className='text-lg font-semibold text-white'>
+            <div className='bg-blue-600 px-4 py-2 sm:py-3 flex justify-between items-center'>
+              <div className='space-y-1'>
+                <h3 className='text-xl sm:text-2xl font-bold text-white'>
                   Próximo partido
                 </h3>
-                <p className='text-blue-100 mt-1'>
-                  {matchDetails.date && formatNextMatchDate(matchDetails.date)}
-                </p>
-                <p className='text-blue-100 mt-1 flex items-center'>
-                  <MapPinIcon className='mr-1 h-4 w-4 flex-shrink-0' />
-                  <span>
-                    {matchDetails.location || group.location || 'Sin ubicación'}
-                  </span>
-                </p>
+                <div className='flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-blue-100'>
+                  <p className='flex items-center text-sm sm:text-base'>
+                    <CalendarIcon className='mr-1.5 h-4 w-4 flex-shrink-0' />
+                    <span>
+                      {matchDetails.date &&
+                        formatNextMatchDate(matchDetails.date)}
+                    </span>
+                  </p>
+                  <p className='flex items-center text-sm sm:text-base'>
+                    <MapPinIcon className='mr-1.5 h-4 w-4 flex-shrink-0' />
+                    <span>
+                      {matchDetails.location ||
+                        group.location ||
+                        'Sin ubicación'}
+                    </span>
+                  </p>
+                </div>
               </div>
               {currentUserIsAdmin && (
                 <Button
                   variant='outline'
                   className='bg-blue-500 text-white border-blue-400 hover:bg-blue-700'
                   onClick={() => {
-                    // Abrir modal de edición
                     window.open(
                       `/matches/edit/${matchDetails.id}?groupId=${id}`,
                       '_self'
@@ -1081,25 +1088,34 @@ export default function NextMatchTab({
             <div className='p-4'>
               <div className='grid grid-cols-1 gap-4'>
                 {/* Estado de la asistencia */}
-                <div className='bg-gray-50 rounded-lg p-3'>
-                  <h4 className='text-md font-medium text-gray-800 mb-3'>
+                <div className='bg-gray-50 rounded-lg p-4 w-full'>
+                  <h4 className='text-lg font-medium text-gray-800 mb-4'>
                     Estado
                   </h4>
 
                   <div className='flex flex-col sm:flex-row gap-4'>
                     {/* Barra de progreso */}
                     <div className='flex-1'>
-                      <div className='flex justify-between text-xs font-medium text-gray-700 mb-1'>
-                        <span>
-                          Confirmados: {confirmedCount}/{requiredPlayers}
+                      <div className='flex justify-between items-center text-sm font-medium text-gray-700 mb-2'>
+                        <div className='flex items-center'>
+                          <UserGroupIcon className='h-5 w-5 mr-2 text-gray-500' />
+                          <span>
+                            {confirmedCount}/{requiredPlayers} jugadores
+                          </span>
+                        </div>
+                        <span className='bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm'>
+                          {progressPercentage}%
                         </span>
-                        <span>{progressPercentage}%</span>
                       </div>
-                      <div className='bg-gray-200 rounded-full h-2.5 mt-1.5'>
+                      <div className='bg-gray-200 rounded-full h-4 mt-1.5 relative w-full'>
                         <div
-                          className='bg-green-500 h-2.5 rounded-full transition-all duration-500'
+                          className='bg-green-500 h-4 rounded-full transition-all duration-500 flex items-center justify-center w-full'
                           style={{ width: `${progressPercentage}%` }}
-                        ></div>
+                        >
+                          <span className='text-xs font-medium text-white'>
+                            {confirmedCount}/{requiredPlayers}
+                          </span>
+                        </div>
                       </div>
                     </div>
 

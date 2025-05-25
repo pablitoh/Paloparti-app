@@ -1,5 +1,11 @@
-import { ArrowPathIcon, PlusIcon } from '@heroicons/react/24/outline';
+import {
+  ArrowPathIcon,
+  PlusIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from '@heroicons/react/24/outline';
 import Button from '../Button';
+import { useState } from 'react';
 
 interface TeamFormationNotificationProps {
   confirmedCount: number;
@@ -36,6 +42,8 @@ const TeamFormationNotification = ({
   balanceByRating = false,
   setBalanceByRating,
 }: TeamFormationNotificationProps) => {
+  const [isAdvancedOptionsOpen, setIsAdvancedOptionsOpen] = useState(false);
+
   // Si no es admin, no mostrar nada
   if (!currentUserIsAdmin) return null;
 
@@ -99,6 +107,56 @@ const TeamFormationNotification = ({
     }
   }
 
+  // Función para renderizar una opción toggleable
+  const renderToggleOption = (
+    id: string,
+    checked: boolean,
+    onChange: (checked: boolean) => void,
+    title: string,
+    description: string
+  ) => (
+    <div
+      className={`p-4 rounded-lg border transition-all duration-200 cursor-pointer ${
+        checked
+          ? 'bg-blue-50 border-blue-200 shadow-sm'
+          : 'bg-white border-gray-200 hover:border-blue-200'
+      }`}
+      onClick={() => onChange(!checked)}
+    >
+      <div className='flex items-start'>
+        <div className='flex-shrink-0'>
+          <div
+            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors duration-200 ${
+              checked
+                ? 'bg-blue-500 border-blue-500'
+                : 'bg-white border-gray-300'
+            }`}
+          >
+            {checked && (
+              <svg
+                className='w-4 h-4 text-white'
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth='2'
+                  d='M5 13l4 4L19 7'
+                />
+              </svg>
+            )}
+          </div>
+        </div>
+        <div className='ml-3'>
+          <h3 className='text-sm font-medium text-gray-900'>{title}</h3>
+          <p className='mt-1 text-sm text-gray-500'>{description}</p>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className='space-y-3'>
       <div
@@ -107,7 +165,7 @@ const TeamFormationNotification = ({
         <div className='flex items-start'>
           <div className='flex-shrink-0'>
             <svg
-              className={`h-5 w-5 ${iconColor}`}
+              className={`h-6 w-6 ${iconColor}`}
               viewBox='0 0 20 20'
               fill='currentColor'
             >
@@ -126,13 +184,13 @@ const TeamFormationNotification = ({
               )}
             </svg>
           </div>
-          <div className='ml-3 flex-1 md:flex md:justify-between'>
-            <p className={`text-sm ${textColor}`}>{message}</p>
-            <div className='mt-3 text-sm md:mt-0 md:ml-6'>
+          <div className='ml-3 flex-1'>
+            <p className={`text-base font-medium ${textColor}`}>{message}</p>
+            <div className='mt-3'>
               <Button
                 onClick={onRandomizeTeams}
                 disabled={isLoading || !canCreateTeams}
-                className='inline-flex items-center'
+                className='w-full sm:w-auto inline-flex items-center justify-center'
                 size='sm'
                 variant={isInitialTeamFormation ? 'primary' : 'outline'}
               >
@@ -178,97 +236,73 @@ const TeamFormationNotification = ({
         </div>
       </div>
 
-      {/* Checkbox para completar equipos - visible siempre que se pueda modificar */}
-      {setAllowFillIn && (
-        <div className='flex flex-col gap-2 px-4'>
-          <div className='flex items-start'>
-            <input
-              type='checkbox'
-              id='allowFillIn'
-              className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-1'
-              checked={allowFillIn}
-              onChange={(e) => setAllowFillIn(e.target.checked)}
-            />
-            <label htmlFor='allowFillIn' className='ml-3 text-sm text-gray-700'>
-              Completar equipos automáticamente con jugadores TBD
-            </label>
-          </div>
-        </div>
-      )}
+      {/* Sección de opciones avanzadas */}
+      <div className='mt-4'>
+        <button
+          onClick={() => setIsAdvancedOptionsOpen(!isAdvancedOptionsOpen)}
+          className='flex items-center text-sm font-medium text-gray-700 hover:text-gray-900'
+        >
+          <span className='mr-2'>⚙️ Opciones avanzadas</span>
+          {isAdvancedOptionsOpen ? (
+            <ChevronUpIcon className='h-5 w-5' />
+          ) : (
+            <ChevronDownIcon className='h-5 w-5' />
+          )}
+        </button>
 
-      {/* Checkbox para equilibrar por rol - visible siempre que se pueda modificar */}
-      {setBalanceByRole && (
-        <div className='flex flex-col gap-2 px-4'>
-          <div className='flex items-start'>
-            <input
-              type='checkbox'
-              id='balanceByRole'
-              className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-1'
-              checked={balanceByRole}
-              onChange={(e) => setBalanceByRole(e.target.checked)}
-            />
-            <label
-              htmlFor='balanceByRole'
-              className='ml-3 text-sm text-gray-700'
-            >
-              Equilibrar equipos por posición de jugador
-            </label>
-          </div>
-        </div>
-      )}
+        {isAdvancedOptionsOpen && (
+          <div className='mt-3 space-y-3'>
+            {/* Opción para completar equipos */}
+            {setAllowFillIn &&
+              renderToggleOption(
+                'allowFillIn',
+                allowFillIn,
+                setAllowFillIn,
+                'Completar equipos automáticamente',
+                'Permite completar los equipos con jugadores TBD cuando no hay suficientes jugadores confirmados'
+              )}
 
-      {/* Checkbox para equilibrar por edad - visible siempre que se pueda modificar */}
-      {setBalanceByAge && (
-        <div className='flex flex-col gap-2 px-4'>
-          <div className='flex items-start'>
-            <input
-              type='checkbox'
-              id='balanceByAge'
-              className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-1'
-              checked={balanceByAge}
-              onChange={(e) => setBalanceByAge(e.target.checked)}
-            />
-            <label
-              htmlFor='balanceByAge'
-              className='ml-3 text-sm text-gray-700'
-            >
-              Equilibrar equipos por edad
-            </label>
-          </div>
-        </div>
-      )}
+            {/* Opción para equilibrar por rol */}
+            {setBalanceByRole &&
+              renderToggleOption(
+                'balanceByRole',
+                balanceByRole,
+                setBalanceByRole,
+                'Equilibrar por posición',
+                'Distribuye los jugadores de manera que cada equipo tenga una mezcla similar de posiciones'
+              )}
 
-      {/* Checkbox para equilibrar por nivel (star rating) - nuevo */}
-      {setBalanceByRating && (
-        <div className='flex flex-col gap-2 px-4'>
-          <div className='flex items-start'>
-            <input
-              type='checkbox'
-              id='balanceByRating'
-              className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-1'
-              checked={balanceByRating}
-              onChange={(e) => setBalanceByRating(e.target.checked)}
-            />
-            <label
-              htmlFor='balanceByRating'
-              className='ml-3 text-sm text-gray-700'
-            >
-              Equilibrar equipos por nivel de habilidad
-            </label>
-          </div>
-        </div>
-      )}
+            {/* Opción para equilibrar por edad */}
+            {setBalanceByAge &&
+              renderToggleOption(
+                'balanceByAge',
+                balanceByAge,
+                setBalanceByAge,
+                'Equilibrar por edad',
+                'Distribuye los jugadores para que los equipos tengan una edad promedio similar'
+              )}
 
-      {/* Información sobre algoritmo aleatorio si no se selecciona ningún criterio */}
-      {setBalanceByAge && setBalanceByRole && setBalanceByRating && (
-        <div className='flex flex-col gap-2 px-4 mt-2'>
-          <div className='text-xs text-gray-500 italic'>
-            Nota: Si no seleccionas ningún criterio de balance, se utilizará un
-            algoritmo completamente aleatorio para formar los equipos con igual
-            número de jugadores.
+            {/* Opción para equilibrar por nivel */}
+            {setBalanceByRating &&
+              renderToggleOption(
+                'balanceByRating',
+                balanceByRating,
+                setBalanceByRating,
+                'Equilibrar por nivel',
+                'Distribuye los jugadores según su nivel de habilidad para crear equipos equilibrados'
+              )}
+
+            {/* Nota informativa */}
+            {setBalanceByAge && setBalanceByRole && setBalanceByRating && (
+              <div className='mt-2 text-xs text-gray-500 italic'>
+                Nota: Si no seleccionas ningún criterio de balance, se utilizará
+                un algoritmo completamente aleatorio para formar los equipos con
+                igual número de jugadores.
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
