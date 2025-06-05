@@ -178,15 +178,15 @@ const TeamFormationNotification = ({
   ) => (
     <button
       onClick={() => onChange(!checked)}
-      className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 border ${
+      className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-medium transition-all duration-200 border ${
         checked
           ? 'bg-blue-500 text-white border-blue-500 shadow-md hover:bg-blue-600'
           : 'bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50'
       }`}
     >
       <span className='flex items-center'>
-        <span className='mr-1.5'>{icon}</span>
-        {title}
+        <span className='mr-1 sm:mr-1.5'>{icon}</span>
+        <span className='whitespace-nowrap'>{title}</span>
       </span>
     </button>
   );
@@ -195,12 +195,12 @@ const TeamFormationNotification = ({
     <>
       <div className='space-y-3'>
         <div
-          className={`${backgroundColor} border ${borderColor} p-4 rounded-lg shadow-md`}
+          className={`${backgroundColor} border ${borderColor} p-3 sm:p-4 rounded-lg shadow-md`}
         >
-          {/* Layout principal con flex para poner el botón a la derecha */}
-          <div className='flex items-start justify-between'>
-            {/* Contenido principal a la izquierda */}
-            <div className='flex items-start flex-1 mr-4'>
+          {/* Layout principal - responsive: vertical en móvil, horizontal en desktop */}
+          <div className='flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4'>
+            {/* Contenido principal */}
+            <div className='flex items-start flex-1'>
               <div className='flex-shrink-0'>
                 <div
                   className={`p-1.5 rounded-full ${
@@ -223,8 +223,8 @@ const TeamFormationNotification = ({
                 <p className={`text-sm ${textColor} mb-3`}>{message}</p>
 
                 {/* Opciones como botones toggle */}
-                <div className='mb-3'>
-                  <div className='flex flex-wrap gap-2'>
+                <div className='mb-3 sm:mb-0'>
+                  <div className='flex flex-wrap gap-1.5 sm:gap-2'>
                     {/* Opción para equilibrar por rol */}
                     {setBalanceByRole &&
                       renderToggleButton(
@@ -267,12 +267,12 @@ const TeamFormationNotification = ({
               </div>
             </div>
 
-            {/* Botón de sortear - A la derecha centrado verticalmente */}
-            <div className='flex items-center'>
+            {/* Botón de sortear - Full width en móvil, auto en desktop */}
+            <div className='flex items-center w-full sm:w-auto'>
               <Button
                 onClick={handleSortClick}
                 disabled={isLoading || !canCreateTeams}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg shadow-md transform transition-all duration-200 hover:scale-105 ${
+                className={`w-full sm:w-auto px-3 sm:px-4 py-2 text-sm font-semibold rounded-lg shadow-md transform transition-all duration-200 hover:scale-105 ${
                   isInitialTeamFormation
                     ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700'
                     : 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700'
@@ -280,7 +280,7 @@ const TeamFormationNotification = ({
                 size='sm'
               >
                 {isLoading ? (
-                  <span className='flex items-center'>
+                  <span className='flex items-center justify-center'>
                     <svg
                       className='animate-spin -ml-1 mr-2 h-4 w-4 text-white'
                       xmlns='http://www.w3.org/2000/svg'
@@ -301,19 +301,22 @@ const TeamFormationNotification = ({
                         d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
                       ></path>
                     </svg>
-                    ⚡ Procesando...
+                    <span className='hidden sm:inline'>⚡ Procesando...</span>
+                    <span className='sm:hidden'>Procesando...</span>
                   </span>
                 ) : (
-                  <span className='flex items-center'>
+                  <span className='flex items-center justify-center'>
                     {isInitialTeamFormation ? (
                       <>
                         <PlusIcon className='mr-1.5 h-4 w-4' />
-                        🎲 Sortear
+                        <span className='hidden sm:inline'>🎲 Sortear</span>
+                        <span className='sm:hidden'>Sortear</span>
                       </>
                     ) : (
                       <>
                         <ArrowPathIcon className='h-4 w-4 mr-1.5' />
-                        🔄 Re-sortear
+                        <span className='hidden sm:inline'>🔄 Re-sortear</span>
+                        <span className='sm:hidden'>Re-sortear</span>
                       </>
                     )}
                   </span>
@@ -327,14 +330,14 @@ const TeamFormationNotification = ({
       {/* Modal de confirmación */}
       {showConfirmModal && (
         <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'>
-          <div className='bg-white rounded-xl shadow-2xl max-w-md w-full p-6'>
+          <div className='bg-white rounded-xl shadow-2xl max-w-md w-full p-4 sm:p-6 mx-4'>
             <div className='flex items-center mb-4'>
               <div className='flex-shrink-0'>
-                <ExclamationCircleIcon className='h-8 w-8 text-amber-500' />
+                <ExclamationCircleIcon className='h-6 w-6 sm:h-8 sm:w-8 text-amber-500' />
               </div>
               <div className='ml-3'>
-                <h3 className='text-lg font-semibold text-gray-900'>
-                  ⚠️ Confirmar sorteo
+                <h3 className='text-base sm:text-lg font-semibold text-gray-900'>
+                  <span className='hidden sm:inline'>⚠️ </span>Confirmar sorteo
                 </h3>
               </div>
             </div>
@@ -358,20 +361,22 @@ const TeamFormationNotification = ({
               </p>
             </div>
 
-            <div className='flex gap-3 justify-end'>
+            <div className='flex flex-col sm:flex-row gap-3 sm:justify-end'>
               <Button
                 onClick={() => setShowConfirmModal(false)}
-                className='px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors'
+                variant='outline'
+                className='w-full sm:w-auto !border-gray-400 !text-gray-700 hover:!bg-gray-50 hover:!border-gray-600 hover:!text-gray-900 order-2 sm:order-1'
                 size='sm'
               >
                 Cancelar
               </Button>
               <Button
                 onClick={handleConfirmSort}
-                className='px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 rounded-lg shadow-md transition-all duration-200'
+                className='w-full sm:w-auto px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 rounded-lg shadow-md transition-all duration-200 order-1 sm:order-2'
                 size='sm'
               >
-                🎲 Sortear de todas formas
+                <span className='hidden sm:inline'>🎲 </span>Sortear de todas
+                formas
               </Button>
             </div>
           </div>
