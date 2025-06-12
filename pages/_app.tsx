@@ -142,9 +142,11 @@ function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
       <SessionProvider
         session={session}
         // Configuración más conservadora para prevenir loops
-        refetchInterval={60} // 60 segundos - más conservador
+        refetchInterval={process.env.NODE_ENV === 'development' ? 60 : 300} // 5 minutos en producción
         refetchOnWindowFocus={true}
         refetchWhenOffline={false}
+        // Configuración específica para Vercel preview
+        basePath='/api/auth'
       >
         <AuthProvider>
           <Component {...pageProps} key={router.asPath} />

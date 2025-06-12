@@ -4,8 +4,32 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { prisma } from '../../../lib/prisma';
 import bcrypt from 'bcryptjs';
 
+// Función para obtener la URL base correcta
+function getBaseUrl() {
+  // En desarrollo local
+  if (process.env.NODE_ENV === 'development') {
+    return process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  }
+
+  // En Vercel preview o production
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+
+  // Fallback a NEXTAUTH_URL si está definida
+  if (process.env.NEXTAUTH_URL) {
+    return process.env.NEXTAUTH_URL;
+  }
+
+  return 'http://localhost:3000';
+}
+
 // Configuración simplificada de NextAuth
 export const authOptions: NextAuthOptions = {
+  // Configuración específica para Vercel
+  useSecureCookies:
+    process.env.NODE_ENV === 'production' ||
+    process.env.VERCEL_ENV === 'preview',
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -70,7 +94,9 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        secure:
+          process.env.NODE_ENV === 'production' ||
+          process.env.VERCEL_ENV === 'preview',
       },
     },
     callbackUrl: {
@@ -78,7 +104,9 @@ export const authOptions: NextAuthOptions = {
       options: {
         sameSite: 'lax',
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        secure:
+          process.env.NODE_ENV === 'production' ||
+          process.env.VERCEL_ENV === 'preview',
       },
     },
     csrfToken: {
@@ -86,7 +114,9 @@ export const authOptions: NextAuthOptions = {
       options: {
         sameSite: 'lax',
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        secure:
+          process.env.NODE_ENV === 'production' ||
+          process.env.VERCEL_ENV === 'preview',
       },
     },
   },
@@ -103,16 +133,41 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string;
         session.user.birthdate = token.birthdate as Date | null;
       }
+
+      // Debug logging para preview
+      if (process.env.VERCEL_ENV === 'preview') {
+        console.log('NextAuth session callback:', {
+          hasSession: !!session,
+          hasUser: !!session?.user,
+          userId: session?.user?.id,
+          environment: process.env.VERCEL_ENV,
+        });
+      }
+
       return session;
     },
     async redirect({ url, baseUrl }) {
+      // Usar la función getBaseUrl para obtener la base correcta
+      const correctBaseUrl = getBaseUrl();
+
       if (url.startsWith('/')) {
-        return `${baseUrl}${url}`;
+        return `${correctBaseUrl}${url}`;
       }
-      if (url.startsWith(baseUrl)) {
+      if (url.startsWith(correctBaseUrl)) {
         return url;
       }
-      return baseUrl;
+
+      // Debug logging
+      if (process.env.VERCEL_ENV === 'preview') {
+        console.log('NextAuth redirect:', {
+          url,
+          baseUrl,
+          correctBaseUrl,
+          result: correctBaseUrl,
+        });
+      }
+
+      return correctBaseUrl;
     },
   },
   pages: {
