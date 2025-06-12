@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import DatePickerField, {
   formatDateForInput,
 } from '../../components/DatePickerField';
+import AvatarUpload from '../../components/AvatarUpload';
 import { GetServerSideProps } from 'next';
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
@@ -35,9 +36,11 @@ export default function EditProfile() {
   const [userData, setUserData] = useState<{
     name: string;
     birthdate: string;
+    image: string | null;
   }>({
     name: '',
     birthdate: '',
+    image: null,
   });
   const [password, setPassword] = useState({
     current: '',
@@ -73,6 +76,7 @@ export default function EditProfile() {
           birthdate: data.user.birthdate
             ? formatDateForInput(data.user.birthdate)
             : '',
+          image: data.user.image || null,
         });
       } catch (error) {
         console.error('Error fetching user data:', error);
@@ -100,6 +104,13 @@ export default function EditProfile() {
     setPassword((prevData) => ({
       ...prevData,
       [name]: value,
+    }));
+  };
+
+  const handleAvatarChange = (newAvatarUrl: string | null) => {
+    setUserData((prevData) => ({
+      ...prevData,
+      image: newAvatarUrl,
     }));
   };
 
@@ -236,6 +247,21 @@ export default function EditProfile() {
 
           <div className='mb-6'>
             <h2 className='text-xl font-semibold mb-4'>Información Personal</h2>
+
+            {/* Avatar Upload Section */}
+            <div className='mb-6'>
+              <label className='block text-sm font-medium text-gray-700 mb-2'>
+                Avatar
+              </label>
+              <div className='flex justify-center'>
+                <AvatarUpload
+                  currentAvatar={userData.image}
+                  onAvatarChange={handleAvatarChange}
+                  size='large'
+                />
+              </div>
+            </div>
+
             <form onSubmit={updateProfile} className='space-y-4'>
               <div>
                 <label

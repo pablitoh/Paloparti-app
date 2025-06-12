@@ -57,6 +57,11 @@ export default async function handler(
   }
 
   try {
+    console.log('Profile API called, headers:', {
+      cookie: req.headers.cookie ? 'Present' : 'Missing',
+      authorization: req.headers.authorization ? 'Present' : 'Missing',
+    });
+
     // Get the current user from the NextAuth session
     const user = await getCurrentUser(req);
 

@@ -64,9 +64,20 @@ export default function Profile() {
 
     const fetchProfileData = async () => {
       try {
-        const response = await fetch('/api/profile');
+        console.log('Fetching profile data...');
+        const response = await fetch('/api/profile', {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
 
         if (!response.ok) {
+          console.error(
+            'Profile fetch error:',
+            response.status,
+            response.statusText
+          );
           if (response.status === 401) {
             router.push('/auth/signin');
             return;
@@ -75,6 +86,7 @@ export default function Profile() {
         }
 
         const data = await response.json();
+        console.log('Profile data received:', data);
         setProfileData(data);
       } catch (error) {
         console.error('Error fetching profile data:', error);
