@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
 import { prisma } from '../../../lib/prisma';
+import { authOptions } from '../auth/[...nextauth]';
 
 interface UserResponse {
   id: string;
@@ -35,78 +36,50 @@ export default async function handler(
   }
 
   try {
-    const session = await getSession({ req });
-
-    console.log('Session in update API:', session);
+    const session = await getServerSession(req, res, authOptions);
 
     if (!session) {
       return res.status(401).json({ message: 'Not authenticated' });
     }
 
     const { name, birthdate } = req.body;
-    const userId = session.user?.id as string;
+    const userId = session.user?.id;
 
     if (!userId) {
       return res.status(400).json({ message: 'User ID not found in session' });
     }
 
-    console.log('Updating user profile:', { userId, name, birthdate });
-
     // Convert birthdate string to Date object if it exists
     let birthdateObj = null;
     if (birthdate) {
       birthdateObj = new Date(birthdate);
-      // Validate that the birthdate is a valid date
       if (isNaN(birthdateObj.getTime())) {
         return res.status(400).json({ message: 'Invalid birthdate format' });
       }
     }
 
-    // Verificar que el usuario existe primero
+    // Verify that the user exists
     const userExists = await prisma.user.findUnique({
       where: { id: userId },
     });
 
     if (!userExists) {
-      return res.status(404).json({ message: 'Usuario no encontrado' });
-    }
-
-    // Crear un objeto de datos dinámico para la actualización
-    const updateData: any = {
-      name: name || null,
-    };
-
-    // Solo incluir birthdate si el esquema lo soporta
-    if (birthdateObj !== null) {
-      try {
-        // Intentamos verificar si el campo existe en el modelo User
-        const userWithBirthdate = await prisma.$queryRaw`
-          SELECT column_name FROM information_schema.columns 
-          WHERE table_name = 'User' AND column_name = 'birthdate'
-        `;
-
-        // Si llegamos aquí, el campo existe
-        updateData.birthdate = birthdateObj;
-        console.log('Birthdate field exists in schema, including in update');
-      } catch (error) {
-        console.warn('Birthdate field may not exist in schema:', error);
-        // No añadimos el campo si no existe en el esquema
-      }
+      return res.status(404).json({ message: 'User not found' });
     }
 
     // Update user in the database
     const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: updateData,
+      data: {
+        name: name || null,
+        birthdate: birthdateObj,
+      },
       select: {
         id: true,
         name: true,
-        // Solo seleccionamos birthdate si existe en el modelo
-        ...(updateData.birthdate !== undefined ? { birthdate: true } : {}),
+        birthdate: true,
       },
     });
-
-    console.log('User updated successfully:', updatedUser);
 
     return res.status(200).json({
       message: 'Profile updated successfully',

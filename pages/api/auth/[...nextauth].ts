@@ -63,7 +63,6 @@ export const authOptions: NextAuthOptions = {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 días
   },
-  // Configuración simplificada de cookies - sin seguridad forzada
   cookies: {
     sessionToken: {
       name: `next-auth.session-token`,
@@ -71,7 +70,7 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: false, // Deshabilitar secure para permitir HTTP en desarrollo y preview
+        secure: process.env.NODE_ENV === 'production',
       },
     },
     callbackUrl: {
@@ -79,7 +78,7 @@ export const authOptions: NextAuthOptions = {
       options: {
         sameSite: 'lax',
         path: '/',
-        secure: false,
+        secure: process.env.NODE_ENV === 'production',
       },
     },
     csrfToken: {
@@ -87,7 +86,7 @@ export const authOptions: NextAuthOptions = {
       options: {
         sameSite: 'lax',
         path: '/',
-        secure: false,
+        secure: process.env.NODE_ENV === 'production',
       },
     },
   },
@@ -106,19 +105,13 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
-    // Redirección simplificada - solo redireccionar cuando sea necesario
     async redirect({ url, baseUrl }) {
-      // Si es una URL relativa, adjuntar la URL base
       if (url.startsWith('/')) {
         return `${baseUrl}${url}`;
       }
-
-      // Si la URL coincide con la base, usar tal cual
       if (url.startsWith(baseUrl)) {
         return url;
       }
-
-      // Para cualquier otro caso, usar la URL base
       return baseUrl;
     },
   },
@@ -126,7 +119,6 @@ export const authOptions: NextAuthOptions = {
     signIn: '/auth/signin',
     error: '/auth/signin',
   },
-  // Activar debug en desarrollo
   debug: process.env.NODE_ENV === 'development',
 };
 

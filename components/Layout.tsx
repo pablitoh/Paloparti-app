@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -8,6 +9,7 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { data: session } = useSession();
+  const { logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -102,7 +104,7 @@ export default function Layout({ children }: LayoutProps) {
                       </Link>
                       <button
                         onClick={() => {
-                          signOut();
+                          logout();
                           setMobileMenuOpen(false);
                         }}
                         className='block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100'
@@ -166,7 +168,7 @@ export default function Layout({ children }: LayoutProps) {
                       </Link>
                       <button
                         onClick={() => {
-                          signOut();
+                          logout();
                           setDropdownOpen(false);
                         }}
                         className='block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100'

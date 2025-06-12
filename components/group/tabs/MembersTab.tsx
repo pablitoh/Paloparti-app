@@ -554,6 +554,11 @@ export default function MembersTab({
                               </span>
                             )}
                           </div>
+                          {currentUserIsAdmin && member.email && (
+                            <div className='text-sm text-gray-500'>
+                              {member.email}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -670,6 +675,11 @@ export default function MembersTab({
                         </span>
                       )}
                     </div>
+                    {currentUserIsAdmin && member.email && (
+                      <div className='text-sm text-gray-500 mt-1'>
+                        {member.email}
+                      </div>
+                    )}
                     <div className='mt-1'>
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${

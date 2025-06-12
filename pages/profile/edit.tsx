@@ -133,6 +133,12 @@ export default function EditProfile() {
         throw new Error(data.message || 'Error al actualizar el perfil');
       }
 
+      // Refresh the session to get updated user data
+      await fetch('/api/auth/session', {
+        method: 'GET',
+        credentials: 'include',
+      });
+
       setSuccessMessage('Perfil actualizado correctamente');
     } catch (error) {
       console.error('Error updating profile:', error);

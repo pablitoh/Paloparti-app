@@ -8,6 +8,7 @@ import DatePickerField from '../components/DatePickerField';
 import { clearAuthState, getSafeCallbackUrl } from '../lib/authUtils';
 import { GetServerSideProps } from 'next';
 import { getSession } from 'next-auth/react';
+import { subYears, format, differenceInYears } from 'date-fns';
 
 /**
  * Página de registro simplificada
@@ -56,6 +57,9 @@ export default function Register({ callbackUrl }: RegisterProps) {
   const router = useRouter();
   const { register, user, loading: authLoading } = useAuth();
 
+  // Calculate minimum date (12 years ago from today)
+  const minDate = format(subYears(new Date(), 12), 'yyyy-MM-dd');
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -100,6 +104,17 @@ export default function Register({ callbackUrl }: RegisterProps) {
 
     if (!formData.birthdate) {
       setError('La fecha de nacimiento es obligatoria');
+      setLoading(false);
+      return;
+    }
+
+    // Validar edad mínima de 12 años
+    const birthDate = new Date(formData.birthdate);
+    const today = new Date();
+    const age = differenceInYears(today, birthDate);
+
+    if (age < 12) {
+      setError('Debes tener al menos 12 años para registrarte');
       setLoading(false);
       return;
     }
@@ -218,6 +233,7 @@ export default function Register({ callbackUrl }: RegisterProps) {
               value={formData.birthdate}
               onChange={handleChange}
               required={true}
+              minDate={minDate}
             />
 
             <div>
