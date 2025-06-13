@@ -97,6 +97,8 @@ export const authOptions: NextAuthOptions = {
         secure:
           process.env.NODE_ENV === 'production' ||
           process.env.VERCEL_ENV === 'preview',
+        // Configuración específica para preview
+        domain: process.env.VERCEL_ENV === 'preview' ? undefined : undefined,
       },
     },
     callbackUrl: {
@@ -107,6 +109,7 @@ export const authOptions: NextAuthOptions = {
         secure:
           process.env.NODE_ENV === 'production' ||
           process.env.VERCEL_ENV === 'preview',
+        domain: process.env.VERCEL_ENV === 'preview' ? undefined : undefined,
       },
     },
     csrfToken: {
@@ -117,15 +120,28 @@ export const authOptions: NextAuthOptions = {
         secure:
           process.env.NODE_ENV === 'production' ||
           process.env.VERCEL_ENV === 'preview',
+        domain: process.env.VERCEL_ENV === 'preview' ? undefined : undefined,
       },
     },
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.birthdate = user.birthdate;
       }
+
+      // Debug logging para preview
+      if (process.env.VERCEL_ENV === 'preview') {
+        console.log('NextAuth JWT callback:', {
+          trigger,
+          hasUser: !!user,
+          hasToken: !!token,
+          tokenId: token?.id,
+          environment: process.env.VERCEL_ENV,
+        });
+      }
+
       return token;
     },
     async session({ session, token }) {
@@ -140,7 +156,10 @@ export const authOptions: NextAuthOptions = {
           hasSession: !!session,
           hasUser: !!session?.user,
           userId: session?.user?.id,
+          userEmail: session?.user?.email,
+          tokenId: token?.id,
           environment: process.env.VERCEL_ENV,
+          vercelUrl: process.env.VERCEL_URL,
         });
       }
 
@@ -164,6 +183,7 @@ export const authOptions: NextAuthOptions = {
           baseUrl,
           correctBaseUrl,
           result: correctBaseUrl,
+          vercelUrl: process.env.VERCEL_URL,
         });
       }
 
@@ -174,7 +194,26 @@ export const authOptions: NextAuthOptions = {
     signIn: '/auth/signin',
     error: '/auth/signin',
   },
-  debug: process.env.NODE_ENV === 'development',
+  debug:
+    process.env.NODE_ENV === 'development' ||
+    process.env.VERCEL_ENV === 'preview',
+  logger: {
+    error(code, metadata) {
+      if (process.env.VERCEL_ENV === 'preview') {
+        console.error('NextAuth Error:', code, metadata);
+      }
+    },
+    warn(code) {
+      if (process.env.VERCEL_ENV === 'preview') {
+        console.warn('NextAuth Warning:', code);
+      }
+    },
+    debug(code, metadata) {
+      if (process.env.VERCEL_ENV === 'preview') {
+        console.log('NextAuth Debug:', code, metadata);
+      }
+    },
+  },
 };
 
 export default NextAuth(authOptions);

@@ -7,9 +7,11 @@ const nextConfig = {
 
   // Configuración específica para Vercel
   env: {
-    NEXTAUTH_URL: process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.NEXTAUTH_URL || 'http://localhost:3000',
+    NEXTAUTH_URL:
+      process.env.NEXTAUTH_URL ||
+      (process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : 'http://localhost:3000'),
   },
 
   // Configuración de headers para CORS

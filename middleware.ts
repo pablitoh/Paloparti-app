@@ -73,6 +73,21 @@ export async function middleware(request: NextRequest) {
   // 4. Para rutas protegidas, verificar token JWT
   const token = await getToken({ req: request });
 
+  // Debug logging específico para preview
+  if (isVercelPreview) {
+    console.log('Middleware Preview Debug:', {
+      path,
+      hasToken: !!token,
+      tokenSub: token?.sub,
+      tokenEmail: token?.email,
+      cookies: request.cookies.getAll().map((c) => c.name),
+      sessionCookie: request.cookies.get('next-auth.session-token')?.value
+        ? 'Present'
+        : 'Missing',
+      vercelUrl: process.env.VERCEL_URL,
+    });
+  }
+
   // Si no hay token, redirigir a la página de inicio de sesión SIN callbackUrl
   if (!token) {
     console.log('Middleware: no autenticado, redirigiendo a login');
