@@ -57,20 +57,37 @@ export default async function handler(
   }
 
   try {
-    console.log('Profile API called, headers:', {
-      cookie: req.headers.cookie ? 'Present' : 'Missing',
-      authorization: req.headers.authorization ? 'Present' : 'Missing',
-    });
+    // Enhanced logging for preview environment
+    if (process.env.VERCEL_ENV === 'preview') {
+      console.log('Profile API called in preview:', {
+        cookie: req.headers.cookie ? 'Present' : 'Missing',
+        authorization: req.headers.authorization ? 'Present' : 'Missing',
+        sessionCookie: req.headers.cookie?.includes('next-auth.session-token')
+          ? 'Present'
+          : 'Missing',
+        userAgent: req.headers['user-agent']?.substring(0, 50),
+        host: req.headers.host,
+      });
+    }
 
     // Get the current user from the NextAuth session
     const user = await getCurrentUser(req);
 
     if (!user) {
       console.log('No authenticated user found in profile API');
+      if (process.env.VERCEL_ENV === 'preview') {
+        console.log('Preview environment - detailed auth failure debug');
+      }
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
     console.log('Processing profile request for user:', user.id);
+    if (process.env.VERCEL_ENV === 'preview') {
+      console.log(
+        'Preview environment - user authenticated successfully:',
+        user.email
+      );
+    }
 
     // Get user data including birthdate
     const userData = (await prisma.user.findUnique({

@@ -1,19 +1,71 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../contexts/AuthContext';
-import { useSession, getSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
+import { GetServerSideProps } from 'next';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../api/auth/[...nextauth]';
 import Layout from '../../components/Layout';
 import { format } from 'date-fns';
 import DatePickerField, {
   formatDateForInput,
 } from '../../components/DatePickerField';
 import AvatarUpload from '../../components/AvatarUpload';
-import { GetServerSideProps } from 'next';
+
+interface EditProfileProps {
+  user: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    image: string | null;
+  };
+}
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-  const session = await getSession(context);
+  try {
+    const session = await getServerSession(
+      context.req,
+      context.res,
+      authOptions
+    );
 
-  if (!session) {
+    // Si no hay sesión, redirigir a login
+    if (!session || !session.user) {
+      console.log(
+        'No session found in profile/edit getServerSideProps, redirecting to signin'
+      );
+      return {
+        redirect: {
+          destination: '/auth/signin?callbackUrl=/profile/edit',
+          permanent: false,
+        },
+      };
+    }
+
+    // Debug logging para preview
+    if (process.env.VERCEL_ENV === 'preview') {
+      console.log('Profile edit getServerSideProps - Session found:', {
+        userId: session.user.id,
+        userEmail: session.user.email,
+        environment: process.env.VERCEL_ENV,
+      });
+    }
+
+    // Pasar información del usuario autenticado
+    return {
+      props: {
+        user: {
+          id: session.user.id,
+          name: session.user.name,
+          email: session.user.email,
+          image: session.user.image,
+        },
+      },
+    };
+  } catch (error) {
+    console.error('Error in profile/edit getServerSideProps:', error);
+
+    // En caso de error, redirigir a signin
     return {
       redirect: {
         destination: '/auth/signin?callbackUrl=/profile/edit',
@@ -21,16 +73,12 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       },
     };
   }
-
-  return {
-    props: { session },
-  };
 };
 
-export default function EditProfile() {
+export default function EditProfile({ user: serverUser }: EditProfileProps) {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const { user, loading: authLoading } = useAuth();
+  const { user: clientUser, loading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [userData, setUserData] = useState<{
@@ -51,13 +99,10 @@ export default function EditProfile() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin?callbackUrl=/profile/edit');
-      return;
-    }
-
+    // Ya tenemos verificación del servidor, solo necesitamos cargar los datos del perfil
     const fetchUserData = async () => {
       try {
+        console.log('Fetching user data for server-verified user...');
         const response = await fetch('/api/profile', {
           credentials: 'include',
           headers: {
@@ -66,17 +111,31 @@ export default function EditProfile() {
         });
 
         if (!response.ok) {
+          console.error(
+            'Profile fetch error:',
+            response.status,
+            response.statusText
+          );
+          if (response.status === 401) {
+            // Si aún así hay un 401, algo está mal con las cookies
+            console.error(
+              '401 error despite server-side verification - possible cookie issue'
+            );
+            router.push('/auth/signin');
+            return;
+          }
           throw new Error('Error fetching profile data');
         }
 
         const data = await response.json();
+        console.log('Profile data received for edit:', data);
 
         setUserData({
-          name: data.user.name || '',
+          name: data.user.name || serverUser.name || '',
           birthdate: data.user.birthdate
             ? formatDateForInput(data.user.birthdate)
             : '',
-          image: data.user.image || null,
+          image: data.user.image || serverUser.image || null,
         });
       } catch (error) {
         console.error('Error fetching user data:', error);
@@ -86,10 +145,9 @@ export default function EditProfile() {
       }
     };
 
-    if (session) {
-      fetchUserData();
-    }
-  }, [session, status, router]);
+    // Cargar datos inmediatamente ya que tenemos verificación del servidor
+    fetchUserData();
+  }, [router, serverUser]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;

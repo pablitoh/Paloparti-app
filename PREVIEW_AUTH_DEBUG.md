@@ -13,7 +13,14 @@ En el ambiente de preview de Vercel, cuando intento acceder al perfil del usuari
 - ✅ Agregado logger específico para preview
 - ✅ Mejorado callback de redirect
 
-### 2. Endpoint de Debug Creado
+### 2. Verificación Server-Side con getServerSession
+
+- ✅ Página de perfil (`/profile`) actualizada con getServerSideProps
+- ✅ Página de edición de perfil (`/profile/edit`) actualizada con getServerSideProps
+- ✅ Verificación robusta del lado del servidor antes de renderizar
+- ✅ Redirección automática a login si no hay sesión válida
+
+### 3. Endpoint de Debug Creado
 
 Usa `/api/debug-preview-auth` en el ambiente de preview para diagnosticar:
 
