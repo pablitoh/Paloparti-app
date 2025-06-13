@@ -71,7 +71,7 @@ export default async function handler(
     }
 
     // Get the current user from the NextAuth session
-    const user = await getCurrentUser(req);
+    const user = await getCurrentUser(req, res);
 
     if (!user) {
       console.log('No authenticated user found in profile API');

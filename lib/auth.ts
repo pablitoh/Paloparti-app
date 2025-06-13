@@ -1,7 +1,8 @@
-import { NextApiRequest } from 'next';
+import { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from './prisma';
 import { getToken } from 'next-auth/jwt';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../pages/api/auth/[...nextauth]';
 
 // Especificamos los campos comunes que queremos seleccionar
 const userSelectFields = {
@@ -12,10 +13,34 @@ const userSelectFields = {
   // Birthdate se añadirá dinámicamente si el esquema lo soporta
 };
 
-export async function getCurrentUser(req: NextApiRequest) {
+export async function getCurrentUser(
+  req: NextApiRequest,
+  res?: NextApiResponse
+) {
   try {
-    // Primero intentar obtener la sesión de NextAuth
-    const session = await getSession({ req });
+    // Primero intentar obtener la sesión de NextAuth usando getServerSession (para APIs)
+    let session = null;
+
+    try {
+      if (res) {
+        session = await getServerSession(req, res, authOptions);
+      } else {
+        // Para llamadas sin res, solo usar JWT token
+        console.log('No res provided, skipping getServerSession');
+      }
+    } catch (sessionError) {
+      console.log('getServerSession failed, will try JWT token:', sessionError);
+    }
+
+    // Debug específico para preview
+    if (process.env.VERCEL_ENV === 'preview') {
+      console.log('getCurrentUser - server session check:', {
+        hasSession: !!session,
+        hasUser: !!session?.user,
+        userId: session?.user?.id,
+        userEmail: session?.user?.email,
+      });
+    }
 
     if (session?.user?.email) {
       console.log('Session found in getCurrentUser:', session.user.id);
@@ -45,8 +70,16 @@ export async function getCurrentUser(req: NextApiRequest) {
       }
     }
 
-    // Si no se encontró por sesión, intentar con el token JWT
+    // Si no se encontró por sesión, intentar con el token JWT como fallback
     const token = await getToken({ req });
+
+    if (process.env.VERCEL_ENV === 'preview') {
+      console.log('getCurrentUser - JWT token check:', {
+        hasToken: !!token,
+        tokenEmail: token?.email,
+        tokenSub: token?.sub,
+      });
+    }
 
     if (!token?.email) {
       console.log('No token or session found in getCurrentUser');
