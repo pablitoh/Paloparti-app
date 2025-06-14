@@ -3,15 +3,23 @@ import { createClient } from '@supabase/supabase-js';
 // Helper function to get environment variables with Vercel integration prefixes
 function getEnvVar(name: string): string | undefined {
   // Try different possible prefixes that Vercel might use
-  const prefixes = ['PALOPARTIPROD_', 'PALOPARTI_', ''];
+  const prefixes = [
+    'palopartiprod_',
+    'paloparti_',
+    'PALOPARTIPROD_',
+    'PALOPARTI_',
+    '',
+  ];
 
   for (const prefix of prefixes) {
     const value = process.env[`${prefix}${name}`];
     if (value) {
+      console.log(`Found ${name} with prefix: ${prefix}`);
       return value;
     }
   }
 
+  console.log(`Could not find ${name} with any prefix`);
   return undefined;
 }
 
@@ -21,7 +29,7 @@ const supabaseServiceKey = getEnvVar('SUPABASE_SERVICE_ROLE_KEY');
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn(
-    'Supabase environment variables not configured. Looking for NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY with possible prefixes: PALOPARTIPROD_, PALOPARTI_, or no prefix'
+    'Supabase environment variables not configured. Looking for NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY with possible prefixes: palopartiprod_, paloparti_, PALOPARTIPROD_, PALOPARTI_, or no prefix'
   );
   console.warn(
     'Available env vars:',
@@ -31,7 +39,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 if (!supabaseServiceKey) {
   console.warn(
-    'Supabase service role key not configured. Looking for SUPABASE_SERVICE_ROLE_KEY with possible prefixes: PALOPARTIPROD_, PALOPARTI_, or no prefix'
+    'Supabase service role key not configured. Looking for SUPABASE_SERVICE_ROLE_KEY with possible prefixes: palopartiprod_, paloparti_, PALOPARTIPROD_, PALOPARTI_, or no prefix'
   );
   console.warn(
     'Available env vars:',
