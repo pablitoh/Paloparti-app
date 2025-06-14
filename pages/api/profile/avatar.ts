@@ -39,9 +39,13 @@ async function uploadAvatar(req: NextApiRequest, res: NextApiResponse) {
 
     // Verificar que Supabase esté configurado
     if (!supabaseAdmin) {
+      const availableSupabaseVars = Object.keys(process.env).filter((key) =>
+        key.includes('SUPABASE')
+      );
       return res.status(500).json({
         message:
-          'Error de configuración: Supabase no está configurado correctamente. Verifica las variables de entorno NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY',
+          'Error de configuración: Supabase no está configurado correctamente. Verifica las variables de entorno con prefijos PALOPARTIPROD_, PALOPARTI_ o sin prefijo: NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY',
+        availableSupabaseVars,
       });
     }
 
