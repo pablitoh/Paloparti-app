@@ -5,6 +5,8 @@ import { calculateAge } from '../../../lib/utils';
 import { logGroupEvent } from '../../../utils/serverLogEvents';
 import { LogAction } from '../../../utils/logTypes';
 import { TeamBuilder } from '../../../lib/teambuilder';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../auth/[...nextauth]';
 
 // Interfaces tipo Member
 type Member = {
@@ -2093,10 +2095,31 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Verificar autenticación
-  const user = await getCurrentUser(req);
-  if (!user) {
+  // Verificar autenticación usando la misma lógica que funciona en otros endpoints
+  const session = await getServerSession(req, res, authOptions);
+
+  if (!session || !session.user?.id) {
+    console.log('No authenticated session found in /api/matches/create-match');
     return res.status(401).json({ message: 'No autenticado' });
+  }
+
+  const userId = session.user.id;
+  console.log('User ID from session in /api/matches/create-match:', userId);
+
+  // Buscar el usuario en la base de datos para confirmar que existe
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      image: true,
+    },
+  });
+
+  if (!user) {
+    console.log('User not found in database for /api/matches/create-match');
+    return res.status(401).json({ message: 'Usuario no encontrado' });
   }
 
   // Sólo permitir método POST para este endpoint

@@ -31,15 +31,21 @@ export async function getCurrentUser(
       });
     }
 
-    // Primero intentar obtener la sesión de NextAuth usando getServerSession (para APIs)
+    // NUEVA LÓGICA: Priorizar getServerSession siempre que sea posible
     let session = null;
 
     try {
+      // Intentar getServerSession si tenemos res, o crear un response mock si no
       if (res) {
         session = await getServerSession(req, res, authOptions);
       } else {
-        // Para llamadas sin res, solo usar JWT token
-        console.log('No res provided, skipping getServerSession');
+        // Crear un mock response para poder usar getServerSession
+        const mockRes = {
+          getHeader: () => undefined,
+          setHeader: () => {},
+          clearPreviewData: () => {},
+        } as any;
+        session = await getServerSession(req, mockRes, authOptions);
       }
     } catch (sessionError) {
       console.log('getServerSession failed, will try JWT token:', sessionError);
@@ -56,6 +62,7 @@ export async function getCurrentUser(
       });
     }
 
+    // Si tenemos sesión, usarla directamente (más confiable)
     if (session?.user?.email) {
       console.log('Session found in getCurrentUser:', session.user.id);
 

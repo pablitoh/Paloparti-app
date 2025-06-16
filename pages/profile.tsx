@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Link from 'next/link';
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 interface Group {
   id: string;
@@ -123,6 +124,10 @@ export default function Profile({ user: serverUser }: ProfileProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Estados para paginación del historial
+  const [currentPage, setCurrentPage] = useState(1);
+  const matchesPerPage = 5;
+
   useEffect(() => {
     // Ya tenemos verificación del servidor, solo necesitamos cargar los datos del perfil
     const fetchProfileData = async () => {
@@ -210,21 +215,53 @@ export default function Profile({ user: serverUser }: ProfileProps) {
     ? format(new Date(profileData.user.birthdate), 'dd/MM/yyyy')
     : 'No especificada';
 
+  // Function to determine if user won or lost the match
+  const getMatchResult = (match: Match) => {
+    const userTeamScore = match.team === 'A' ? match.scoreA : match.scoreB;
+    const opponentTeamScore = match.team === 'A' ? match.scoreB : match.scoreA;
+
+    if (userTeamScore > opponentTeamScore) {
+      return 'victory';
+    } else if (userTeamScore < opponentTeamScore) {
+      return 'defeat';
+    } else {
+      return 'draw';
+    }
+  };
+
+  // Calcular partidos para la página actual
+  const totalMatches = profileData?.matches.length || 0;
+  const totalPages = Math.ceil(totalMatches / matchesPerPage);
+  const startIndex = (currentPage - 1) * matchesPerPage;
+  const endIndex = startIndex + matchesPerPage;
+  const currentMatches = profileData?.matches.slice(startIndex, endIndex) || [];
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  };
+
   return (
     <Layout>
-      <div className='max-w-4xl mx-auto px-4 py-8'>
-        {/* Debug info for preview */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className='mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs'>
-            <strong>Debug:</strong> Server user: {serverUser.email} | Client
-            user: {clientUser?.email || 'loading...'}
-          </div>
-        )}
+      <div className='max-w-4xl mx-auto px-4 py-4 sm:py-8'>
+        {/* Enlace para volver a grupos */}
+        <div className='mb-4'>
+          <Link
+            href='/groups'
+            className='inline-flex items-center text-sm text-blue-600 hover:text-blue-800 transition-colors'
+          >
+            <ArrowLeftIcon className='h-4 w-4 mr-1' />
+            Volver a grupos
+          </Link>
+        </div>
 
-        <div className='bg-white rounded-xl shadow-md p-6'>
+        <div className='bg-white rounded-xl shadow-md p-4 sm:p-6'>
           {/* User Info */}
-          <div className='flex items-center justify-between mb-8'>
-            <div className='flex items-center gap-4'>
+          <div className='flex flex-col sm:flex-row sm:items-center justify-between mb-6 sm:mb-8 gap-4'>
+            <div className='flex flex-col sm:flex-row items-center sm:items-start gap-4'>
               <img
                 src={
                   profileData?.user.image ||
@@ -232,13 +269,15 @@ export default function Profile({ user: serverUser }: ProfileProps) {
                   '/default-avatar.png'
                 }
                 alt={profileData?.user.name || serverUser.name || 'User'}
-                className='w-24 h-24 rounded-full'
+                className='w-20 h-20 sm:w-24 sm:h-24 rounded-full mx-auto sm:mx-0'
               />
-              <div>
-                <h1 className='text-2xl font-bold'>
+              <div className='text-center sm:text-left'>
+                <h1 className='text-xl sm:text-2xl font-bold'>
                   {profileData?.user.name || serverUser.name || 'Usuario'}
                 </h1>
-                <p className='text-gray-600'>{serverUser.email}</p>
+                <p className='text-gray-600 text-sm sm:text-base'>
+                  {serverUser.email}
+                </p>
                 <div className='mt-2 text-sm'>
                   <p className='text-gray-600'>
                     <span className='font-medium'>Fecha de nacimiento:</span>{' '}
@@ -253,55 +292,42 @@ export default function Profile({ user: serverUser }: ProfileProps) {
                 </div>
               </div>
             </div>
-            <Link
-              href='/profile/edit'
-              className='bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded transition-colors'
-            >
-              Editar Perfil
-            </Link>
-          </div>
-
-          {/* Stats */}
-          <div className='grid grid-cols-3 gap-4 mb-8'>
-            <div className='bg-blue-50 p-4 rounded-lg text-center'>
-              <p className='text-sm text-gray-600'>Partidos Jugados</p>
-              <p className='text-2xl font-bold'>
-                {profileData?.totalMatches || 0}
-              </p>
-            </div>
-            <div className='bg-green-50 p-4 rounded-lg text-center'>
-              <p className='text-sm text-gray-600'>Goles Totales</p>
-              <p className='text-2xl font-bold'>
-                {profileData?.totalGoals || 0}
-              </p>
-            </div>
-            <div className='bg-purple-50 p-4 rounded-lg text-center'>
-              <p className='text-sm text-gray-600'>Grupos</p>
-              <p className='text-2xl font-bold'>
-                {profileData?.totalGroups || 0}
-              </p>
+            <div className='flex justify-center sm:justify-end'>
+              <Link
+                href='/profile/edit'
+                className='w-full sm:w-auto text-center bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded transition-colors text-sm sm:text-base'
+              >
+                Editar Perfil
+              </Link>
             </div>
           </div>
 
           {/* Groups */}
-          <div className='mb-8'>
-            <h2 className='text-xl font-bold mb-4'>Grupos</h2>
-            <div className='space-y-4'>
+          <div className='mb-6 sm:mb-8'>
+            <div className='flex flex-col sm:flex-row sm:items-center gap-2 mb-4'>
+              <h2 className='text-lg sm:text-xl font-bold'>Grupos</h2>
+              <span className='bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs sm:text-sm font-semibold w-fit'>
+                {profileData?.totalGroups || 0}
+              </span>
+            </div>
+            <div className='space-y-3 sm:space-y-4'>
               {profileData?.groups.map((group) => (
                 <div
                   key={group.id}
-                  className='border rounded-lg p-4 hover:bg-gray-50 cursor-pointer'
+                  className='border rounded-lg p-3 sm:p-4 hover:bg-gray-50 cursor-pointer'
                   onClick={() => router.push(`/group/${group.id}`)}
                 >
-                  <div className='flex justify-between items-center'>
-                    <div>
-                      <h3 className='font-semibold'>{group.name}</h3>
-                      <p className='text-sm text-gray-600'>
+                  <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2'>
+                    <div className='flex-1'>
+                      <h3 className='font-semibold text-sm sm:text-base'>
+                        {group.name}
+                      </h3>
+                      <p className='text-xs sm:text-sm text-gray-600'>
                         {group.sport} - {group.location}
                       </p>
                     </div>
                     <span
-                      className={`px-3 py-1 rounded-full text-sm ${
+                      className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm w-fit ${
                         group.role === 'ADMIN'
                           ? 'bg-blue-100 text-blue-800'
                           : 'bg-gray-100 text-gray-800'
@@ -315,51 +341,121 @@ export default function Profile({ user: serverUser }: ProfileProps) {
             </div>
           </div>
 
-          {/* Goals per Group */}
-          <div className='mb-8'>
-            <h2 className='text-xl font-bold mb-4'>Goles por Grupo</h2>
-            <div className='space-y-2'>
-              {profileData?.goalsPerGroup.map((item) => (
-                <div
-                  key={item.groupName}
-                  className='flex justify-between items-center p-2 bg-gray-50 rounded'
-                >
-                  <span>{item.groupName}</span>
-                  <span className='font-semibold'>{item.count} goles</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Match History */}
           <div>
-            <h2 className='text-xl font-bold mb-4'>Historial de Partidos</h2>
-            <div className='space-y-4'>
-              {profileData?.matches.map((match) => (
-                <div
-                  key={match.id}
-                  className='border rounded-lg p-4 hover:bg-gray-50 cursor-pointer'
-                  onClick={() => router.push(`/match/${match.id}/result`)}
-                >
-                  <div className='flex justify-between items-center mb-2'>
-                    <div>
-                      <h3 className='font-semibold'>{match.group.name}</h3>
-                      <p className='text-sm text-gray-600'>
-                        {format(new Date(match.date), 'PPP', { locale: es })}
-                      </p>
+            <div className='flex flex-col sm:flex-row sm:items-center gap-2 mb-4'>
+              <h2 className='text-lg sm:text-xl font-bold'>
+                Historial de Partidos
+              </h2>
+              <span className='bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs sm:text-sm font-semibold w-fit'>
+                {profileData?.totalMatches || 0}
+              </span>
+            </div>
+
+            {totalMatches > 0 ? (
+              <>
+                <div className='space-y-3 sm:space-y-4 mb-4 sm:mb-6'>
+                  {currentMatches.map((match) => {
+                    const result = getMatchResult(match);
+                    return (
+                      <div
+                        key={match.id}
+                        className='border rounded-lg p-3 sm:p-4'
+                      >
+                        <div className='flex flex-col gap-3'>
+                          <div className='flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2'>
+                            <div className='flex-1'>
+                              <h3 className='font-semibold text-sm sm:text-base'>
+                                {match.group.name}
+                              </h3>
+                              <p className='text-xs sm:text-sm text-gray-600'>
+                                {format(new Date(match.date), 'PPP', {
+                                  locale: es,
+                                })}
+                              </p>
+                              <p className='text-xs sm:text-sm text-gray-600 mt-1'>
+                                {match.location}
+                              </p>
+                            </div>
+                            <div className='flex items-center justify-between sm:justify-end gap-3'>
+                              <div className='text-left sm:text-right'>
+                                <p className='text-xs sm:text-sm font-medium'>
+                                  Equipo {match.team}:{' '}
+                                  {match.team === 'A'
+                                    ? match.scoreA
+                                    : match.scoreB}{' '}
+                                  -{' '}
+                                  {match.team === 'A'
+                                    ? match.scoreB
+                                    : match.scoreA}
+                                </p>
+                              </div>
+                              <span
+                                className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                                  result === 'victory'
+                                    ? 'bg-green-100 text-green-800'
+                                    : result === 'defeat'
+                                    ? 'bg-red-100 text-red-800'
+                                    : 'bg-gray-100 text-gray-800'
+                                }`}
+                              >
+                                {result === 'victory'
+                                  ? 'Victoria'
+                                  : result === 'defeat'
+                                  ? 'Derrota'
+                                  : 'Empate'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Controles de paginación */}
+                {totalPages > 1 && (
+                  <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between pt-4 border-t border-gray-200 gap-3'>
+                    <div className='text-xs sm:text-sm text-gray-600 text-center sm:text-left'>
+                      Mostrando {startIndex + 1} -{' '}
+                      {Math.min(endIndex, totalMatches)} de {totalMatches}{' '}
+                      partidos
                     </div>
-                    <div className='text-right'>
-                      <p className='text-sm text-gray-600'>{match.location}</p>
-                      <p className='text-sm'>
-                        Equipo {match.team} -{' '}
-                        {match.team === 'A' ? match.scoreA : match.scoreB} -{' '}
-                        {match.team === 'A' ? match.scoreB : match.scoreA}
-                      </p>
+                    <div className='flex items-center justify-center gap-2'>
+                      <button
+                        onClick={handlePreviousPage}
+                        disabled={currentPage === 1}
+                        className={`px-3 py-2 rounded-md text-xs sm:text-sm font-medium ${
+                          currentPage === 1
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                        }`}
+                      >
+                        Anterior
+                      </button>
+                      <span className='px-2 sm:px-3 py-2 text-xs sm:text-sm text-gray-600 whitespace-nowrap'>
+                        {currentPage} / {totalPages}
+                      </span>
+                      <button
+                        onClick={handleNextPage}
+                        disabled={currentPage === totalPages}
+                        className={`px-3 py-2 rounded-md text-xs sm:text-sm font-medium ${
+                          currentPage === totalPages
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                        }`}
+                      >
+                        Siguiente
+                      </button>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                )}
+              </>
+            ) : (
+              <div className='text-center py-6 sm:py-8 text-gray-500 text-sm sm:text-base'>
+                No hay partidos en el historial
+              </div>
+            )}
           </div>
         </div>
       </div>

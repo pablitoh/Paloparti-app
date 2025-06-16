@@ -15,7 +15,7 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
   size = 'medium',
   className = '',
 }) => {
-  const { data: session } = useSession();
+  const { data: session, update } = useSession();
   const [isUploading, setIsUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -76,8 +76,25 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
       }
 
       toast.success('Avatar actualizado correctamente');
-      onAvatarChange?.(result.avatar);
+
+      // Agregar timestamp para evitar cache
+      const avatarUrlWithTimestamp = `${result.avatar}?t=${Date.now()}`;
+
+      // Primero notificar al componente padre
+      onAvatarChange?.(avatarUrlWithTimestamp);
       setPreview(null);
+
+      // Forzar refetch completo de la sesión desde el servidor
+      setTimeout(async () => {
+        try {
+          console.log('Forzando refetch de sesión desde el servidor...');
+          // Forzar refetch desde el servidor en lugar de solo actualizar el objeto local
+          await update();
+          console.log('Sesión refetcheada desde servidor');
+        } catch (error) {
+          console.error('Error refetcheando sesión:', error);
+        }
+      }, 500);
     } catch (error) {
       console.error('Error uploading avatar:', error);
       toast.error(
@@ -114,7 +131,23 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
       }
 
       toast.success('Avatar eliminado correctamente');
+
+      // Primero notificar al componente padre
       onAvatarChange?.(null);
+
+      // Forzar refetch completo de la sesión desde el servidor
+      setTimeout(async () => {
+        try {
+          console.log(
+            'Forzando refetch de sesión desde el servidor (delete)...'
+          );
+          // Forzar refetch desde el servidor en lugar de solo actualizar el objeto local
+          await update();
+          console.log('Sesión refetcheada desde servidor (delete)');
+        } catch (error) {
+          console.error('Error refetcheando sesión:', error);
+        }
+      }, 500);
     } catch (error) {
       console.error('Error deleting avatar:', error);
       toast.error(

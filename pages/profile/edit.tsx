@@ -11,6 +11,8 @@ import DatePickerField, {
   formatDateForInput,
 } from '../../components/DatePickerField';
 import AvatarUpload from '../../components/AvatarUpload';
+import Link from 'next/link';
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 interface EditProfileProps {
   user: {
@@ -77,7 +79,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 
 export default function EditProfile({ user: serverUser }: EditProfileProps) {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const { user: clientUser, loading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -202,10 +204,14 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
         throw new Error(data.message || 'Error al actualizar el perfil');
       }
 
-      // Refresh the session to get updated user data
-      await fetch('/api/auth/session', {
-        method: 'GET',
-        credentials: 'include',
+      // Update the session to reflect the new user data
+      await update({
+        ...session,
+        user: {
+          ...session.user,
+          name: userData.name,
+          image: userData.image,
+        },
       });
 
       setSuccessMessage('Perfil actualizado correctamente');
@@ -289,6 +295,17 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
   return (
     <Layout>
       <div className='max-w-md mx-auto px-4 py-8'>
+        {/* Enlace para volver al perfil */}
+        <div className='mb-4'>
+          <Link
+            href='/profile'
+            className='inline-flex items-center text-sm text-blue-600 hover:text-blue-800 transition-colors'
+          >
+            <ArrowLeftIcon className='h-4 w-4 mr-1' />
+            Volver al Perfil
+          </Link>
+        </div>
+
         <div className='bg-white rounded-xl shadow-md p-6'>
           <h1 className='text-2xl font-bold mb-6 text-center'>Editar Perfil</h1>
 
@@ -417,15 +434,6 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
                 {isSaving ? 'Actualizando...' : 'Actualizar Contraseña'}
               </button>
             </form>
-          </div>
-
-          <div className='mt-6'>
-            <button
-              onClick={() => router.push('/profile')}
-              className='w-full bg-gray-100 hover:bg-gray-200 text-gray-800 py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2'
-            >
-              Volver al Perfil
-            </button>
           </div>
         </div>
       </div>

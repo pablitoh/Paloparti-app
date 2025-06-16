@@ -131,6 +131,41 @@ export const authOptions: NextAuthOptions = {
         token.birthdate = user.birthdate;
       }
 
+      // Cuando se llama update(), refrescar datos del usuario desde la base de datos
+      if (trigger === 'update' && token.id) {
+        try {
+          const updatedUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+              birthdate: true,
+            },
+          });
+
+          if (updatedUser) {
+            // Actualizar el token con los datos más recientes
+            token.name = updatedUser.name;
+            token.email = updatedUser.email;
+            token.picture = updatedUser.image; // NextAuth usa 'picture' para la imagen
+            token.birthdate = updatedUser.birthdate;
+
+            console.log('JWT actualizado con datos del usuario:', {
+              name: updatedUser.name,
+              email: updatedUser.email,
+              image: updatedUser.image,
+            });
+          }
+        } catch (error) {
+          console.error(
+            'Error refrescando datos del usuario en JWT callback:',
+            error
+          );
+        }
+      }
+
       // Debug logging para preview
       if (process.env.VERCEL_ENV === 'preview') {
         console.log('NextAuth JWT callback:', {
@@ -147,6 +182,9 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
+        session.user.name = token.name;
+        session.user.email = token.email;
+        session.user.image = token.picture as string | null; // NextAuth usa 'picture' internamente
         session.user.birthdate = token.birthdate as Date | null;
       }
 
@@ -157,6 +195,7 @@ export const authOptions: NextAuthOptions = {
           hasUser: !!session?.user,
           userId: session?.user?.id,
           userEmail: session?.user?.email,
+          userImage: session?.user?.image,
           tokenId: token?.id,
           environment: process.env.VERCEL_ENV,
           vercelUrl: process.env.VERCEL_URL,

@@ -2,6 +2,8 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getCurrentUser } from '../../../../lib/auth';
 import { prisma } from '../../../../lib/prisma';
 import { Prisma } from '@prisma/client';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../../auth/[...nextauth]';
 
 export default async function handler(
   req: NextApiRequest,
@@ -12,9 +14,26 @@ export default async function handler(
   }
 
   try {
-    const user = await getCurrentUser(req);
-    if (!user) {
+    // Use getServerSession for better compatibility in preview
+    const session = await getServerSession(req, res, authOptions);
+
+    if (!session || !session.user?.id) {
+      console.log('No authenticated session found in manual-teams');
       return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: 'User not found' });
     }
 
     const { id: matchId } = req.query;
