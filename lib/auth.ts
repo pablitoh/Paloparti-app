@@ -18,6 +18,19 @@ export async function getCurrentUser(
   res?: NextApiResponse
 ) {
   try {
+    // Debug específico para preview - logs de inicio
+    if (process.env.VERCEL_ENV === 'preview') {
+      console.log('getCurrentUser - Debug Info:', {
+        method: req.method,
+        url: req.url,
+        headers: {
+          cookie: req.headers.cookie ? 'Present' : 'Missing',
+          authorization: req.headers.authorization ? 'Present' : 'Missing',
+        },
+        hasRes: !!res,
+      });
+    }
+
     // Primero intentar obtener la sesión de NextAuth usando getServerSession (para APIs)
     let session = null;
 
@@ -39,6 +52,7 @@ export async function getCurrentUser(
         hasUser: !!session?.user,
         userId: session?.user?.id,
         userEmail: session?.user?.email,
+        sessionError: session ? null : 'No session found',
       });
     }
 
@@ -71,18 +85,38 @@ export async function getCurrentUser(
     }
 
     // Si no se encontró por sesión, intentar con el token JWT como fallback
-    const token = await getToken({ req });
+    let token = null;
+    try {
+      token = await getToken({ req });
+    } catch (tokenError) {
+      console.log('getToken failed:', tokenError);
+    }
 
     if (process.env.VERCEL_ENV === 'preview') {
       console.log('getCurrentUser - JWT token check:', {
         hasToken: !!token,
         tokenEmail: token?.email,
         tokenSub: token?.sub,
+        tokenError: token ? null : 'No token found',
+        cookieHeader: req.headers.cookie
+          ? req.headers.cookie.substring(0, 100) + '...'
+          : 'No cookies',
       });
     }
 
     if (!token?.email) {
       console.log('No token or session found in getCurrentUser');
+
+      // Debug adicional en preview para entender por qué falla
+      if (process.env.VERCEL_ENV === 'preview') {
+        console.log('getCurrentUser - Failed Authentication Details:', {
+          hasSessionUser: !!session?.user,
+          hasTokenEmail: !!token?.email,
+          requestUrl: req.url,
+          userAgent: req.headers['user-agent']?.substring(0, 50),
+        });
+      }
+
       return null;
     }
 

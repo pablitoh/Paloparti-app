@@ -20,9 +20,8 @@ NEXTAUTH_SECRET=tu-clave-secreta-aqui
 ### Supabase (si usas Supabase)
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=tu-url-de-supabase
-NEXT_PUBLIC_SUPABASE_ANON_KEY=tu-clave-anonima-de-supabase
-SUPABASE_SERVICE_ROLE_KEY=tu-clave-de-rol-de-servicio-de-supabase
+SUPABASE_URL=tu-url-de-supabase
+SUPABASE_ANON_KEY=tu-clave-anonima-de-supabase
 ```
 
 ### Entorno

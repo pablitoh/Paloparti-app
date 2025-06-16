@@ -5,6 +5,8 @@ import { getCurrentUser } from '../../../lib/auth';
 import { calculateAge } from '../../../lib/utils';
 import { logGroupEvent } from '../../../utils/serverLogEvents';
 import { LogAction } from '../../../utils/logTypes';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../auth/[...nextauth]';
 
 // Tipos para formatear los datos
 interface FormattedMember {
@@ -162,10 +164,31 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Verificar autenticación
-  const user = await getCurrentUser(req);
-  if (!user) {
+  // Verificar autenticación usando la misma lógica que funciona en /api/groups
+  const session = await getServerSession(req, res, authOptions);
+
+  if (!session || !session.user?.id) {
+    console.log('No authenticated session found in /api/groups/[id]');
     return res.status(401).json({ message: 'No autenticado' });
+  }
+
+  const userId = session.user.id;
+  console.log('User ID from session in /api/groups/[id]:', userId);
+
+  // Buscar el usuario en la base de datos para confirmar que existe
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      image: true,
+    },
+  });
+
+  if (!user) {
+    console.log('User not found in database for /api/groups/[id]');
+    return res.status(401).json({ message: 'Usuario no encontrado' });
   }
 
   // Obtener ID del grupo
