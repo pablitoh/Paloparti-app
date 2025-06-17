@@ -10,8 +10,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatDateUTC } from '../lib/utils';
-import Link from 'next/link';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 interface Group {
   id: string;
@@ -260,25 +258,6 @@ export default function Profile({ user: serverUser }: ProfileProps) {
     <Layout>
       <div className='min-h-screen bg-gradient-green-soft'>
         <div className='max-w-4xl mx-auto px-4 py-8'>
-          {/* Header con breadcrumb */}
-          <div className='mb-8'>
-            <Link
-              href='/groups'
-              className='inline-flex items-center text-primary-600 hover:text-primary-700 font-medium transition-colors bg-white px-4 py-2 rounded-xl shadow-sm hover:shadow-green mb-4'
-            >
-              <ArrowLeftIcon className='h-5 w-5 mr-2' />
-              Volver a grupos
-            </Link>
-            <div>
-              <h1 className='text-3xl font-bold text-gray-900 mb-1'>
-                Mi Perfil
-              </h1>
-              <p className='text-gray-600'>
-                Información personal y estadísticas deportivas
-              </p>
-            </div>
-          </div>
-
           {/* Card principal del perfil */}
           <div className='bg-white rounded-2xl shadow-green-lg p-6 sm:p-8 mb-6'>
             {/* User Info */}

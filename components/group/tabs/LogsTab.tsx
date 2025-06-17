@@ -166,14 +166,14 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
   if (isLoading) {
     return (
       <div className='flex justify-center items-center p-8'>
-        <div className='animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500'></div>
+        <div className='animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500'></div>
       </div>
     );
   }
 
   if (isError) {
     return (
-      <div className='bg-red-50 border border-red-200 text-red-800 rounded-md p-4 my-4'>
+      <div className='bg-red-50 border border-red-200 text-red-800 rounded-xl p-4 my-4 shadow-sm'>
         <p>Error al cargar los logs: {(error as Error).message}</p>
       </div>
     );
@@ -181,41 +181,52 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
 
   if (!data || !data.logs || data.logs.length === 0) {
     return (
-      <div className='text-center p-8 text-gray-500'>
-        <p>No hay actividad registrada en este grupo todavía.</p>
+      <div className='bg-white rounded-2xl p-8 text-center border border-primary-200 shadow-green-lg'>
+        <div className='w-16 h-16 bg-gradient-green-light rounded-full flex items-center justify-center mx-auto mb-6'>
+          <span className='text-2xl' role='img' aria-label='logs'>
+            📝
+          </span>
+        </div>
+        <h3 className='text-lg font-semibold text-gray-900 mb-3'>
+          Sin actividad registrada
+        </h3>
+        <p className='text-primary-600 max-w-md mx-auto'>
+          Las acciones del grupo aparecerán aquí cuando los miembros
+          interactúen.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className='bg-white rounded-lg shadow overflow-hidden'>
-      <div className='px-4 py-5 sm:px-6 border-b border-gray-200'>
+    <div className='bg-white rounded-2xl shadow-green-lg overflow-hidden border border-primary-200'>
+      <div className='px-6 py-5 sm:px-6 border-b border-primary-200 bg-gradient-green-soft'>
         <div className='flex justify-between items-center'>
           <div>
-            <h3 className='text-lg leading-6 font-medium text-gray-900'>
+            <h3 className='text-lg leading-6 font-semibold text-primary-800'>
               Registro de actividad
             </h3>
-            <p className='mt-1 max-w-2xl text-sm text-gray-500'>
+            <p className='mt-1 max-w-2xl text-sm text-primary-600'>
               Historial de acciones realizadas en el grupo
             </p>
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className='flex items-center text-sm text-gray-600 hover:text-gray-900 px-3 py-1 rounded-md border border-gray-300 hover:bg-gray-50'
+            className='flex items-center text-sm text-primary-700 hover:text-primary-800 px-3 py-2 rounded-lg border border-primary-200 hover:bg-primary-50 transition-colors duration-200 bg-white'
           >
-            <FunnelIcon className='h-4 w-4 mr-1' />
+            <FunnelIcon className='h-4 w-4 mr-2' />
             Filtros
           </button>
         </div>
 
         {/* Filtros */}
         {showFilters && (
-          <div className='mt-4 p-3 bg-gray-50 rounded-md border border-gray-200'>
-            <div className='flex flex-col sm:flex-row items-start sm:items-center gap-3'>
+          <div className='mt-4 p-4 bg-primary-25 rounded-xl border border-primary-200'>
+            <div className='flex flex-col sm:flex-row items-start sm:items-center gap-4'>
               <div className='w-full sm:w-auto'>
                 <label
                   htmlFor='action-filter'
-                  className='block text-sm font-medium text-gray-700 mb-1'
+                  className='block text-sm font-semibold text-primary-700 mb-2'
                 >
                   Tipo de actividad
                 </label>
@@ -223,7 +234,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
                   id='action-filter'
                   value={actionFilter}
                   onChange={handleActionFilterChange}
-                  className='w-full sm:w-auto block py-1.5 px-3 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500'
+                  className='w-full sm:w-auto block py-2 px-3 text-sm border border-primary-200 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 bg-white'
                 >
                   {Object.entries(actionGroups).map(([key, label]) => (
                     <option key={key} value={key}>
@@ -236,7 +247,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
               <div className='w-full sm:w-auto'>
                 <label
                   htmlFor='page-size'
-                  className='block text-sm font-medium text-gray-700 mb-1'
+                  className='block text-sm font-semibold text-primary-700 mb-2'
                 >
                   Registros por página
                 </label>
@@ -244,7 +255,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
                   id='page-size'
                   value={pageSize}
                   onChange={handlePageSizeChange}
-                  className='w-full sm:w-auto block py-1.5 px-3 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500'
+                  className='w-full sm:w-auto block py-2 px-3 text-sm border border-primary-200 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 bg-white'
                 >
                   <option value={5}>5</option>
                   <option value={10}>10</option>
@@ -257,7 +268,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
         )}
       </div>
 
-      <ul className='divide-y divide-gray-200'>
+      <ul className='divide-y divide-primary-100'>
         {filteredLogs.map((log: any) => {
           const date = new Date(log.createdAt);
           const timeAgo = formatDistanceToNow(date, {
@@ -274,22 +285,22 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
           return (
             <li
               key={log.id}
-              className='py-3 px-6 hover:bg-gray-50 transition-colors duration-150'
+              className='py-4 px-6 hover:bg-primary-25 transition-colors duration-200'
             >
               <div className='flex items-center'>
                 <div className='flex-1 min-w-0'>
                   <div className='flex items-baseline'>
                     <p
-                      className='text-sm text-gray-500 mr-3'
+                      className='text-sm text-primary-600 font-medium mr-3'
                       title={formattedDate}
                     >
                       {formattedDate}:
                     </p>
                     <p className='text-sm'>
-                      <span className='font-medium text-gray-900'>
+                      <span className='font-semibold text-primary-900'>
                         {log.user?.name || 'Usuario'}
                       </span>{' '}
-                      <span className='text-gray-600'>
+                      <span className='text-primary-700'>
                         {renderFormattedText(message)}
                       </span>
                     </p>

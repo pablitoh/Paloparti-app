@@ -454,11 +454,11 @@ export default function MembersTab({
       {/* Buscador */}
       <div className='relative w-full md:w-64 mb-4'>
         <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
-          <MagnifyingGlassIcon className='h-5 w-5 text-gray-400' />
+          <MagnifyingGlassIcon className='h-5 w-5 text-primary-400' />
         </div>
         <input
           type='text'
-          className='block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm'
+          className='block w-full pl-10 pr-3 py-2 border border-primary-200 rounded-lg leading-5 bg-white placeholder-primary-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition-colors duration-200'
           placeholder='Buscar miembro...'
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -466,30 +466,44 @@ export default function MembersTab({
       </div>
 
       {isMaxPlayersReached && (
-        <div className='bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4'>
-          <p className='text-sm text-yellow-700'>
-            Se ha alcanzado el cupo máximo de {requiredPlayers} jugadores para
-            este partido.
-          </p>
+        <div className='bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-4 mb-4 shadow-sm'>
+          <div className='flex items-center'>
+            <div className='w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center mr-3'>
+              <span className='text-sm' role='img' aria-label='warning'>
+                ⚠️
+              </span>
+            </div>
+            <p className='text-sm text-yellow-800 font-medium'>
+              Se ha alcanzado el cupo máximo de {requiredPlayers} jugadores para
+              este partido.
+            </p>
+          </div>
         </div>
       )}
 
       {!group?.nextMatchId && (
-        <div className='bg-amber-50 border border-amber-200 rounded-md p-3 mb-4'>
-          <p className='text-sm text-amber-700'>
-            No hay un próximo partido programado para este grupo.
-          </p>
+        <div className='bg-gradient-green-light border border-primary-200 rounded-xl p-4 mb-4 shadow-green-sm'>
+          <div className='flex items-center'>
+            <div className='w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center mr-3'>
+              <span className='text-sm' role='img' aria-label='info'>
+                ℹ️
+              </span>
+            </div>
+            <p className='text-sm text-primary-700 font-medium'>
+              No hay un próximo partido programado para este grupo.
+            </p>
+          </div>
         </div>
       )}
 
       {/* Vista de tabla para pantallas medianas y grandes */}
       <div className='hidden md:block'>
-        <div className='overflow-x-auto'>
-          <table className='min-w-full divide-y divide-gray-200'>
-            <thead className='bg-gray-50'>
+        <div className='overflow-x-auto rounded-2xl shadow-green-lg border border-primary-200'>
+          <table className='min-w-full divide-y divide-primary-200'>
+            <thead className='bg-gradient-green-soft'>
               <tr>
                 <th
-                  className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer'
+                  className='px-6 py-4 text-left text-xs font-semibold text-primary-700 uppercase tracking-wider cursor-pointer hover:bg-primary-75 transition-colors duration-200'
                   onClick={() => handleSort('name')}
                 >
                   <div className='flex items-center'>
@@ -497,12 +511,14 @@ export default function MembersTab({
                     <span className='ml-1'>{renderSortIcon('name')}</span>
                   </div>
                 </th>
-                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                <th className='px-6 py-4 text-left text-xs font-semibold text-primary-700 uppercase tracking-wider'>
                   Estado para el próximo partido
                 </th>
                 <th
-                  className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                    currentUserIsAdmin ? 'cursor-pointer' : ''
+                  className={`px-6 py-4 text-left text-xs font-semibold text-primary-700 uppercase tracking-wider ${
+                    currentUserIsAdmin
+                      ? 'cursor-pointer hover:bg-primary-75 transition-colors duration-200'
+                      : ''
                   }`}
                   onClick={
                     currentUserIsAdmin
@@ -519,12 +535,12 @@ export default function MembersTab({
                     )}
                   </div>
                 </th>
-                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                <th className='px-6 py-4 text-left text-xs font-semibold text-primary-700 uppercase tracking-wider'>
                   {currentUserIsAdmin ? 'Acciones' : ''}
                 </th>
               </tr>
             </thead>
-            <tbody className='bg-white divide-y divide-gray-200'>
+            <tbody className='bg-white divide-y divide-primary-100'>
               {filteredAndSortedMembers.map((member: Member) => {
                 // Determinar el estado para el próximo partido específicamente
                 const isConfirmedForNextMatch =
@@ -535,27 +551,30 @@ export default function MembersTab({
                 const isCurrentUser = user && member.userId === user.id;
 
                 return (
-                  <tr key={member.id}>
+                  <tr
+                    key={member.id}
+                    className='hover:bg-primary-25 transition-colors duration-200'
+                  >
                     <td className='px-6 py-4 whitespace-nowrap'>
                       <div className='flex items-center'>
                         <div className='flex-shrink-0 h-10 w-10'>
                           <Avatar
                             alt={member.name || 'Usuario sin nombre'}
                             src={member.avatar || ''}
-                            className='h-10 w-10 rounded-full'
+                            className='h-10 w-10 rounded-full border-2 border-primary-100'
                           />
                         </div>
                         <div className='ml-4'>
-                          <div className='text-sm font-medium text-gray-900'>
+                          <div className='text-sm font-semibold text-primary-900'>
                             {member.name || 'Usuario sin nombre'}
                             {member.role === 'ADMIN' && (
-                              <span className='ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800'>
+                              <span className='ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gradient-green-soft text-primary-700 border border-primary-200'>
                                 Admin
                               </span>
                             )}
                           </div>
                           {currentUserIsAdmin && member.email && (
-                            <div className='text-sm text-gray-500'>
+                            <div className='text-sm text-primary-600'>
                               {member.email}
                             </div>
                           )}
@@ -564,10 +583,10 @@ export default function MembersTab({
                     </td>
                     <td className='px-6 py-4 whitespace-nowrap'>
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
                           isConfirmedForNextMatch
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
+                            ? 'bg-gradient-green-light text-primary-800 border border-primary-200'
+                            : 'bg-gray-100 text-gray-700 border border-gray-200'
                         }`}
                       >
                         {isConfirmedForNextMatch ? 'Confirmado' : 'Pendiente'}
@@ -609,11 +628,11 @@ export default function MembersTab({
       <div className='md:hidden space-y-3'>
         {/* Sección de estadísticas móvil */}
         <div className='sticky top-0 z-[1] bg-white pb-2'>
-          <div className='flex justify-between items-center mb-2 bg-gray-50 p-3 rounded-md shadow-sm'>
-            <span className='text-sm font-medium text-gray-600'>
+          <div className='flex justify-between items-center mb-2 bg-gradient-green-soft p-3 rounded-xl shadow-green-sm border border-primary-200'>
+            <span className='text-sm font-semibold text-primary-700'>
               Total: {filteredAndSortedMembers.length || 0}
             </span>
-            <span className='text-sm font-medium text-green-600'>
+            <span className='text-sm font-semibold text-primary-800'>
               {localConfirmedCount} confirmados
             </span>
           </div>
@@ -622,10 +641,10 @@ export default function MembersTab({
           <div className='flex gap-2 mb-2'>
             <button
               onClick={() => handleSort('name')}
-              className={`flex items-center text-xs px-3 py-1.5 rounded-md ${
+              className={`flex items-center text-xs px-3 py-1.5 rounded-lg transition-colors duration-200 ${
                 sortField === 'name'
-                  ? 'bg-blue-100 text-blue-800'
-                  : 'bg-gray-100'
+                  ? 'bg-gradient-green-light text-primary-800 border border-primary-200'
+                  : 'bg-gray-100 text-gray-700 hover:bg-primary-50'
               }`}
             >
               Nombre{' '}
@@ -633,10 +652,10 @@ export default function MembersTab({
             </button>
             <button
               onClick={() => handleSort('starRating')}
-              className={`flex items-center text-xs px-3 py-1.5 rounded-md ${
+              className={`flex items-center text-xs px-3 py-1.5 rounded-lg transition-colors duration-200 ${
                 sortField === 'starRating'
-                  ? 'bg-blue-100 text-blue-800'
-                  : 'bg-gray-100'
+                  ? 'bg-gradient-green-light text-primary-800 border border-primary-200'
+                  : 'bg-gray-100 text-gray-700 hover:bg-primary-50'
               }`}
             >
               Habilidad{' '}
@@ -655,7 +674,7 @@ export default function MembersTab({
           return (
             <div
               key={member.id}
-              className='bg-white shadow rounded-lg p-3 flex flex-col border border-gray-100'
+              className='bg-white shadow-green-sm rounded-xl p-4 flex flex-col border border-primary-200 hover:shadow-green-md transition-all duration-200'
             >
               <div className='flex items-center justify-between'>
                 <div className='flex items-center flex-1'>
@@ -666,26 +685,26 @@ export default function MembersTab({
                   />
                   <div className='ml-3 min-w-0 flex-1'>
                     <div className='flex items-center flex-wrap gap-1'>
-                      <span className='text-sm font-medium text-gray-900 truncate'>
+                      <span className='text-sm font-semibold text-primary-900 truncate'>
                         {member.name || 'Usuario sin nombre'}
                       </span>
                       {member.role === 'ADMIN' && (
-                        <span className='inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800'>
+                        <span className='inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gradient-green-soft text-primary-700 border border-primary-200'>
                           Admin
                         </span>
                       )}
                     </div>
                     {currentUserIsAdmin && member.email && (
-                      <div className='text-sm text-gray-500 mt-1'>
+                      <div className='text-sm text-primary-600 mt-1'>
                         {member.email}
                       </div>
                     )}
                     <div className='mt-1'>
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
                           isConfirmedForNextMatch
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
+                            ? 'bg-gradient-green-light text-primary-800 border border-primary-200'
+                            : 'bg-gray-100 text-gray-700 border border-gray-200'
                         }`}
                       >
                         {isConfirmedForNextMatch ? 'Confirmado' : 'Pendiente'}

@@ -1,11 +1,8 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { NextRouter } from 'next/router';
-import {
-  PencilIcon,
-  ClipboardIcon,
-  Bars3Icon,
-} from '@heroicons/react/24/outline';
+import { PencilIcon, ShareIcon } from '@heroicons/react/24/outline';
+import { showSuccessToast } from '../../services/toastService';
 
 interface GroupHeaderProps {
   group: any;
@@ -18,7 +15,6 @@ interface GroupHeaderProps {
   copyInviteLink: () => void;
   isCopying: boolean;
   router: NextRouter;
-  onToggleDrawer?: () => void;
 }
 
 const GroupHeader: React.FC<GroupHeaderProps> = ({
@@ -32,102 +28,123 @@ const GroupHeader: React.FC<GroupHeaderProps> = ({
   copyInviteLink,
   isCopying,
   router,
-  onToggleDrawer,
 }) => {
+  const [isSticky, setIsSticky] = useState(false);
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsSticky(entry.intersectionRatio < 1);
+      },
+      {
+        threshold: [1],
+        rootMargin: '-64px 0px 0px 0px', // Offset for the main header height
+      }
+    );
+
+    if (headerRef.current) {
+      observer.observe(headerRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div
-      className='sticky top-0 z-[2] bg-primary-500 rounded-2xl shadow-green-lg p-4 mb-0 border border-primary-300'
-      style={{ backgroundColor: '#10b981 !important' }}
+      ref={headerRef}
+      className={`sticky top-16 z-[9997] bg-primary-500 mb-0 left-0 right-0 w-full transition-all duration-200 ${
+        isSticky
+          ? 'rounded-none border-0 shadow-lg'
+          : 'rounded-2xl border border-primary-300 shadow-green-lg'
+      }`}
+      style={{
+        backgroundColor: '#10b981 !important',
+        marginTop: isSticky ? '-1px' : '0', // Para eliminar el espacio entre headers cuando sea sticky
+      }}
     >
-      <div className='flex items-center justify-between flex-wrap gap-3'>
-        <div className='flex items-center gap-2'>
-          {/* Icono de hamburguesa para el drawer */}
-          <button
-            onClick={onToggleDrawer}
-            className='flex-shrink-0 flex items-center justify-center p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200'
-          >
-            <Bars3Icon className='h-5 w-5' />
-          </button>
-          <div className='min-w-0'>
-            <div className='flex items-center gap-2'>
-              <h1 className='text-xl font-bold text-white truncate'>
-                {group.name}
-              </h1>
-              {recurrenceText && (
-                <span className='hidden sm:inline text-sm text-white/90 bg-white/20 px-2 py-1 rounded-lg'>
-                  {recurrenceText}
-                </span>
-              )}
-            </div>
-          </div>
-          {currentUserIsAdmin && (
-            <span className='hidden sm:inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white/20 text-white shadow-sm'>
-              <svg
-                className='w-3 h-3 mr-1'
-                fill='none'
-                stroke='currentColor'
-                viewBox='0 0 24 24'
-              >
-                <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  strokeWidth='2'
-                  d='M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'
-                />
-              </svg>
-              Admin
-            </span>
-          )}
-        </div>
-
-        <div className='flex items-center space-x-2'>
-          {/* Invite link button - visible on all devices */}
-          <button
-            onClick={copyInviteLink}
-            disabled={isCopying}
-            className='flex items-center space-x-2 px-4 py-2 bg-white/20 text-white rounded-xl hover:bg-white/30 transition-all duration-200 disabled:opacity-50'
-            title='Copiar enlace de invitación'
-          >
-            {isCopying ? (
-              <div className='animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent'></div>
-            ) : (
-              <ClipboardIcon className='h-4 w-4' />
+      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4'>
+        <div className='flex items-center justify-between gap-2 sm:gap-3 flex-nowrap'>
+          {/* Información del grupo - lado izquierdo */}
+          <div className='flex items-center gap-1 sm:gap-2 min-w-0 flex-1'>
+            <h1 className='text-base sm:text-xl font-bold text-white truncate flex-shrink min-w-0'>
+              {group.name}
+            </h1>
+            {recurrenceText && (
+              <span className='hidden md:inline text-xs sm:text-sm text-white/90 bg-white/20 px-2 py-1 rounded-lg flex-shrink-0'>
+                {recurrenceText}
+              </span>
             )}
-            <span className='text-sm font-medium'>
-              {isCopying ? 'Copiando...' : 'Invitar'}
-            </span>
-          </button>
+            {currentUserIsAdmin && (
+              <span className='hidden sm:inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-white/20 text-white shadow-sm flex-shrink-0'>
+                <svg
+                  className='w-3 h-3 mr-1'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth='2'
+                    d='M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'
+                  />
+                </svg>
+                Admin
+              </span>
+            )}
+          </div>
 
-          {/* User status (pendiente) */}
-          {group.userStatus === 'PENDING' && (
-            <span className='hidden sm:inline-flex px-3 py-1 bg-warning-100 text-warning-800 rounded-full text-sm font-medium border border-warning-200'>
-              <svg
-                className='w-4 h-4 mr-1'
-                fill='none'
-                stroke='currentColor'
-                viewBox='0 0 24 24'
-              >
-                <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  strokeWidth='2'
-                  d='M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'
-                />
-              </svg>
-              Pendiente
-            </span>
-          )}
+          {/* Botones - lado derecho */}
+          <div className='flex items-center space-x-1 sm:space-x-2 flex-shrink-0'>
+            {/* User status (pendiente) - solo en desktop */}
+            {group.userStatus === 'PENDING' && (
+              <span className='hidden lg:inline-flex px-2 py-1 bg-warning-100 text-warning-800 rounded-full text-xs font-medium border border-warning-200 flex-shrink-0'>
+                <svg
+                  className='w-3 h-3 mr-1'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth='2'
+                    d='M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'
+                  />
+                </svg>
+                Pendiente
+              </span>
+            )}
 
-          {/* Admin actions - only edit button */}
-          {currentUserIsAdmin && (
+            {/* Invite button - compacto en mobile */}
             <button
-              onClick={() => router.push(`/edit-group/${group.id}`)}
-              className='p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200'
-              title='Editar grupo'
+              onClick={copyInviteLink}
+              disabled={isCopying}
+              className='flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-1.5 sm:py-2 bg-white/20 text-white rounded-lg sm:rounded-xl hover:bg-white/30 transition-all duration-200 disabled:opacity-50 flex-shrink-0'
+              title='Compartir enlace de invitación'
             >
-              <PencilIcon className='h-5 w-5' />
+              {isCopying ? (
+                <div className='animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-2 border-white border-t-transparent'></div>
+              ) : (
+                <ShareIcon className='h-3 w-3 sm:h-4 sm:w-4' />
+              )}
+              <span className='text-xs sm:text-sm font-medium hidden sm:inline'>
+                {isCopying ? 'Copiando...' : 'Compartir'}
+              </span>
             </button>
-          )}
+
+            {/* Edit button - solo para admins */}
+            {currentUserIsAdmin && (
+              <button
+                onClick={() => router.push(`/edit-group/${group.id}`)}
+                className='p-1.5 sm:p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-lg sm:rounded-xl transition-all duration-200 flex-shrink-0'
+                title='Editar grupo'
+              >
+                <PencilIcon className='h-4 w-4 sm:h-5 sm:w-5' />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

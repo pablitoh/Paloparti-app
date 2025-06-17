@@ -22,52 +22,52 @@ export default function GoalsTab({ goleadores }: GoalsTabProps) {
       </div>
 
       {goleadores && goleadores.length > 0 ? (
-        <div className='bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden'>
-          <div className='bg-gray-50 px-6 py-3 border-b border-gray-200'>
+        <div className='bg-white rounded-2xl border border-primary-200 shadow-green-lg overflow-hidden'>
+          <div className='bg-gradient-green-soft px-6 py-4 border-b border-primary-200'>
             <div className='grid grid-cols-12 gap-4'>
               <div className='col-span-1'>
-                <span className='text-xs font-medium text-gray-500 uppercase'>
+                <span className='text-xs font-semibold text-primary-700 uppercase tracking-wide'>
                   Pos.
                 </span>
               </div>
               <div className='col-span-7'>
-                <span className='text-xs font-medium text-gray-500 uppercase'>
+                <span className='text-xs font-semibold text-primary-700 uppercase tracking-wide'>
                   Jugador
                 </span>
               </div>
               <div className='col-span-4 text-center'>
-                <span className='text-xs font-medium text-gray-500 uppercase'>
+                <span className='text-xs font-semibold text-primary-700 uppercase tracking-wide'>
                   Goles
                 </span>
               </div>
             </div>
           </div>
 
-          <div className='divide-y divide-gray-200'>
+          <div className='divide-y divide-primary-100'>
             {goleadores.map((goleador, index) => (
               <div
                 key={goleador.id}
-                className={`px-6 py-4 hover:bg-gray-50 transition-colors ${
-                  index < 3 ? 'bg-gradient-to-r from-amber-50 to-white' : ''
+                className={`px-6 py-4 hover:bg-primary-50 transition-all duration-200 ${
+                  index < 3 ? 'bg-gradient-to-r from-primary-25 to-white' : ''
                 }`}
               >
                 <div className='grid grid-cols-12 gap-4 items-center'>
                   <div className='col-span-1'>
                     <div
                       className={`
-                          flex items-center justify-center w-8 h-8 rounded-full
+                          flex items-center justify-center w-9 h-9 rounded-full font-bold text-sm shadow-sm
                           ${
                             index === 0
-                              ? 'bg-yellow-100 text-yellow-700'
+                              ? 'bg-gradient-green text-white shadow-green'
                               : index === 1
-                              ? 'bg-gray-100 text-gray-600'
+                              ? 'bg-primary-100 text-primary-700 border-2 border-primary-200'
                               : index === 2
-                              ? 'bg-amber-100 text-amber-700'
-                              : 'bg-blue-50 text-blue-600'
+                              ? 'bg-primary-50 text-primary-600 border border-primary-200'
+                              : 'bg-gray-50 text-gray-600 border border-gray-200'
                           }
                         `}
                     >
-                      <span className='text-sm font-semibold'>{index + 1}</span>
+                      <span>{index + 1}</span>
                     </div>
                   </div>
                   <div className='col-span-7'>
@@ -87,29 +87,13 @@ export default function GoalsTab({ goleadores }: GoalsTabProps) {
                     </div>
                   </div>
                   <div className='col-span-4 text-center'>
-                    <div className='flex items-center justify-center space-x-1'>
-                      <span className='text-sm font-semibold text-gray-900'>
+                    <div className='flex items-center justify-center space-x-2'>
+                      <span className='text-lg font-bold text-gray-900'>
                         {goleador.goals}
                       </span>
-                      <div className='flex'>
-                        {Array.from({
-                          length: Math.min(goleador.goals, 5),
-                        }).map((_, i) => (
-                          <span
-                            key={i}
-                            role='img'
-                            aria-label='goal'
-                            className='text-sm'
-                          >
-                            ⚽
-                          </span>
-                        ))}
-                        {goleador.goals > 5 && (
-                          <span className='text-xs text-gray-500 ml-1'>
-                            +{goleador.goals - 5}
-                          </span>
-                        )}
-                      </div>
+                      <span role='img' aria-label='goal' className='text-lg'>
+                        ⚽
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -118,27 +102,18 @@ export default function GoalsTab({ goleadores }: GoalsTabProps) {
           </div>
         </div>
       ) : (
-        <div className='bg-white rounded-lg p-6 text-center border border-gray-200 shadow-sm'>
-          <svg
-            xmlns='http://www.w3.org/2000/svg'
-            className='h-12 w-12 mx-auto text-gray-400 mb-4'
-            fill='none'
-            viewBox='0 0 24 24'
-            stroke='currentColor'
-          >
-            <path
-              strokeLinecap='round'
-              strokeLinejoin='round'
-              strokeWidth={1}
-              d='M16 4v12l-4-2-4 2V4M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z'
-            />
-          </svg>
-          <h3 className='text-lg font-medium text-gray-900 mb-2'>
-            No hay datos de goleadores
+        <div className='bg-white rounded-2xl p-8 text-center border border-primary-200 shadow-green-lg'>
+          <div className='w-16 h-16 bg-gradient-green-light rounded-full flex items-center justify-center mx-auto mb-6'>
+            <span className='text-2xl' role='img' aria-label='soccer ball'>
+              ⚽
+            </span>
+          </div>
+          <h3 className='text-lg font-semibold text-gray-900 mb-3'>
+            No hay goleadores aún
           </h3>
-          <p className='text-gray-500 max-w-md mx-auto'>
-            Aún no se han registrado goles o no se han jugado suficientes
-            partidos para mostrar estadísticas.
+          <p className='text-primary-600 max-w-md mx-auto'>
+            Los goles se registrarán automáticamente cuando se completen los
+            partidos.
           </p>
         </div>
       )}

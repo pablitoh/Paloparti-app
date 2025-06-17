@@ -34,56 +34,56 @@ const RequestsTab: React.FC<RequestsTabProps> = ({
       </div>
 
       {pendingRequests && pendingRequests.length > 0 ? (
-        <div className='bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden'>
-          <ul className='divide-y divide-gray-200'>
+        <div className='bg-white rounded-2xl border border-primary-200 shadow-green-lg overflow-hidden'>
+          <ul className='divide-y divide-primary-100'>
             {pendingRequests.map((request) => (
               <li
                 key={request.id}
-                className='hover:bg-gray-50 transition-colors'
+                className='hover:bg-primary-25 transition-colors duration-200'
               >
-                <div className='px-4 py-4 sm:px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between'>
+                <div className='px-6 py-5 sm:px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between'>
                   <div className='flex items-center'>
-                    <div className='flex-shrink-0 h-10 w-10'>
+                    <div className='flex-shrink-0 h-12 w-12'>
                       <Avatar
-                        className='h-10 w-10 rounded-full'
+                        className='h-12 w-12 rounded-full border-2 border-primary-100'
                         src={request.avatar || ''}
                         alt={request.name || ''}
                       />
                     </div>
                     <div className='ml-4'>
                       <div className='flex items-center'>
-                        <div className='text-sm font-medium text-gray-900'>
+                        <div className='text-sm font-semibold text-primary-900'>
                           {request.name}
                         </div>
-                        <span className='ml-2 px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-700'>
+                        <span className='ml-2 px-3 py-1 text-xs font-medium rounded-full bg-gradient-to-r from-yellow-100 to-orange-100 text-orange-700 border border-orange-200'>
                           Pendiente
                         </span>
                       </div>
                       {request.email && (
-                        <div className='text-sm text-gray-500'>
+                        <div className='text-sm text-primary-600 mt-1'>
                           {request.email}
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <div className='flex space-x-2 mt-3 sm:mt-0'>
+                  <div className='flex space-x-3 mt-4 sm:mt-0'>
                     <button
                       onClick={() =>
                         handleMembershipRequest(request.userId, 'APPROVE')
                       }
-                      className='inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 transition-colors'
+                      className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-green-sm text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 transition-all duration-200'
                     >
-                      <CheckCircleIcon className='h-4 w-4 mr-1' />
+                      <CheckCircleIcon className='h-4 w-4 mr-2' />
                       Aprobar
                     </button>
                     <button
                       onClick={() =>
                         handleMembershipRequest(request.userId, 'REJECT')
                       }
-                      className='inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 transition-colors'
+                      className='inline-flex items-center px-4 py-2 border border-red-200 text-sm font-medium rounded-lg shadow-sm text-red-700 bg-white hover:bg-red-50 transition-all duration-200'
                     >
-                      <XCircleIcon className='h-4 w-4 mr-1' />
+                      <XCircleIcon className='h-4 w-4 mr-2' />
                       Rechazar
                     </button>
                   </div>
@@ -93,27 +93,18 @@ const RequestsTab: React.FC<RequestsTabProps> = ({
           </ul>
         </div>
       ) : (
-        <div className='bg-white rounded-lg p-6 text-center border border-gray-200 shadow-sm'>
-          <svg
-            xmlns='http://www.w3.org/2000/svg'
-            className='h-12 w-12 mx-auto text-gray-400 mb-4'
-            fill='none'
-            viewBox='0 0 24 24'
-            stroke='currentColor'
-          >
-            <path
-              strokeLinecap='round'
-              strokeLinejoin='round'
-              strokeWidth={1}
-              d='M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z'
-            />
-          </svg>
-          <h3 className='text-lg font-medium text-gray-900 mb-2'>
+        <div className='bg-white rounded-2xl p-8 text-center border border-primary-200 shadow-green-lg'>
+          <div className='w-16 h-16 bg-gradient-green-light rounded-full flex items-center justify-center mx-auto mb-6'>
+            <span className='text-2xl' role='img' aria-label='requests'>
+              📋
+            </span>
+          </div>
+          <h3 className='text-lg font-semibold text-gray-900 mb-3'>
             No hay solicitudes pendientes
           </h3>
-          <p className='text-gray-500 max-w-md mx-auto'>
-            No tienes usuarios esperando aprobación para unirse al grupo en este
-            momento.
+          <p className='text-primary-600 max-w-md mx-auto'>
+            Todas las solicitudes han sido procesadas. Las nuevas solicitudes
+            aparecerán aquí.
           </p>
         </div>
       )}

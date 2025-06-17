@@ -1144,9 +1144,16 @@ export default function NextMatchTab({
                     ></div>
                     {/* Porcentaje centrado y legible dentro de la barra */}
                     <span
-                      className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-sm font-bold text-white drop-shadow-lg select-none pointer-events-none z-10'
+                      className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-sm font-bold select-none pointer-events-none z-20 transition-colors duration-300 ${
+                        progressPercentage > 50
+                          ? 'text-white drop-shadow-lg'
+                          : 'text-gray-700'
+                      }`}
                       style={{
-                        textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                        textShadow:
+                          progressPercentage > 50
+                            ? '0 2px 4px rgba(0,0,0,0.3)'
+                            : 'none',
                       }}
                     >
                       {progressPercentage}%

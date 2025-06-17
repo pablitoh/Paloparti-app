@@ -565,13 +565,6 @@ export default function GroupDetails() {
             </div>
           )}
         </div>
-
-        {/* Elementos decorativos de fondo */}
-        <div className='fixed top-20 right-10 w-32 h-32 bg-primary-200 rounded-full opacity-10 animate-pulse pointer-events-none'></div>
-        <div
-          className='fixed bottom-20 left-10 w-24 h-24 bg-accent-300 rounded-full opacity-15 animate-pulse pointer-events-none'
-          style={{ animationDelay: '3s' }}
-        ></div>
       </div>
     </Layout>
   );
@@ -920,17 +913,6 @@ const GroupContent = ({
 
   return (
     <div className='space-y-6'>
-      {/* Enlace para volver a grupos */}
-      <div className='mb-2'>
-        <Link
-          href='/groups'
-          className='inline-flex items-center text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors bg-white px-4 py-2 rounded-xl shadow-sm hover:shadow-green'
-        >
-          <ArrowLeftIcon className='h-4 w-4 mr-1' />
-          Volver a grupos
-        </Link>
-      </div>
-
       <GroupHeader
         group={groupBasicData}
         currentUserIsAdmin={currentUserIsAdmin}
@@ -942,7 +924,6 @@ const GroupContent = ({
         copyInviteLink={copyInviteLink}
         isCopying={isCopying}
         router={router}
-        onToggleDrawer={() => setIsDrawerOpen(!isDrawerOpen)}
       />
 
       {/* Tabs de navegación - ocultos en móvil */}

@@ -60,6 +60,22 @@ module.exports = {
           500: '#ef4444',
           600: '#dc2626',
         },
+        // Nuevos colores de la paleta del screenshot
+        lime: {
+          400: '#90FF63', // Verde lima brillante
+          500: '#7BE84A', // Verde lima medio
+          600: '#63FF98', // Verde menta
+        },
+        coral: {
+          400: '#FF9563', // Coral/naranja suave
+          500: '#FF7B47', // Coral medio
+          600: '#FF6763', // Coral rosado
+        },
+        slate: {
+          400: '#7BAA8B', // Verde grisáceo
+          500: '#758071', // Gris verdoso oscuro
+          600: '#6B7280', // Gris medio
+        },
       },
       backgroundImage: {
         'gradient-green': 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
@@ -67,10 +83,24 @@ module.exports = {
           'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
         'gradient-green-soft':
           'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+        // Nuevos gradientes con la paleta del screenshot
+        'gradient-lime': 'linear-gradient(135deg, #90FF63 0%, #63FF98 100%)',
+        'gradient-coral': 'linear-gradient(135deg, #FF9563 0%, #FF6763 100%)',
+        'gradient-winner': 'linear-gradient(135deg, #90FF63 0%, #7BE84A 100%)',
+        'gradient-vibrant':
+          'linear-gradient(135deg, #90FF63 0%, #FF9563 50%, #FF6763 100%)',
       },
       boxShadow: {
         green: '0 4px 14px 0 rgba(16, 185, 129, 0.25)',
         'green-lg': '0 10px 40px rgba(16, 185, 129, 0.2)',
+        'green-sm': '0 2px 8px rgba(16, 185, 129, 0.15)',
+        'green-md': '0 6px 20px rgba(16, 185, 129, 0.18)',
+        // Nuevas sombras con los colores del screenshot
+        lime: '0 4px 14px 0 rgba(144, 255, 99, 0.25)',
+        'lime-lg': '0 10px 40px rgba(144, 255, 99, 0.2)',
+        coral: '0 4px 14px 0 rgba(255, 149, 99, 0.25)',
+        'coral-lg': '0 10px 40px rgba(255, 149, 99, 0.2)',
+        winner: '0 4px 14px 0 rgba(144, 255, 99, 0.3)',
       },
     },
   },
