@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from 'next-auth/react';
@@ -92,6 +92,9 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
     birthdate: '',
     image: null,
   });
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(
+    null
+  );
   const [password, setPassword] = useState({
     current: '',
     new: '',
@@ -99,6 +102,9 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
   });
   const [successMessage, setSuccessMessage] = useState('');
   const [error, setError] = useState('');
+  const avatarUploadRef = useRef<{
+    uploadSelectedFile: () => Promise<string | null>;
+  }>(null);
 
   useEffect(() => {
     // Ya tenemos verificación del servidor, solo necesitamos cargar los datos del perfil
@@ -174,6 +180,10 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
     }));
   };
 
+  const handleFileSelect = (file: File | null) => {
+    setSelectedAvatarFile(file);
+  };
+
   const updateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -187,6 +197,13 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
     }
 
     try {
+      // Primero subir la imagen si hay una seleccionada
+      if (selectedAvatarFile && avatarUploadRef.current) {
+        await avatarUploadRef.current.uploadSelectedFile();
+        // La imagen se actualiza automáticamente a través del callback handleAvatarChange
+      }
+
+      // Luego actualizar el resto del perfil
       const response = await fetch('/api/profile/update', {
         method: 'PUT',
         headers: {
@@ -215,6 +232,12 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
       });
 
       setSuccessMessage('Perfil actualizado correctamente');
+      setSelectedAvatarFile(null); // Limpiar el archivo seleccionado
+
+      // Redirigir al perfil después de un breve delay para mostrar el mensaje
+      setTimeout(() => {
+        router.push('/profile');
+      }, 1500);
     } catch (error) {
       console.error('Error updating profile:', error);
       setError(
@@ -267,6 +290,11 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
         new: '',
         confirm: '',
       });
+
+      // Redirigir al perfil después de un breve delay para mostrar el mensaje
+      setTimeout(() => {
+        router.push('/profile');
+      }, 1500);
     } catch (error) {
       console.error('Error updating password:', error);
       setError(
@@ -330,9 +358,12 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
               </label>
               <div className='flex justify-center'>
                 <AvatarUpload
+                  ref={avatarUploadRef}
                   currentAvatar={userData.image}
                   onAvatarChange={handleAvatarChange}
+                  onFileSelect={handleFileSelect}
                   size='large'
+                  autoUpload={false}
                 />
               </div>
             </div>
