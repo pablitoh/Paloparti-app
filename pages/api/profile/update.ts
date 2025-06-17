@@ -52,9 +52,44 @@ export default async function handler(
     // Convert birthdate string to Date object if it exists
     let birthdateObj = null;
     if (birthdate) {
-      // Para evitar problemas de zona horaria, asegurar que la fecha se interprete como local
+      // Enhanced logging for preview environment
+      if (process.env.VERCEL_ENV === 'preview') {
+        console.log('Preview environment - processing birthdate:', {
+          originalBirthdate: birthdate,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          serverTime: new Date().toISOString(),
+        });
+      }
+
+      // Para evitar problemas de zona horaria, crear la fecha como UTC medianoche
       const [year, month, day] = birthdate.split('-').map(Number);
-      birthdateObj = new Date(year, month - 1, day); // month es 0-indexed en JS
+
+      if (
+        !year ||
+        !month ||
+        !day ||
+        year < 1900 ||
+        year > 2100 ||
+        month < 1 ||
+        month > 12 ||
+        day < 1 ||
+        day > 31
+      ) {
+        return res.status(400).json({ message: 'Invalid birthdate format' });
+      }
+
+      // Crear fecha UTC explícitamente para evitar problemas de zona horaria
+      birthdateObj = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+
+      if (process.env.VERCEL_ENV === 'preview') {
+        console.log('Preview environment - created birthdate object:', {
+          year,
+          month,
+          day,
+          birthdateObj: birthdateObj.toISOString(),
+          birthdateUTC: birthdateObj.toUTCString(),
+        });
+      }
 
       if (isNaN(birthdateObj.getTime())) {
         return res.status(400).json({ message: 'Invalid birthdate format' });

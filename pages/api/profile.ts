@@ -103,6 +103,17 @@ export default async function handler(
     // Calculate age from birthdate
     const age = calculateAge(userData.birthdate);
 
+    // Enhanced logging for preview environment
+    if (process.env.VERCEL_ENV === 'preview' && userData.birthdate) {
+      console.log('Preview environment - reading birthdate from DB:', {
+        rawBirthdate: userData.birthdate,
+        birthdateISO: userData.birthdate.toISOString(),
+        birthdateUTC: userData.birthdate.toUTCString(),
+        calculatedAge: age,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
+    }
+
     // Obtener grupos del usuario
     const userGroups = await prisma.groupMember.findMany({
       where: {

@@ -54,10 +54,10 @@ export const formatDateForInput = (date: Date | string | null): string => {
 
   try {
     const dateObj = new Date(date);
-    // Evitar problemas de zona horaria usando los componentes de fecha locales
-    const year = dateObj.getFullYear();
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const day = String(dateObj.getDate()).padStart(2, '0');
+    // Usar componentes UTC para fechas que se almacenan como UTC en la DB
+    const year = dateObj.getUTCFullYear();
+    const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getUTCDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   } catch (error) {
     console.error('Error formatting date for input:', error);
