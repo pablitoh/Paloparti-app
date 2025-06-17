@@ -33,3 +33,23 @@ export function calculateAge(birthdate: Date | string | null): number | null {
 
   return age;
 }
+
+/**
+ * Format a date as DD/MM/YYYY using UTC components to avoid timezone issues
+ * @param date Date to format
+ * @returns Formatted date string
+ */
+export function formatDateUTC(date: Date | string | null): string {
+  if (!date) return 'No especificada';
+
+  try {
+    const dateObj = new Date(date);
+    const day = String(dateObj.getUTCDate()).padStart(2, '0');
+    const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+    const year = dateObj.getUTCFullYear();
+    return `${day}/${month}/${year}`;
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Fecha inválida';
+  }
+}

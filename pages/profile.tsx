@@ -8,6 +8,7 @@ import Avatar from '../components/Avatar';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatDateUTC } from '../lib/utils';
 import Link from 'next/link';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 
@@ -211,10 +212,8 @@ export default function Profile({ user: serverUser }: ProfileProps) {
     );
   }
 
-  // Format birthdate for display
-  const formattedBirthdate = profileData?.user.birthdate
-    ? format(new Date(profileData.user.birthdate), 'dd/MM/yyyy')
-    : 'No especificada';
+  // Format birthdate for display using UTC to avoid timezone issues
+  const formattedBirthdate = formatDateUTC(profileData?.user.birthdate || null);
 
   // Function to determine if user won or lost the match
   const getMatchResult = (match: Match) => {
