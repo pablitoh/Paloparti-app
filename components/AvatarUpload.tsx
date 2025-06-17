@@ -16,10 +16,12 @@ interface AvatarUploadProps {
   className?: string;
   autoUpload?: boolean;
   fallbackText?: string;
+  onDeleteRequested?: () => void;
 }
 
 interface AvatarUploadRef {
   uploadSelectedFile: () => Promise<string | null>;
+  deleteAvatar: () => Promise<void>;
 }
 
 const AvatarUpload = forwardRef<AvatarUploadRef, AvatarUploadProps>(
@@ -32,6 +34,7 @@ const AvatarUpload = forwardRef<AvatarUploadRef, AvatarUploadProps>(
       className = '',
       autoUpload = true,
       fallbackText,
+      onDeleteRequested,
     },
     ref
   ) => {
@@ -39,6 +42,7 @@ const AvatarUpload = forwardRef<AvatarUploadRef, AvatarUploadProps>(
     const [isUploading, setIsUploading] = useState(false);
     const [preview, setPreview] = useState<string | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [pendingDelete, setPendingDelete] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const avatarSizeMapping: Record<string, 'md' | 'lg' | 'xl'> = {
@@ -140,56 +144,41 @@ const AvatarUpload = forwardRef<AvatarUploadRef, AvatarUploadProps>(
       }
     };
 
-    const deleteAvatar = async () => {
+    const requestDeleteAvatar = () => {
+      if (!currentAvatar && !pendingDelete) {
+        return;
+      }
+
+      if (pendingDelete) {
+        // Cancelar la eliminación pendiente
+        setPendingDelete(false);
+        onDeleteRequested?.();
+      } else {
+        // Marcar para eliminar
+        setPendingDelete(true);
+        onDeleteRequested?.();
+      }
+    };
+
+    const actualDeleteAvatar = async () => {
       if (!session) {
-        toast.error('Debes estar autenticado');
-        return;
+        throw new Error('Debes estar autenticado');
       }
 
-      if (!currentAvatar) {
-        toast.error('No hay avatar para eliminar');
-        return;
+      const response = await fetch('/api/profile/avatar', {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Error al eliminar el avatar');
       }
 
-      setIsUploading(true);
+      // Limpiar el estado de eliminación pendiente
+      setPendingDelete(false);
 
-      try {
-        const response = await fetch('/api/profile/avatar', {
-          method: 'DELETE',
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result.message || 'Error al eliminar el avatar');
-        }
-
-        toast.success('Avatar eliminado correctamente');
-
-        // Primero notificar al componente padre
-        onAvatarChange?.(null);
-
-        // Forzar refetch completo de la sesión desde el servidor
-        setTimeout(async () => {
-          try {
-            console.log(
-              'Forzando refetch de sesión desde el servidor (delete)...'
-            );
-            // Forzar refetch desde el servidor en lugar de solo actualizar el objeto local
-            await update();
-            console.log('Sesión refetcheada desde servidor (delete)');
-          } catch (error) {
-            console.error('Error refetcheando sesión:', error);
-          }
-        }, 500);
-      } catch (error) {
-        console.error('Error deleting avatar:', error);
-        toast.error(
-          error instanceof Error ? error.message : 'Error al eliminar el avatar'
-        );
-      } finally {
-        setIsUploading(false);
-      }
+      return result;
     };
 
     const triggerFileInput = () => {
@@ -205,7 +194,7 @@ const AvatarUpload = forwardRef<AvatarUploadRef, AvatarUploadProps>(
       }
     };
 
-    const displayAvatar = preview || currentAvatar;
+    const displayAvatar = preview || (pendingDelete ? null : currentAvatar);
 
     // Función pública para subir el archivo seleccionado
     const uploadSelectedFile = async (): Promise<string | null> => {
@@ -215,9 +204,10 @@ const AvatarUpload = forwardRef<AvatarUploadRef, AvatarUploadProps>(
       return null; // La función uploadAvatar maneja la notificación al padre
     };
 
-    // Exponer la función de upload al componente padre
+    // Exponer las funciones al componente padre
     useImperativeHandle(ref, () => ({
       uploadSelectedFile,
+      deleteAvatar: actualDeleteAvatar,
     }));
 
     return (
@@ -262,19 +252,27 @@ const AvatarUpload = forwardRef<AvatarUploadRef, AvatarUploadProps>(
             </button>
           )}
 
-          {currentAvatar && !preview && (
+          {(currentAvatar || pendingDelete) && !preview && (
             <button
-              onClick={deleteAvatar}
+              onClick={requestDeleteAvatar}
               disabled={isUploading}
-              className='bg-red-600 hover:bg-red-700 text-white p-1 rounded-full shadow-md transition-colors disabled:opacity-50'
-              title='Eliminar avatar'
+              className={`p-1 rounded-full shadow-md transition-colors disabled:opacity-50 ${
+                pendingDelete
+                  ? 'bg-gray-600 hover:bg-gray-700 text-white'
+                  : 'bg-red-600 hover:bg-red-700 text-white'
+              }`}
+              title={pendingDelete ? 'Cancelar eliminación' : 'Eliminar avatar'}
             >
               <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 20 20'>
-                <path
-                  fillRule='evenodd'
-                  d='M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z'
-                  clipRule='evenodd'
-                />
+                {pendingDelete ? (
+                  <path d='M4 2a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V4a2 2 0 00-2-2H4zm6 2v6l1.5-1.5a.5.5 0 01.707.707L10 11.414l-2.207-2.207a.5.5 0 01.707-.707L10 10V4z' />
+                ) : (
+                  <path
+                    fillRule='evenodd'
+                    d='M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z'
+                    clipRule='evenodd'
+                  />
+                )}
               </svg>
             </button>
           )}

@@ -52,7 +52,10 @@ export default async function handler(
     // Convert birthdate string to Date object if it exists
     let birthdateObj = null;
     if (birthdate) {
-      birthdateObj = new Date(birthdate);
+      // Para evitar problemas de zona horaria, asegurar que la fecha se interprete como local
+      const [year, month, day] = birthdate.split('-').map(Number);
+      birthdateObj = new Date(year, month - 1, day); // month es 0-indexed en JS
+
       if (isNaN(birthdateObj.getTime())) {
         return res.status(400).json({ message: 'Invalid birthdate format' });
       }

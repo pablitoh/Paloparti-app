@@ -13,6 +13,7 @@ import DatePickerField, {
 import AvatarUpload from '../../components/AvatarUpload';
 import Link from 'next/link';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { showSuccessToast, showErrorToast } from '../../services/toastService';
 
 interface EditProfileProps {
   user: {
@@ -92,19 +93,58 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
     birthdate: '',
     image: null,
   });
+  const [originalUserData, setOriginalUserData] = useState<{
+    name: string;
+    birthdate: string;
+    image: string | null;
+  }>({
+    name: '',
+    birthdate: '',
+    image: null,
+  });
   const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(
     null
   );
+  const [pendingAvatarDelete, setPendingAvatarDelete] = useState(false);
   const [password, setPassword] = useState({
     current: '',
     new: '',
     confirm: '',
   });
-  const [successMessage, setSuccessMessage] = useState('');
-  const [error, setError] = useState('');
   const avatarUploadRef = useRef<{
     uploadSelectedFile: () => Promise<string | null>;
+    deleteAvatar: () => Promise<void>;
   }>(null);
+
+  // Función para detectar si hay cambios
+  const hasChanges = () => {
+    return (
+      userData.name !== originalUserData.name ||
+      userData.birthdate !== originalUserData.birthdate ||
+      userData.image !== originalUserData.image ||
+      selectedAvatarFile !== null ||
+      pendingAvatarDelete
+    );
+  };
+
+  // Función para detectar si hay información en el formulario de contraseña
+  const hasPasswordData = () => {
+    return (
+      password.current.trim() !== '' ||
+      password.new.trim() !== '' ||
+      password.confirm.trim() !== ''
+    );
+  };
+
+  // Función para validar el formulario de contraseña
+  const isPasswordFormValid = () => {
+    return (
+      password.current.trim() !== '' &&
+      password.new.trim() !== '' &&
+      password.confirm.trim() !== '' &&
+      password.new === password.confirm
+    );
+  };
 
   useEffect(() => {
     // Ya tenemos verificación del servidor, solo necesitamos cargar los datos del perfil
@@ -138,16 +178,19 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
         const data = await response.json();
         console.log('Profile data received for edit:', data);
 
-        setUserData({
+        const initialData = {
           name: data.user.name || serverUser.name || '',
           birthdate: data.user.birthdate
             ? formatDateForInput(data.user.birthdate)
             : '',
           image: data.user.image || serverUser.image || null,
-        });
+        };
+
+        setUserData(initialData);
+        setOriginalUserData(initialData);
       } catch (error) {
         console.error('Error fetching user data:', error);
-        setError('Error al cargar los datos del usuario');
+        showErrorToast('Error al cargar los datos del usuario');
       } finally {
         setIsLoading(false);
       }
@@ -184,14 +227,16 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
     setSelectedAvatarFile(file);
   };
 
+  const handleDeleteRequest = () => {
+    setPendingAvatarDelete(!pendingAvatarDelete);
+  };
+
   const updateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccessMessage('');
     setIsSaving(true);
 
     if (!session) {
-      setError('No hay sesión activa. Por favor inicia sesión de nuevo.');
+      showErrorToast('No hay sesión activa. Por favor inicia sesión de nuevo.');
       setIsSaving(false);
       return;
     }
@@ -201,6 +246,14 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
       if (selectedAvatarFile && avatarUploadRef.current) {
         await avatarUploadRef.current.uploadSelectedFile();
         // La imagen se actualiza automáticamente a través del callback handleAvatarChange
+      }
+
+      // Eliminar avatar si está marcado para eliminación
+      if (pendingAvatarDelete && avatarUploadRef.current) {
+        await avatarUploadRef.current.deleteAvatar();
+        setPendingAvatarDelete(false);
+        // Actualizar la imagen a null
+        setUserData((prev) => ({ ...prev, image: null }));
       }
 
       // Luego actualizar el resto del perfil
@@ -231,16 +284,19 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
         },
       });
 
-      setSuccessMessage('Perfil actualizado correctamente');
+      showSuccessToast('Perfil actualizado correctamente');
       setSelectedAvatarFile(null); // Limpiar el archivo seleccionado
+      setPendingAvatarDelete(false); // Limpiar eliminación pendiente
 
-      // Redirigir al perfil después de un breve delay para mostrar el mensaje
-      setTimeout(() => {
-        router.push('/profile');
-      }, 1500);
+      // Actualizar los datos originales para que el botón se deshabilite
+      setOriginalUserData({
+        name: userData.name,
+        birthdate: userData.birthdate,
+        image: userData.image,
+      });
     } catch (error) {
       console.error('Error updating profile:', error);
-      setError(
+      showErrorToast(
         error instanceof Error ? error.message : 'Error al actualizar el perfil'
       );
     } finally {
@@ -250,17 +306,14 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
 
   const updatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccessMessage('');
 
     if (!session) {
-      setError('No hay sesión activa. Por favor inicia sesión de nuevo.');
-      setIsSaving(false);
+      showErrorToast('No hay sesión activa. Por favor inicia sesión de nuevo.');
       return;
     }
 
     if (password.new !== password.confirm) {
-      setError('Las contraseñas nuevas no coinciden');
+      showErrorToast('Las contraseñas nuevas no coinciden');
       return;
     }
 
@@ -284,20 +337,15 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
         throw new Error(data.message || 'Error al actualizar la contraseña');
       }
 
-      setSuccessMessage('Contraseña actualizada correctamente');
+      showSuccessToast('Contraseña actualizada correctamente');
       setPassword({
         current: '',
         new: '',
         confirm: '',
       });
-
-      // Redirigir al perfil después de un breve delay para mostrar el mensaje
-      setTimeout(() => {
-        router.push('/profile');
-      }, 1500);
     } catch (error) {
       console.error('Error updating password:', error);
-      setError(
+      showErrorToast(
         error instanceof Error
           ? error.message
           : 'Error al actualizar la contraseña'
@@ -337,17 +385,6 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
         <div className='bg-white rounded-xl shadow-md p-6'>
           <h1 className='text-2xl font-bold mb-6 text-center'>Editar Perfil</h1>
 
-          {successMessage && (
-            <div className='bg-green-50 border border-green-200 text-green-700 p-3 rounded mb-4'>
-              {successMessage}
-            </div>
-          )}
-          {error && (
-            <div className='bg-red-50 border border-red-200 text-red-600 p-3 rounded mb-4'>
-              {error}
-            </div>
-          )}
-
           <div className='mb-6'>
             <h2 className='text-xl font-semibold mb-4'>Información Personal</h2>
 
@@ -362,6 +399,7 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
                   currentAvatar={userData.image}
                   onAvatarChange={handleAvatarChange}
                   onFileSelect={handleFileSelect}
+                  onDeleteRequested={handleDeleteRequest}
                   size='large'
                   autoUpload={false}
                   fallbackText={userData.name || serverUser.name || 'U'}
@@ -396,10 +434,18 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
               />
               <button
                 type='submit'
-                disabled={isSaving}
-                className='w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
+                disabled={isSaving || !hasChanges()}
+                className={`w-full py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors ${
+                  isSaving || !hasChanges()
+                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
               >
-                {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+                {isSaving
+                  ? 'Guardando...'
+                  : hasChanges()
+                  ? 'Guardar Cambios'
+                  : 'Sin Cambios'}
               </button>
             </form>
           </div>
@@ -455,15 +501,38 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
                   value={password.confirm}
                   onChange={handlePasswordChange}
                   required
-                  className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500'
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
+                    password.confirm &&
+                    password.new &&
+                    password.new !== password.confirm
+                      ? 'border-red-300 bg-red-50'
+                      : 'border-gray-300'
+                  }`}
                 />
+                {password.confirm &&
+                  password.new &&
+                  password.new !== password.confirm && (
+                    <p className='text-red-500 text-xs mt-1'>
+                      Las contraseñas no coinciden
+                    </p>
+                  )}
               </div>
               <button
                 type='submit'
-                disabled={isSaving}
-                className='w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
+                disabled={isSaving || !isPasswordFormValid()}
+                className={`w-full py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors ${
+                  isSaving || !isPasswordFormValid()
+                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
               >
-                {isSaving ? 'Actualizando...' : 'Actualizar Contraseña'}
+                {isSaving
+                  ? 'Actualizando...'
+                  : isPasswordFormValid()
+                  ? 'Actualizar Contraseña'
+                  : hasPasswordData()
+                  ? 'Complete todos los campos'
+                  : 'Actualizar Contraseña'}
               </button>
             </form>
           </div>

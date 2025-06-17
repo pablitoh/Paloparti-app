@@ -53,7 +53,12 @@ export const formatDateForInput = (date: Date | string | null): string => {
   if (!date) return '';
 
   try {
-    return format(new Date(date), 'yyyy-MM-dd');
+    const dateObj = new Date(date);
+    // Evitar problemas de zona horaria usando los componentes de fecha locales
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   } catch (error) {
     console.error('Error formatting date for input:', error);
     return '';
@@ -64,7 +69,12 @@ export const parseInputDate = (dateStr: string): Date | null => {
   if (!dateStr) return null;
 
   try {
-    const date = new Date(dateStr);
+    // Parsear la fecha en formato YYYY-MM-DD evitando problemas de zona horaria
+    const [year, month, day] = dateStr.split('-').map(Number);
+    if (!year || !month || !day) return null;
+
+    // Crear fecha local (month es 0-indexed en JS)
+    const date = new Date(year, month - 1, day);
     if (isNaN(date.getTime())) return null;
     return date;
   } catch (error) {
