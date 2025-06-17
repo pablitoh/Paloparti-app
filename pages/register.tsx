@@ -57,8 +57,8 @@ export default function Register({ callbackUrl }: RegisterProps) {
   const router = useRouter();
   const { register, user, loading: authLoading } = useAuth();
 
-  // Calculate minimum date (12 years ago from today)
-  const minDate = format(subYears(new Date(), 12), 'yyyy-MM-dd');
+  // Calculate maximum date (12 years ago from today) to ensure minimum age of 12
+  const maxDate = format(subYears(new Date(), 12), 'yyyy-MM-dd');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -233,7 +233,7 @@ export default function Register({ callbackUrl }: RegisterProps) {
               value={formData.birthdate}
               onChange={handleChange}
               required={true}
-              minDate={minDate}
+              maxDate={maxDate}
             />
 
             <div>

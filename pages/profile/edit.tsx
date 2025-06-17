@@ -6,7 +6,7 @@ import { GetServerSideProps } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../api/auth/[...nextauth]';
 import Layout from '../../components/Layout';
-import { format } from 'date-fns';
+import { format, subYears } from 'date-fns';
 import DatePickerField, {
   formatDateForInput,
 } from '../../components/DatePickerField';
@@ -82,6 +82,9 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
   const router = useRouter();
   const { data: session, status, update } = useSession();
   const { user: clientUser, loading: authLoading } = useAuth();
+
+  // Calculate maximum date (12 years ago from today) to ensure minimum age of 12
+  const maxDate = format(subYears(new Date(), 12), 'yyyy-MM-dd');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [userData, setUserData] = useState<{
@@ -430,6 +433,7 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
                 label='Fecha de nacimiento'
                 value={userData.birthdate}
                 onChange={handleInputChange}
+                maxDate={maxDate}
                 className=''
               />
               <button
