@@ -113,7 +113,7 @@ export default function SignIn({ error, callbackUrl }: SignInProps) {
   };
 
   return (
-    <div className='min-h-screen bg-gradient-green flex items-center justify-center px-4'>
+    <div className='min-h-screen bg-gradient-green flex items-center justify-center px-4 font-body'>
       <div className='w-full max-w-sm'>
         {/* Logo/Shield */}
         <div className='text-center mb-8'>
@@ -124,7 +124,7 @@ export default function SignIn({ error, callbackUrl }: SignInProps) {
               className='w-full h-full object-contain drop-shadow-lg'
             />
           </div>
-          <h1 className='text-4xl font-bold text-white mb-2 tracking-wide'>
+          <h1 className='text-4xl font-heading font-bold text-white mb-2 tracking-wide'>
             PALOPARTI
           </h1>
         </div>
@@ -156,7 +156,7 @@ export default function SignIn({ error, callbackUrl }: SignInProps) {
           <button
             type='submit'
             disabled={loading}
-            className='w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 hover:shadow-xl text-white font-bold py-4 px-6 rounded-2xl transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg text-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none'
+            className='w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 hover:shadow-xl text-white font-heading font-bold py-4 px-6 rounded-2xl transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg text-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none'
           >
             {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
@@ -171,7 +171,7 @@ export default function SignIn({ error, callbackUrl }: SignInProps) {
 
         {/* Crear cuenta */}
         <Link href='/register'>
-          <button className='w-full bg-transparent border-2 border-white/30 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-200 hover:bg-white/10 hover:border-white/50 mb-6 text-lg'>
+          <button className='w-full bg-transparent border-2 border-white/30 text-white font-heading font-semibold py-4 px-6 rounded-2xl transition-all duration-200 hover:bg-white/10 hover:border-white/50 mb-6 text-lg'>
             Crear cuenta
           </button>
         </Link>

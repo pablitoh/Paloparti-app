@@ -6,6 +6,16 @@ module.exports = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        // Fuentes para titulares y botones
+        heading: ['Poppins', 'Rubik', 'sans-serif'],
+        poppins: ['Poppins', 'sans-serif'],
+        rubik: ['Rubik', 'sans-serif'],
+        // Fuentes para texto y descripciones
+        body: ['Inter', 'Nunito', 'sans-serif'],
+        inter: ['Inter', 'sans-serif'],
+        nunito: ['Nunito', 'sans-serif'],
+      },
       colors: {
         // Paleta verde principal basada en la imagen
         primary: {
