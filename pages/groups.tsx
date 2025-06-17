@@ -256,35 +256,31 @@ export default function Groups() {
                     }
                   }}
                 >
-                  {/* Indicador de estado */}
-                  <div className='flex items-center justify-between mb-4'>
-                    <div className='flex items-center gap-2'>
-                      <div className='w-3 h-3 bg-accent-400 rounded-full animate-pulse'></div>
-                      <span className='text-sm text-gray-500'>Activo</span>
+                  {/* Estado pendiente (solo si aplica) */}
+                  {group.userStatus === 'PENDING' && (
+                    <div className='flex items-center justify-end mb-4'>
+                      <span className='px-3 py-1 text-xs font-medium text-warning-700 bg-warning-100 rounded-full'>
+                        Pendiente
+                      </span>
                     </div>
-                    <div className='flex items-center gap-2'>
+                  )}
+
+                  {/* Contenido principal */}
+                  <div className='mb-4'>
+                    <div className='flex items-center gap-2 mb-2'>
+                      <h2 className='text-xl font-bold text-gray-900'>
+                        {group.name}
+                      </h2>
                       {group.members.some(
                         (member) =>
                           member.id === session?.user?.id &&
                           member.role === 'ADMIN'
                       ) && (
-                        <span className='px-3 py-1 text-xs font-medium text-primary-700 bg-primary-100 rounded-full'>
+                        <span className='px-2 py-1 text-xs font-medium text-primary-700 bg-primary-100 rounded-full'>
                           Admin
                         </span>
                       )}
-                      {group.userStatus === 'PENDING' && (
-                        <span className='px-3 py-1 text-xs font-medium text-warning-700 bg-warning-100 rounded-full'>
-                          Pendiente
-                        </span>
-                      )}
                     </div>
-                  </div>
-
-                  {/* Contenido principal */}
-                  <div className='mb-4'>
-                    <h2 className='text-xl font-bold text-gray-900 mb-2'>
-                      {group.name}
-                    </h2>
                     <p className='text-gray-600 text-sm mb-3 line-clamp-2'>
                       {group.description}
                     </p>
@@ -292,24 +288,6 @@ export default function Groups() {
 
                   {/* Información del grupo */}
                   <div className='space-y-2 mb-4'>
-                    <div className='flex items-center text-sm text-gray-500'>
-                      <svg
-                        className='w-4 h-4 mr-2 text-primary-500'
-                        fill='none'
-                        stroke='currentColor'
-                        viewBox='0 0 24 24'
-                      >
-                        <path
-                          strokeLinecap='round'
-                          strokeLinejoin='round'
-                          strokeWidth='2'
-                          d='M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H3m2 0h3M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'
-                        />
-                      </svg>
-                      <span className='font-medium text-primary-600'>
-                        {group.sport}
-                      </span>
-                    </div>
                     <div className='flex items-center text-sm text-gray-500'>
                       <svg
                         className='w-4 h-4 mr-2 text-primary-500'
