@@ -481,40 +481,97 @@ export default function GroupDetails() {
 
   return (
     <Layout>
-      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-        {isGroupBasicLoading ? (
-          <div className='flex justify-center items-center min-h-screen'>
-            <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500'></div>
-          </div>
-        ) : groupBasicError ? (
-          <div className='text-center text-red-600'>
-            {groupBasicError instanceof Error
-              ? groupBasicError.message
-              : String(groupBasicError)}
-          </div>
-        ) : groupBasicData ? (
-          <GroupContent
-            groupBasicData={groupBasicData as GroupWithRelations}
-            groupId={groupId}
-            user={user}
-            router={router}
-            selectedTab={selectedTab}
-            setSelectedTab={setSelectedTab}
-            showReplaceTbdModal={showReplaceTbdModal}
-            setShowReplaceTbdModal={setShowReplaceTbdModal}
-            showSwapPlayersModal={showSwapPlayersModal}
-            setShowSwapPlayersModal={setShowSwapPlayersModal}
-            preSelectedPlayer={preSelectedPlayer}
-            setPreSelectedPlayer={setPreSelectedPlayer}
-            allowFillIn={allowFillIn}
-            setAllowFillIn={setAllowFillIn}
-            onRefreshData={refetchBasicInfo}
-            showManualTeamFormationModal={showManualTeamFormationModal}
-            setShowManualTeamFormationModal={setShowManualTeamFormationModal}
-          />
-        ) : (
-          <div className='text-center text-gray-600'>Grupo no encontrado</div>
-        )}
+      <div className='min-h-screen bg-gradient-green-soft'>
+        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+          {isGroupBasicLoading ? (
+            <div className='flex justify-center items-center min-h-screen'>
+              <div className='text-center'>
+                <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4'></div>
+                <p className='text-primary-700 font-medium'>
+                  Cargando grupo...
+                </p>
+              </div>
+            </div>
+          ) : groupBasicError ? (
+            <div className='flex justify-center items-center min-h-screen'>
+              <div className='bg-white rounded-2xl shadow-green-lg p-8 max-w-md mx-auto text-center'>
+                <div className='w-16 h-16 bg-error-100 rounded-full flex items-center justify-center mx-auto mb-4'>
+                  <svg
+                    className='w-8 h-8 text-error-500'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth='2'
+                      d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z'
+                    />
+                  </svg>
+                </div>
+                <div className='text-center text-error-600'>
+                  {groupBasicError instanceof Error
+                    ? groupBasicError.message
+                    : String(groupBasicError)}
+                </div>
+              </div>
+            </div>
+          ) : groupBasicData ? (
+            <GroupContent
+              groupBasicData={groupBasicData as GroupWithRelations}
+              groupId={groupId}
+              user={user}
+              router={router}
+              selectedTab={selectedTab}
+              setSelectedTab={setSelectedTab}
+              showReplaceTbdModal={showReplaceTbdModal}
+              setShowReplaceTbdModal={setShowReplaceTbdModal}
+              showSwapPlayersModal={showSwapPlayersModal}
+              setShowSwapPlayersModal={setShowSwapPlayersModal}
+              preSelectedPlayer={preSelectedPlayer}
+              setPreSelectedPlayer={setPreSelectedPlayer}
+              allowFillIn={allowFillIn}
+              setAllowFillIn={setAllowFillIn}
+              onRefreshData={refetchBasicInfo}
+              showManualTeamFormationModal={showManualTeamFormationModal}
+              setShowManualTeamFormationModal={setShowManualTeamFormationModal}
+            />
+          ) : (
+            <div className='flex justify-center items-center min-h-screen'>
+              <div className='bg-white rounded-2xl shadow-green-lg p-8 text-center'>
+                <div className='w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4'>
+                  <svg
+                    className='w-8 h-8 text-gray-400'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth='2'
+                      d='M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47.938-6.018 2.472M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'
+                    />
+                  </svg>
+                </div>
+                <div className='text-center text-gray-600 font-medium'>
+                  Grupo no encontrado
+                </div>
+                <p className='text-gray-500 text-sm mt-2'>
+                  El grupo que buscas no existe o no tienes acceso a él
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Elementos decorativos de fondo */}
+        <div className='fixed top-20 right-10 w-32 h-32 bg-primary-200 rounded-full opacity-10 animate-pulse pointer-events-none'></div>
+        <div
+          className='fixed bottom-20 left-10 w-24 h-24 bg-accent-300 rounded-full opacity-15 animate-pulse pointer-events-none'
+          style={{ animationDelay: '3s' }}
+        ></div>
       </div>
     </Layout>
   );
@@ -743,15 +800,15 @@ const GroupContent = ({
         onClick={() => handleTabChange(index)}
         className={`${
           selectedTab === index
-            ? 'border-blue-500 text-blue-600 bg-blue-50'
-            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+            ? 'border-primary-500 text-primary-600 bg-primary-50'
+            : 'border-transparent text-gray-500 hover:text-primary-600 hover:border-primary-300 hover:bg-primary-50'
         } flex-1 whitespace-nowrap py-4 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-all duration-200 relative min-w-[25%] sm:min-w-0`}
       >
         {tab.showBadge ? (
           <div className='inline-flex items-center'>
             <span>{tab.label}</span>
             {tab.badgeCount && tab.badgeCount > 0 && (
-              <span className='ml-1.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1 text-xs font-bold text-white rounded-full bg-red-500'>
+              <span className='ml-1.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1 text-xs font-bold text-white rounded-full bg-gradient-green shadow-green'>
                 {tab.badgeCount}
               </span>
             )}
@@ -862,12 +919,12 @@ const GroupContent = ({
   }, [groupBasicData?.nextMatchId, onRefreshData]);
 
   return (
-    <div className='space-y-4'>
+    <div className='space-y-6'>
       {/* Enlace para volver a grupos */}
       <div className='mb-2'>
         <Link
           href='/groups'
-          className='inline-flex items-center text-sm text-blue-600 hover:text-blue-800 transition-colors'
+          className='inline-flex items-center text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors bg-white px-4 py-2 rounded-xl shadow-sm hover:shadow-green'
         >
           <ArrowLeftIcon className='h-4 w-4 mr-1' />
           Volver a grupos
@@ -889,9 +946,9 @@ const GroupContent = ({
       />
 
       {/* Tabs de navegación - ocultos en móvil */}
-      <div className='hidden md:block bg-white rounded-xl shadow-sm mb-0'>
+      <div className='hidden md:block bg-white rounded-2xl shadow-green-lg mb-0'>
         <nav
-          className='flex overflow-x-auto rounded-t-xl scrollbar-hide'
+          className='flex overflow-x-auto rounded-t-2xl scrollbar-hide'
           aria-label='Tabs'
         >
           {renderTabs}
@@ -912,7 +969,7 @@ const GroupContent = ({
       />
 
       {/* Área de contenido principal */}
-      <div className='bg-white rounded-xl shadow-sm p-4 sm:p-6'>
+      <div className='bg-white rounded-2xl shadow-green-lg p-6 sm:p-8'>
         {renderTabContent}
       </div>
 

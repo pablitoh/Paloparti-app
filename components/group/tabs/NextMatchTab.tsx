@@ -1036,23 +1036,63 @@ export default function NextMatchTab({
       {matchDetails ? (
         <>
           {/* Cabecera con información del partido */}
-          <div className='bg-white rounded-lg overflow-hidden'>
-            <div className='bg-blue-600 px-4 py-2 sm:py-3 flex justify-between items-center'>
-              <div className='space-y-1'>
-                <h3 className='text-xl sm:text-2xl font-bold text-white'>
+          <div className='bg-white rounded-2xl overflow-hidden shadow-green-lg border border-primary-100'>
+            <div className='bg-gradient-green px-4 py-3 sm:py-4'>
+              <div className='space-y-2'>
+                <h3 className='text-xl sm:text-2xl font-bold text-white flex items-center'>
+                  <svg
+                    className='w-6 h-6 mr-2 text-white'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth='2'
+                      d='M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'
+                    />
+                  </svg>
                   Próximo partido
+                  {currentUserIsAdmin && (
+                    <button
+                      className='ml-3 p-1.5 text-white hover:bg-white hover:bg-opacity-20 rounded-lg transition-all duration-200'
+                      onClick={() => {
+                        window.open(
+                          `/matches/edit/${matchDetails.id}?groupId=${id}`,
+                          '_self'
+                        );
+                      }}
+                      title='Editar partido'
+                    >
+                      <svg
+                        xmlns='http://www.w3.org/2000/svg'
+                        fill='none'
+                        viewBox='0 0 24 24'
+                        strokeWidth={1.5}
+                        stroke='currentColor'
+                        className='w-5 h-5'
+                      >
+                        <path
+                          strokeLinecap='round'
+                          strokeLinejoin='round'
+                          d='m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10'
+                        />
+                      </svg>
+                    </button>
+                  )}
                 </h3>
-                <div className='flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-blue-100'>
-                  <p className='flex items-center text-sm sm:text-base'>
-                    <CalendarIcon className='mr-1.5 h-4 w-4 flex-shrink-0' />
-                    <span>
+                <div className='flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-primary-100'>
+                  <p className='flex items-center text-sm sm:text-base bg-white bg-opacity-10 px-3 py-1 rounded-lg'>
+                    <CalendarIcon className='mr-2 h-4 w-4 flex-shrink-0' />
+                    <span className='font-medium'>
                       {matchDetails.date &&
                         formatNextMatchDate(matchDetails.date)}
                     </span>
                   </p>
-                  <p className='flex items-center text-sm sm:text-base'>
-                    <MapPinIcon className='mr-1.5 h-4 w-4 flex-shrink-0' />
-                    <span>
+                  <p className='flex items-center text-sm sm:text-base bg-white bg-opacity-10 px-3 py-1 rounded-lg'>
+                    <MapPinIcon className='mr-2 h-4 w-4 flex-shrink-0' />
+                    <span className='font-medium'>
                       {matchDetails.location ||
                         group.location ||
                         'Sin ubicación'}
@@ -1060,67 +1100,53 @@ export default function NextMatchTab({
                   </p>
                 </div>
               </div>
-              {currentUserIsAdmin && (
-                <Button
-                  variant='outline'
-                  className='bg-blue-500 text-white border-blue-400 hover:bg-blue-700'
-                  onClick={() => {
-                    window.open(
-                      `/matches/edit/${matchDetails.id}?groupId=${id}`,
-                      '_self'
-                    );
-                  }}
-                >
-                  <svg
-                    xmlns='http://www.w3.org/2000/svg'
-                    fill='none'
-                    viewBox='0 0 24 24'
-                    strokeWidth={1.5}
-                    stroke='currentColor'
-                    className='w-5 h-5'
-                  >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      d='m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10'
-                    />
-                  </svg>
-                </Button>
-              )}
             </div>
 
             {/* Estado de la asistencia */}
-            <div className='bg-gray-50 rounded-lg p-4 w-full mb-6'>
-              <h4 className='text-lg font-medium text-gray-800 mb-4'>Estado</h4>
+            <div className='bg-gradient-green-soft rounded-2xl p-6 w-full border border-primary-100 shadow-green'>
+              <h4 className='text-lg font-semibold text-gray-800 mb-4 flex items-center'>
+                <svg
+                  className='w-5 h-5 mr-2 text-primary-600'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth='2'
+                    d='M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'
+                  />
+                </svg>
+                Estado de Asistencia
+              </h4>
 
-              <div className='flex flex-col sm:flex-row gap-4'>
+              <div className='flex flex-col sm:flex-row gap-6'>
                 {/* Barra de progreso */}
                 <div className='flex-1'>
-                  <div className='flex justify-between items-end mb-2'>
+                  <div className='flex justify-between items-end mb-3'>
                     <div className='flex items-center text-base font-semibold text-gray-800'>
-                      <UserGroupIcon className='h-5 w-5 mr-2 text-gray-500' />
+                      <UserGroupIcon className='h-5 w-5 mr-2 text-primary-500' />
                       <span>
                         {confirmedCount}/{requiredPlayers} jugadores
                       </span>
                     </div>
-                    <span className='ml-2 text-sm font-medium text-blue-700'>
+                    <span className='ml-2 text-sm font-bold text-primary-700 bg-primary-100 px-2 py-1 rounded-lg'>
                       {progressPercentage}%
                     </span>
                   </div>
-                  <div className='relative w-full h-6 bg-gray-100 rounded-full overflow-hidden shadow-sm border border-gray-200'>
+                  <div className='relative w-full h-8 bg-white rounded-full overflow-hidden shadow-green border border-primary-200'>
                     <div
-                      className='absolute left-0 top-0 h-full rounded-full transition-all duration-500'
+                      className='absolute left-0 top-0 h-full rounded-full transition-all duration-700 ease-out bg-gradient-green shadow-green'
                       style={{
                         width: `${progressPercentage}%`,
-                        background:
-                          'linear-gradient(90deg, #43e97b 0%, #38f9d7 100%)',
                       }}
                     ></div>
                     {/* Porcentaje centrado y legible dentro de la barra */}
                     <span
-                      className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-sm font-bold text-black drop-shadow-md select-none pointer-events-none'
+                      className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-sm font-bold text-white drop-shadow-lg select-none pointer-events-none z-10'
                       style={{
-                        textShadow: '0 1px 4px rgba(255,255,255,0.5)',
+                        textShadow: '0 2px 4px rgba(0,0,0,0.3)',
                       }}
                     >
                       {progressPercentage}%
@@ -1199,13 +1225,26 @@ export default function NextMatchTab({
           {/* Sección de equipos formados - Solo mostrar cuando sortCount > 0 o se forzó la formación de equipos */}
           {forceTeamsFormed ||
           (matchDetails?.sortCount && matchDetails.sortCount > 0) ? (
-            <div className='bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200 mb-6'>
-              <div className='px-3 py-4 sm:px-4 border-b border-gray-200 flex justify-between items-center'>
+            <div className='bg-white rounded-2xl overflow-hidden shadow-green-lg border border-primary-100'>
+              <div className='px-6 py-4 border-b border-primary-100 bg-gradient-green-soft flex justify-between items-center'>
                 <div>
-                  <h3 className='text-md font-medium leading-6 text-gray-900'>
-                    Equipos
+                  <h3 className='text-lg font-semibold leading-6 text-gray-900 flex items-center'>
+                    <svg
+                      className='w-5 h-5 mr-2 text-primary-600'
+                      fill='none'
+                      stroke='currentColor'
+                      viewBox='0 0 24 24'
+                    >
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        strokeWidth='2'
+                        d='M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z'
+                      />
+                    </svg>
+                    Equipos Formados
                   </h3>
-                  <p className='mt-1 max-w-2xl text-sm text-gray-500'>
+                  <p className='mt-1 max-w-2xl text-sm text-primary-600'>
                     Equipos para el próximo partido
                   </p>
                 </div>
@@ -1241,7 +1280,7 @@ export default function NextMatchTab({
                 )}
               </div>
 
-              <div className='px-3 py-4'>
+              <div>
                 {/* TeamsList component */}
                 <TeamsList
                   key={teamsListKey}
@@ -1270,7 +1309,7 @@ export default function NextMatchTab({
           {matchDetails?.sortCount &&
           matchDetails.sortCount > 0 &&
           unassignedPlayers.length > 0 ? (
-            <div className='mt-4'>
+            <div>
               <UnassignedPlayersManager
                 confirmedPlayers={confirmedPlayers}
                 playersA={playersA}
@@ -1284,38 +1323,42 @@ export default function NextMatchTab({
           ) : null}
         </>
       ) : (
-        <div className='bg-white rounded-lg p-8 text-center'>
+        <div className='bg-white rounded-2xl p-8 text-center shadow-green-lg border border-primary-100'>
           <div className='mb-6'>
-            <svg
-              className='mx-auto h-12 w-12 text-gray-400'
-              fill='none'
-              viewBox='0 0 24 24'
-              stroke='currentColor'
-              aria-hidden='true'
-            >
-              <path
-                strokeLinecap='round'
-                strokeLinejoin='round'
-                strokeWidth={1}
-                d='M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'
-              />
-            </svg>
+            <div className='w-20 h-20 bg-gradient-green-light rounded-full flex items-center justify-center mx-auto mb-4'>
+              <svg
+                className='h-10 w-10 text-primary-600'
+                fill='none'
+                viewBox='0 0 24 24'
+                stroke='currentColor'
+                aria-hidden='true'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'
+                />
+              </svg>
+            </div>
           </div>
-          <h3 className='text-lg font-medium text-gray-900'>
+          <h3 className='text-xl font-semibold text-gray-900 mb-2'>
             No hay próximo partido
           </h3>
-          <p className='mt-2 text-sm text-gray-500'>
-            Actualmente no hay un partido programado para este grupo.
+          <p className='mt-2 text-sm text-gray-600 max-w-md mx-auto'>
+            Actualmente no hay un partido programado para este grupo. ¡Es hora
+            de organizar el próximo encuentro!
           </p>
 
           {currentUserIsAdmin && (
-            <div className='mt-6'>
+            <div className='mt-8'>
               <Button
                 variant='primary'
                 onClick={() => router.push(`/matches/create?groupId=${id}`)}
+                className='shadow-green flex items-center justify-center'
               >
-                <PlusIcon className='h-5 w-5 mr-2' />
-                Programar partido
+                <PlusIcon className='h-5 w-5 mr-2 flex-shrink-0' />
+                <span>Programar partido</span>
               </Button>
             </div>
           )}

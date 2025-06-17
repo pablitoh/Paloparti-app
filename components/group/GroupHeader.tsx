@@ -35,13 +35,13 @@ const GroupHeader: React.FC<GroupHeaderProps> = ({
   onToggleDrawer,
 }) => {
   return (
-    <div className='sticky top-0 z-[2] bg-white rounded-xl shadow-sm p-4 mb-0'>
+    <div className='sticky top-0 z-[2] bg-white rounded-2xl shadow-green-lg p-4 mb-0 border border-primary-100'>
       <div className='flex items-center justify-between flex-wrap gap-3'>
         <div className='flex items-center gap-2'>
           {/* Icono de hamburguesa para el drawer */}
           <button
             onClick={onToggleDrawer}
-            className='flex-shrink-0 flex items-center justify-center p-2 rounded-full text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-all'
+            className='flex-shrink-0 flex items-center justify-center p-2 rounded-xl text-gray-600 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200'
           >
             <Bars3Icon className='h-5 w-5' />
           </button>
@@ -51,14 +51,27 @@ const GroupHeader: React.FC<GroupHeaderProps> = ({
                 {group.name}
               </h1>
               {recurrenceText && (
-                <span className='hidden sm:inline text-sm text-gray-500'>
-                  ({recurrenceText})
+                <span className='hidden sm:inline text-sm text-primary-600 bg-primary-50 px-2 py-1 rounded-lg'>
+                  {recurrenceText}
                 </span>
               )}
             </div>
           </div>
           {currentUserIsAdmin && (
-            <span className='hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800'>
+            <span className='hidden sm:inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-green text-white shadow-green'>
+              <svg
+                className='w-3 h-3 mr-1'
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth='2'
+                  d='M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'
+                />
+              </svg>
               Admin
             </span>
           )}
@@ -68,17 +81,37 @@ const GroupHeader: React.FC<GroupHeaderProps> = ({
           {/* Invite link button - visible on all devices */}
           <button
             onClick={copyInviteLink}
-            className='flex items-center space-x-1 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors'
+            disabled={isCopying}
+            className='flex items-center space-x-2 px-4 py-2 bg-primary-50 text-primary-600 rounded-xl hover:bg-primary-100 hover:shadow-green transition-all duration-200 disabled:opacity-50'
             title='Copiar enlace de invitación'
           >
-            <ClipboardIcon className='h-4 w-4' />
-            <span className='text-sm'>Invitar</span>
+            {isCopying ? (
+              <div className='animate-spin rounded-full h-4 w-4 border-2 border-primary-600 border-t-transparent'></div>
+            ) : (
+              <ClipboardIcon className='h-4 w-4' />
+            )}
+            <span className='text-sm font-medium'>
+              {isCopying ? 'Copiando...' : 'Invitar'}
+            </span>
           </button>
 
           {/* User status (pendiente) */}
           {group.userStatus === 'PENDING' && (
-            <span className='hidden sm:inline-flex px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm'>
-              Solicitud pendiente
+            <span className='hidden sm:inline-flex px-3 py-1 bg-warning-100 text-warning-800 rounded-full text-sm font-medium border border-warning-200'>
+              <svg
+                className='w-4 h-4 mr-1'
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth='2'
+                  d='M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'
+                />
+              </svg>
+              Pendiente
             </span>
           )}
 
@@ -86,7 +119,7 @@ const GroupHeader: React.FC<GroupHeaderProps> = ({
           {currentUserIsAdmin && (
             <button
               onClick={() => router.push(`/edit-group/${group.id}`)}
-              className='p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all'
+              className='p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200 hover:shadow-sm'
               title='Editar grupo'
             >
               <PencilIcon className='h-5 w-5' />

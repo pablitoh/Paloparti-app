@@ -361,10 +361,15 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
   if (status === 'loading' || isLoading) {
     return (
       <Layout>
-        <div className='max-w-md mx-auto px-4 py-8'>
+        <div className='min-h-screen bg-gradient-green-soft flex items-center justify-center py-12'>
           <div className='text-center'>
-            <h1 className='text-2xl font-bold mb-4'>Editar Perfil</h1>
-            <p>Cargando...</p>
+            <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4'></div>
+            <h1 className='text-2xl font-bold text-gray-900 mb-2'>
+              Editar Perfil
+            </h1>
+            <p className='text-primary-700 font-medium'>
+              Cargando tu información...
+            </p>
           </div>
         </div>
       </Layout>
@@ -373,172 +378,336 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
 
   return (
     <Layout>
-      <div className='max-w-md mx-auto px-4 py-8'>
-        {/* Enlace para volver al perfil */}
-        <div className='mb-4'>
-          <Link
-            href='/profile'
-            className='inline-flex items-center text-sm text-blue-600 hover:text-blue-800 transition-colors'
-          >
-            <ArrowLeftIcon className='h-4 w-4 mr-1' />
-            Volver al Perfil
-          </Link>
-        </div>
+      <div className='min-h-screen bg-gradient-green-soft'>
+        <div className='max-w-2xl mx-auto px-4 py-8'>
+          {/* Header con breadcrumb */}
+          <div className='mb-8'>
+            <Link
+              href='/profile'
+              className='inline-flex items-center text-primary-600 hover:text-primary-700 transition-colors mb-4 bg-white px-4 py-2 rounded-xl shadow-sm hover:shadow-green'
+            >
+              <ArrowLeftIcon className='h-5 w-5 mr-2' />
+              Volver al Perfil
+            </Link>
+            <div>
+              <h1 className='text-3xl font-bold text-gray-900 mb-2'>
+                Editar Perfil
+              </h1>
+              <p className='text-gray-600'>
+                Actualiza tu información personal y configuración
+              </p>
+            </div>
+          </div>
 
-        <div className='bg-white rounded-xl shadow-md p-6'>
-          <h1 className='text-2xl font-bold mb-6 text-center'>Editar Perfil</h1>
-
-          <div className='mb-6'>
-            <h2 className='text-xl font-semibold mb-4'>Información Personal</h2>
-
-            {/* Avatar Upload Section */}
-            <div className='mb-6'>
-              <label className='block text-sm font-medium text-gray-700 mb-2'>
-                Avatar
-              </label>
-              <div className='flex justify-center'>
-                <AvatarUpload
-                  ref={avatarUploadRef}
-                  currentAvatar={userData.image}
-                  onAvatarChange={handleAvatarChange}
-                  onFileSelect={handleFileSelect}
-                  onDeleteRequested={handleDeleteRequest}
-                  size='large'
-                  autoUpload={false}
-                  fallbackText={userData.name || serverUser.name || 'U'}
-                />
+          {/* Card principal de información personal */}
+          <div className='bg-white rounded-2xl shadow-green-lg overflow-hidden mb-6'>
+            {/* Header de la sección */}
+            <div className='bg-gradient-green-light p-6 border-b border-primary-100'>
+              <div className='flex items-center gap-3'>
+                <div className='w-10 h-10 bg-primary-500 rounded-xl flex items-center justify-center'>
+                  <svg
+                    className='w-6 h-6 text-white'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth='2'
+                      d='M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
+                    />
+                  </svg>
+                </div>
+                <h2 className='text-xl font-semibold text-gray-900'>
+                  Información Personal
+                </h2>
               </div>
             </div>
 
-            <form onSubmit={updateProfile} className='space-y-4'>
-              <div>
-                <label
-                  htmlFor='name'
-                  className='block text-sm font-medium text-gray-700 mb-1'
-                >
-                  Nombre
+            <div className='p-6'>
+              {/* Avatar Upload Section */}
+              <div className='mb-8'>
+                <label className='block text-sm font-medium text-gray-700 mb-4'>
+                  Foto de Perfil
                 </label>
-                <input
-                  id='name'
-                  name='name'
-                  type='text'
-                  value={userData.name}
-                  onChange={handleInputChange}
-                  className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500'
-                />
+                <div className='flex justify-center'>
+                  <AvatarUpload
+                    ref={avatarUploadRef}
+                    currentAvatar={userData.image}
+                    onAvatarChange={handleAvatarChange}
+                    onFileSelect={handleFileSelect}
+                    onDeleteRequested={handleDeleteRequest}
+                    size='large'
+                    autoUpload={false}
+                    fallbackText={userData.name || serverUser.name || 'U'}
+                  />
+                </div>
               </div>
-              <DatePickerField
-                id='birthdate'
-                name='birthdate'
-                label='Fecha de nacimiento'
-                value={userData.birthdate}
-                onChange={handleInputChange}
-                maxDate={maxDate}
-                className=''
-              />
-              <button
-                type='submit'
-                disabled={isSaving || !hasChanges()}
-                className={`w-full py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors ${
-                  isSaving || !hasChanges()
-                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                }`}
-              >
-                {isSaving
-                  ? 'Guardando...'
-                  : hasChanges()
-                  ? 'Guardar Cambios'
-                  : 'Sin Cambios'}
-              </button>
-            </form>
+
+              <form onSubmit={updateProfile} className='space-y-6'>
+                <div>
+                  <label
+                    htmlFor='name'
+                    className='block text-sm font-medium text-gray-700 mb-2'
+                  >
+                    Nombre completo
+                  </label>
+                  <input
+                    id='name'
+                    name='name'
+                    type='text'
+                    value={userData.name}
+                    onChange={handleInputChange}
+                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors'
+                    placeholder='Ingresa tu nombre completo'
+                  />
+                </div>
+
+                <DatePickerField
+                  id='birthdate'
+                  name='birthdate'
+                  label='Fecha de nacimiento'
+                  value={userData.birthdate}
+                  onChange={handleInputChange}
+                  maxDate={maxDate}
+                  className='[&>input]:rounded-xl [&>input]:border-gray-300 [&>input]:px-4 [&>input]:py-3 [&>input]:focus:ring-2 [&>input]:focus:ring-primary-500 [&>input]:focus:border-primary-500'
+                />
+
+                <button
+                  type='submit'
+                  disabled={isSaving || !hasChanges()}
+                  className={`w-full py-3 px-6 rounded-xl font-medium transition-all duration-200 transform ${
+                    isSaving || !hasChanges()
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-gradient-green text-white hover:shadow-green focus:outline-none focus:ring-4 focus:ring-primary-200 active:scale-95'
+                  }`}
+                >
+                  {isSaving ? (
+                    <div className='flex items-center justify-center'>
+                      <div className='animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2'></div>
+                      Guardando...
+                    </div>
+                  ) : hasChanges() ? (
+                    <div className='flex items-center justify-center'>
+                      <svg
+                        className='w-5 h-5 mr-2'
+                        fill='none'
+                        stroke='currentColor'
+                        viewBox='0 0 24 24'
+                      >
+                        <path
+                          strokeLinecap='round'
+                          strokeLinejoin='round'
+                          strokeWidth='2'
+                          d='M5 13l4 4L19 7'
+                        />
+                      </svg>
+                      Guardar Cambios
+                    </div>
+                  ) : (
+                    <div className='flex items-center justify-center'>
+                      <svg
+                        className='w-5 h-5 mr-2'
+                        fill='none'
+                        stroke='currentColor'
+                        viewBox='0 0 24 24'
+                      >
+                        <path
+                          strokeLinecap='round'
+                          strokeLinejoin='round'
+                          strokeWidth='2'
+                          d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
+                        />
+                      </svg>
+                      Sin Cambios
+                    </div>
+                  )}
+                </button>
+              </form>
+            </div>
           </div>
 
-          <div className='border-t border-gray-200 pt-6'>
-            <h2 className='text-xl font-semibold mb-4'>Cambiar Contraseña</h2>
-            <form onSubmit={updatePassword} className='space-y-4'>
-              <div>
-                <label
-                  htmlFor='current'
-                  className='block text-sm font-medium text-gray-700 mb-1'
-                >
-                  Contraseña Actual
-                </label>
-                <input
-                  id='current'
-                  name='current'
-                  type='password'
-                  value={password.current}
-                  onChange={handlePasswordChange}
-                  required
-                  className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500'
-                />
+          {/* Card de cambio de contraseña */}
+          <div className='bg-white rounded-2xl shadow-green-lg overflow-hidden'>
+            {/* Header de la sección */}
+            <div className='bg-gradient-green-light p-6 border-b border-primary-100'>
+              <div className='flex items-center gap-3'>
+                <div className='w-10 h-10 bg-primary-500 rounded-xl flex items-center justify-center'>
+                  <svg
+                    className='w-6 h-6 text-white'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth='2'
+                      d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
+                    />
+                  </svg>
+                </div>
+                <h2 className='text-xl font-semibold text-gray-900'>
+                  Cambiar Contraseña
+                </h2>
               </div>
-              <div>
-                <label
-                  htmlFor='new'
-                  className='block text-sm font-medium text-gray-700 mb-1'
-                >
-                  Nueva Contraseña
-                </label>
-                <input
-                  id='new'
-                  name='new'
-                  type='password'
-                  value={password.new}
-                  onChange={handlePasswordChange}
-                  required
-                  className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500'
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor='confirm'
-                  className='block text-sm font-medium text-gray-700 mb-1'
-                >
-                  Confirmar Contraseña
-                </label>
-                <input
-                  id='confirm'
-                  name='confirm'
-                  type='password'
-                  value={password.confirm}
-                  onChange={handlePasswordChange}
-                  required
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
-                    password.confirm &&
+            </div>
+
+            <div className='p-6'>
+              <form onSubmit={updatePassword} className='space-y-6'>
+                <div>
+                  <label
+                    htmlFor='current'
+                    className='block text-sm font-medium text-gray-700 mb-2'
+                  >
+                    Contraseña Actual
+                  </label>
+                  <input
+                    id='current'
+                    name='current'
+                    type='password'
+                    value={password.current}
+                    onChange={handlePasswordChange}
+                    required
+                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors'
+                    placeholder='Ingresa tu contraseña actual'
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor='new'
+                    className='block text-sm font-medium text-gray-700 mb-2'
+                  >
+                    Nueva Contraseña
+                  </label>
+                  <input
+                    id='new'
+                    name='new'
+                    type='password'
+                    value={password.new}
+                    onChange={handlePasswordChange}
+                    required
+                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors'
+                    placeholder='Ingresa tu nueva contraseña'
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor='confirm'
+                    className='block text-sm font-medium text-gray-700 mb-2'
+                  >
+                    Confirmar Nueva Contraseña
+                  </label>
+                  <input
+                    id='confirm'
+                    name='confirm'
+                    type='password'
+                    value={password.confirm}
+                    onChange={handlePasswordChange}
+                    required
+                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none transition-colors ${
+                      password.confirm &&
+                      password.new &&
+                      password.new !== password.confirm
+                        ? 'border-error-300 bg-error-50 focus:ring-2 focus:ring-error-500 focus:border-error-500'
+                        : 'border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500'
+                    }`}
+                    placeholder='Confirma tu nueva contraseña'
+                  />
+                  {password.confirm &&
                     password.new &&
-                    password.new !== password.confirm
-                      ? 'border-red-300 bg-red-50'
-                      : 'border-gray-300'
+                    password.new !== password.confirm && (
+                      <div className='mt-2 flex items-center text-error-600'>
+                        <svg
+                          className='w-4 h-4 mr-2'
+                          fill='none'
+                          stroke='currentColor'
+                          viewBox='0 0 24 24'
+                        >
+                          <path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            strokeWidth='2'
+                            d='M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                          />
+                        </svg>
+                        <p className='text-sm'>Las contraseñas no coinciden</p>
+                      </div>
+                    )}
+                </div>
+
+                <button
+                  type='submit'
+                  disabled={isSaving || !isPasswordFormValid()}
+                  className={`w-full py-3 px-6 rounded-xl font-medium transition-all duration-200 transform ${
+                    isSaving || !isPasswordFormValid()
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-gradient-green text-white hover:shadow-green focus:outline-none focus:ring-4 focus:ring-primary-200 active:scale-95'
                   }`}
-                />
-                {password.confirm &&
-                  password.new &&
-                  password.new !== password.confirm && (
-                    <p className='text-red-500 text-xs mt-1'>
-                      Las contraseñas no coinciden
-                    </p>
+                >
+                  {isSaving ? (
+                    <div className='flex items-center justify-center'>
+                      <div className='animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2'></div>
+                      Actualizando...
+                    </div>
+                  ) : isPasswordFormValid() ? (
+                    <div className='flex items-center justify-center'>
+                      <svg
+                        className='w-5 h-5 mr-2'
+                        fill='none'
+                        stroke='currentColor'
+                        viewBox='0 0 24 24'
+                      >
+                        <path
+                          strokeLinecap='round'
+                          strokeLinejoin='round'
+                          strokeWidth='2'
+                          d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
+                        />
+                      </svg>
+                      Actualizar Contraseña
+                    </div>
+                  ) : hasPasswordData() ? (
+                    <div className='flex items-center justify-center'>
+                      <svg
+                        className='w-5 h-5 mr-2'
+                        fill='none'
+                        stroke='currentColor'
+                        viewBox='0 0 24 24'
+                      >
+                        <path
+                          strokeLinecap='round'
+                          strokeLinejoin='round'
+                          strokeWidth='2'
+                          d='M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                        />
+                      </svg>
+                      Complete todos los campos
+                    </div>
+                  ) : (
+                    <div className='flex items-center justify-center'>
+                      <svg
+                        className='w-5 h-5 mr-2'
+                        fill='none'
+                        stroke='currentColor'
+                        viewBox='0 0 24 24'
+                      >
+                        <path
+                          strokeLinecap='round'
+                          strokeLinejoin='round'
+                          strokeWidth='2'
+                          d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
+                        />
+                      </svg>
+                      Actualizar Contraseña
+                    </div>
                   )}
-              </div>
-              <button
-                type='submit'
-                disabled={isSaving || !isPasswordFormValid()}
-                className={`w-full py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors ${
-                  isSaving || !isPasswordFormValid()
-                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                }`}
-              >
-                {isSaving
-                  ? 'Actualizando...'
-                  : isPasswordFormValid()
-                  ? 'Actualizar Contraseña'
-                  : hasPasswordData()
-                  ? 'Complete todos los campos'
-                  : 'Actualizar Contraseña'}
-              </button>
-            </form>
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       </div>

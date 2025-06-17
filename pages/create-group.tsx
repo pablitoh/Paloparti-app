@@ -35,8 +35,11 @@ export default function CreateGroup() {
   if (loading) {
     return (
       <Layout>
-        <div className='flex justify-center items-center min-h-screen'>
-          <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500'></div>
+        <div className='min-h-screen bg-gradient-green-soft flex justify-center items-center'>
+          <div className='text-center'>
+            <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4'></div>
+            <p className='text-primary-700 font-medium'>Cargando...</p>
+          </div>
         </div>
       </Layout>
     );
@@ -46,42 +49,46 @@ export default function CreateGroup() {
     return null; // Will redirect in useEffect
   }
 
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value, type } = e.target;
+
+    if (type === 'checkbox') {
+      const checkbox = e.target as HTMLInputElement;
+      const dayValue = parseInt(checkbox.value);
+
+      if (checkbox.checked) {
+        setFormData((prev) => ({
+          ...prev,
+          recurrenceDays: [...prev.recurrenceDays, dayValue],
+        }));
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          recurrenceDays: prev.recurrenceDays.filter((day) => day !== dayValue),
+        }));
+      }
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
+    setError(null);
 
     try {
-      setIsSubmitting(true);
-      setError(null);
-
-      // Validar que los campos requeridos estén completos
-      if (!formData.name || !formData.location) {
-        setError('Todos los campos obligatorios deben estar completos');
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Validar que jugadores por equipo sea mayor a 0
-      if (formData.requiredPlayers < 1) {
-        setError('Debe haber al menos 1 jugador por equipo');
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Calcular próxima fecha de partido si corresponde
-      const nextMatch = calculateNextMatch();
-
-      const dataToSend = {
-        ...formData,
-        requiredPlayers: formData.requiredPlayers * 2,
-        nextMatch: nextMatch ? nextMatch.toISOString() : null,
-      };
-
       const response = await fetch('/api/groups', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(dataToSend),
+        body: JSON.stringify(formData),
       });
 
       const data = await response.json();
@@ -90,357 +97,321 @@ export default function CreateGroup() {
         throw new Error(data.message || 'Error al crear el grupo');
       }
 
-      // Redireccionar a la página del grupo recién creado
+      // Redirect to the new group
       router.push(`/group/${data.id}`);
-    } catch (error) {
-      console.error('Error creating group:', error);
-      setError(
-        error instanceof Error ? error.message : 'Error al crear el grupo'
-      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+    } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: name === 'requiredPlayers' ? Number(value) : value,
-    }));
-  };
-
-  const handleDayChange = (day: number) => {
-    setFormData((prev) => {
-      const days = [...prev.recurrenceDays];
-      const index = days.indexOf(day);
-
-      if (index === -1) {
-        days.push(day);
-      } else {
-        days.splice(index, 1);
-      }
-
-      return {
-        ...prev,
-        recurrenceDays: days,
-      };
-    });
-  };
-
-  const calculateNextMatch = () => {
-    if (
-      formData.recurrenceType === 'NONE' ||
-      formData.recurrenceDays.length === 0
-    ) {
-      return null;
-    }
-
-    const today = new Date();
-    const todayDay = today.getDay();
-
-    const sortedDays = [...formData.recurrenceDays].sort();
-
-    let nextDay: number | null = null;
-    for (const day of sortedDays) {
-      if (day > todayDay) {
-        nextDay = day;
-        break;
-      }
-    }
-
-    if (nextDay === null && sortedDays.length > 0) {
-      nextDay = sortedDays[0];
-    } else if (nextDay === null) {
-      return null;
-    }
-
-    let daysToAdd = nextDay - todayDay;
-    if (daysToAdd <= 0) {
-      daysToAdd += 7;
-    }
-
-    const nextMatchDate = new Date(today);
-    nextMatchDate.setDate(today.getDate() + daysToAdd);
-
-    if (formData.recurrenceTime) {
-      const [hours, minutes] = formData.recurrenceTime.split(':').map(Number);
-      nextMatchDate.setHours(hours, minutes, 0, 0);
-    }
-
-    return nextMatchDate;
-  };
-
-  const getDefaultRequiredPlayers = (sport: string): number => {
-    switch (sport) {
-      case 'Fútbol':
-        return 10;
-      case 'Baloncesto':
-        return 6;
-      case 'Pádel':
-        return 4;
-      case 'Tenis':
-        return 2;
-      case 'Voleibol':
-        return 6;
-      case 'Natación':
-        return 4;
-      default:
-        return 4;
-    }
-  };
+  const dayOptions = [
+    { value: 0, label: 'Domingo' },
+    { value: 1, label: 'Lunes' },
+    { value: 2, label: 'Martes' },
+    { value: 3, label: 'Miércoles' },
+    { value: 4, label: 'Jueves' },
+    { value: 5, label: 'Viernes' },
+    { value: 6, label: 'Sábado' },
+  ];
 
   return (
     <Layout>
-      <div className='max-w-2xl mx-auto px-4 py-8'>
-        <div className='bg-white rounded-xl shadow-md p-6'>
-          <div className='flex items-center gap-4 mb-6'>
-            <Link
-              href='/groups'
-              className='inline-flex items-center text-sm text-blue-600 hover:text-blue-800 transition-colors'
-            >
-              <ArrowLeftIcon className='h-4 w-4 mr-1' />
-              Volver a grupos
-            </Link>
-            <h1 className='text-2xl font-bold text-gray-800'>
-              Crear Nuevo Grupo
-            </h1>
-          </div>
-
-          {error && (
-            <div className='mb-4 p-3 bg-red-100 text-red-700 rounded-lg'>
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className='space-y-6'>
-            <div>
-              <label
-                htmlFor='name'
-                className='block text-sm font-medium text-gray-700 mb-1'
+      <div className='min-h-screen bg-gradient-green-soft py-8 px-4 sm:px-6 lg:px-8'>
+        <div className='max-w-2xl mx-auto'>
+          <div className='bg-white rounded-2xl shadow-green-lg p-8'>
+            {/* Header */}
+            <div className='flex items-center gap-4 mb-8'>
+              <Link
+                href='/groups'
+                className='inline-flex items-center text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors bg-primary-50 px-4 py-2 rounded-xl hover:bg-primary-100'
               >
-                Nombre del Grupo
-              </label>
-              <input
-                type='text'
-                id='name'
-                name='name'
-                value={formData.name}
-                onChange={handleChange}
-                required
-                className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                placeholder='Ej: Fútbol Los Domingos'
-              />
+                <ArrowLeftIcon className='h-4 w-4 mr-1' />
+                Volver a grupos
+              </Link>
             </div>
 
-            <div>
-              <label
-                htmlFor='description'
-                className='block text-sm font-medium text-gray-700 mb-1'
-              >
-                Descripción
-              </label>
-              <textarea
-                id='description'
-                name='description'
-                value={formData.description}
-                onChange={handleChange}
-                rows={3}
-                className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                placeholder='Describe tu grupo...'
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor='location'
-                className='block text-sm font-medium text-gray-700 mb-1'
-              >
-                Ubicación
-              </label>
-              <input
-                type='text'
-                id='location'
-                name='location'
-                value={formData.location}
-                onChange={handleChange}
-                required
-                className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor='teamAName'
-                className='block text-sm font-medium text-gray-700 mb-1'
-              >
-                Nombre del Equipo A
-              </label>
-              <input
-                type='text'
-                id='teamAName'
-                name='teamAName'
-                value={formData.teamAName}
-                onChange={handleChange}
-                required
-                className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                placeholder='Ej: Rojos'
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor='teamBName'
-                className='block text-sm font-medium text-gray-700 mb-1'
-              >
-                Nombre del Equipo B
-              </label>
-              <input
-                type='text'
-                id='teamBName'
-                name='teamBName'
-                value={formData.teamBName}
-                onChange={handleChange}
-                required
-                className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                placeholder='Ej: Azules'
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor='requiredPlayers'
-                className='block text-sm font-medium text-gray-700 mb-1'
-              >
-                Jugadores por equipo
-              </label>
-              <input
-                type='number'
-                id='requiredPlayers'
-                name='requiredPlayers'
-                value={formData.requiredPlayers}
-                onChange={handleChange}
-                min={1}
-                required
-                className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-              />
-              <p className='mt-1 text-sm text-gray-500'>
-                Número de jugadores por equipo
+            <div className='text-center mb-8'>
+              <div className='mx-auto w-16 h-16 bg-gradient-green rounded-full flex items-center justify-center mb-4'>
+                <svg
+                  className='w-8 h-8 text-white'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth='2'
+                    d='M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z'
+                  />
+                </svg>
+              </div>
+              <h1 className='text-3xl font-bold text-gray-900 mb-2'>
+                Crear Nuevo Grupo
+              </h1>
+              <p className='text-gray-600'>
+                Configura tu grupo deportivo y empieza a organizar partidos
               </p>
             </div>
 
-            {/* Sección de recurrencia */}
-            <div className='border-t pt-4'>
-              <h3 className='text-md font-medium text-gray-700 mb-3'>
-                Programación de partidos
-              </h3>
+            {error && (
+              <div className='mb-6 p-4 bg-error-50 border border-error-200 text-error-600 rounded-xl'>
+                <p className='font-medium'>{error}</p>
+              </div>
+            )}
 
-              <div className='mb-4'>
+            <form onSubmit={handleSubmit} className='space-y-6'>
+              <div>
                 <label
-                  htmlFor='recurrenceType'
-                  className='block text-sm font-medium text-gray-700 mb-1'
+                  htmlFor='name'
+                  className='block text-sm font-medium text-gray-700 mb-2'
                 >
-                  Frecuencia
+                  Nombre del Grupo
                 </label>
-                <select
-                  id='recurrenceType'
-                  name='recurrenceType'
-                  value={formData.recurrenceType}
+                <input
+                  type='text'
+                  id='name'
+                  name='name'
+                  value={formData.name}
                   onChange={handleChange}
-                  className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                >
-                  <option value='NONE'>Sin programación automática</option>
-                  <option value='WEEKLY'>Semanal</option>
-                  <option value='BIWEEKLY'>Quincenal</option>
-                  <option value='MONTHLY'>Mensual</option>
-                </select>
+                  required
+                  className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-200 focus:border-primary-500 transition-all duration-200'
+                  placeholder='Ej: Fútbol Los Domingos'
+                />
               </div>
 
-              {formData.recurrenceType !== 'NONE' && (
-                <>
-                  <div className='mb-4'>
-                    <label className='block text-sm font-medium text-gray-700 mb-1'>
-                      Días de la semana
-                    </label>
-                    <div className='grid grid-cols-7 gap-2'>
-                      {['D', 'L', 'M', 'X', 'J', 'V', 'S'].map((day, index) => (
-                        <div key={index} className='text-center'>
-                          <label className='flex flex-col items-center'>
-                            <span className='text-sm'>{day}</span>
-                            <input
-                              type='checkbox'
-                              checked={formData.recurrenceDays.includes(index)}
-                              onChange={() => handleDayChange(index)}
-                              className='mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
-                            />
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+              <div>
+                <label
+                  htmlFor='description'
+                  className='block text-sm font-medium text-gray-700 mb-2'
+                >
+                  Descripción
+                </label>
+                <input
+                  type='text'
+                  id='description'
+                  name='description'
+                  value={formData.description}
+                  onChange={handleChange}
+                  className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-200 focus:border-primary-500 transition-all duration-200'
+                  placeholder='Describe brevemente tu grupo...'
+                />
+              </div>
 
-                  <div className='mb-4'>
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+                <div>
+                  <label
+                    htmlFor='sport'
+                    className='block text-sm font-medium text-gray-700 mb-2'
+                  >
+                    Deporte
+                  </label>
+                  <select
+                    id='sport'
+                    name='sport'
+                    value={formData.sport}
+                    onChange={handleChange}
+                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-200 focus:border-primary-500 transition-all duration-200'
+                  >
+                    <option value='Fútbol'>Fútbol</option>
+                    <option value='Baloncesto'>Baloncesto</option>
+                    <option value='Tenis'>Tenis</option>
+                    <option value='Pádel'>Pádel</option>
+                    <option value='Voleibol'>Voleibol</option>
+                    <option value='Hockey'>Hockey</option>
+                    <option value='Rugby'>Rugby</option>
+                    <option value='Otro'>Otro</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor='location'
+                    className='block text-sm font-medium text-gray-700 mb-2'
+                  >
+                    Ubicación
+                  </label>
+                  <input
+                    type='text'
+                    id='location'
+                    name='location'
+                    value={formData.location}
+                    onChange={handleChange}
+                    required
+                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-200 focus:border-primary-500 transition-all duration-200'
+                    placeholder='Ej: Parque Central'
+                  />
+                </div>
+              </div>
+
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+                <div>
+                  <label
+                    htmlFor='teamAName'
+                    className='block text-sm font-medium text-gray-700 mb-2'
+                  >
+                    Nombre del Equipo A
+                  </label>
+                  <input
+                    type='text'
+                    id='teamAName'
+                    name='teamAName'
+                    value={formData.teamAName}
+                    onChange={handleChange}
+                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-200 focus:border-primary-500 transition-all duration-200'
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor='teamBName'
+                    className='block text-sm font-medium text-gray-700 mb-2'
+                  >
+                    Nombre del Equipo B
+                  </label>
+                  <input
+                    type='text'
+                    id='teamBName'
+                    name='teamBName'
+                    value={formData.teamBName}
+                    onChange={handleChange}
+                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-200 focus:border-primary-500 transition-all duration-200'
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor='requiredPlayers'
+                  className='block text-sm font-medium text-gray-700 mb-2'
+                >
+                  Jugadores Requeridos por Equipo
+                </label>
+                <input
+                  type='number'
+                  id='requiredPlayers'
+                  name='requiredPlayers'
+                  value={formData.requiredPlayers}
+                  onChange={handleChange}
+                  min='1'
+                  max='15'
+                  className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-200 focus:border-primary-500 transition-all duration-200'
+                />
+              </div>
+
+              {/* Recurrence Section */}
+              <div className='bg-primary-50 rounded-xl p-6 border border-primary-200'>
+                <h3 className='text-lg font-medium text-primary-900 mb-4'>
+                  Configuración de Recurrencia (Opcional)
+                </h3>
+                <div className='space-y-4'>
+                  <div>
                     <label
-                      htmlFor='recurrenceTime'
-                      className='block text-sm font-medium text-gray-700 mb-1'
+                      htmlFor='recurrenceType'
+                      className='block text-sm font-medium text-gray-700 mb-2'
                     >
-                      Hora
+                      Tipo de Recurrencia
                     </label>
-                    <input
-                      type='time'
-                      id='recurrenceTime'
-                      name='recurrenceTime'
-                      value={formData.recurrenceTime || '18:00'}
+                    <select
+                      id='recurrenceType'
+                      name='recurrenceType'
+                      value={formData.recurrenceType}
                       onChange={handleChange}
-                      className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    />
+                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-200 focus:border-primary-500 transition-all duration-200'
+                    >
+                      <option value='NONE'>Sin recurrencia</option>
+                      <option value='WEEKLY'>Semanal</option>
+                      <option value='BIWEEKLY'>Quincenal</option>
+                      <option value='MONTHLY'>Mensual</option>
+                    </select>
                   </div>
 
-                  <div className='p-3 bg-blue-50 text-blue-800 rounded-lg mb-4'>
-                    {formData.recurrenceDays.length > 0 ? (
+                  {formData.recurrenceType !== 'NONE' && (
+                    <>
                       <div>
-                        <p className='font-medium'>Próximo partido:</p>
-                        <p>
-                          {calculateNextMatch()?.toLocaleDateString('es-ES', {
-                            weekday: 'long',
-                            day: 'numeric',
-                            month: 'long',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          }) || 'Selecciona al menos un día de la semana'}
-                        </p>
+                        <label className='block text-sm font-medium text-gray-700 mb-2'>
+                          Días de la Semana
+                        </label>
+                        <div className='grid grid-cols-2 md:grid-cols-4 gap-2'>
+                          {dayOptions.map((day) => (
+                            <label
+                              key={day.value}
+                              className='flex items-center space-x-2 p-2 rounded-lg hover:bg-primary-100 transition-colors'
+                            >
+                              <input
+                                type='checkbox'
+                                value={day.value}
+                                checked={formData.recurrenceDays.includes(
+                                  day.value
+                                )}
+                                onChange={handleChange}
+                                className='rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-500 focus:ring focus:ring-primary-200'
+                              />
+                              <span className='text-sm text-gray-700'>
+                                {day.label}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                    ) : (
-                      <p>Selecciona al menos un día de la semana</p>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
 
-            <div className='flex space-x-4'>
-              <Button
-                type='button'
-                variant='outline'
-                onClick={() => router.push('/groups')}
-                fullWidth
-                disabled={isSubmitting}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type='submit'
-                variant='primary'
-                fullWidth
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Creando...' : 'Crear Grupo'}
-              </Button>
-            </div>
-          </form>
+                      <div>
+                        <label
+                          htmlFor='recurrenceTime'
+                          className='block text-sm font-medium text-gray-700 mb-2'
+                        >
+                          Hora Predeterminada
+                        </label>
+                        <input
+                          type='time'
+                          id='recurrenceTime'
+                          name='recurrenceTime'
+                          value={formData.recurrenceTime}
+                          onChange={handleChange}
+                          className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-200 focus:border-primary-500 transition-all duration-200'
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className='flex flex-col sm:flex-row gap-4 pt-6'>
+                <Button
+                  type='button'
+                  variant='outline'
+                  onClick={() => router.back()}
+                  className='flex-1'
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type='submit'
+                  variant='primary'
+                  disabled={isSubmitting}
+                  className='flex-1 shadow-green'
+                >
+                  {isSubmitting ? (
+                    <div className='flex items-center justify-center'>
+                      <div className='animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2'></div>
+                      Creando grupo...
+                    </div>
+                  ) : (
+                    'Crear Grupo'
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+
+          {/* Elementos decorativos */}
+          <div className='absolute top-10 right-10 w-20 h-20 bg-accent-200 rounded-full opacity-30 animate-pulse pointer-events-none'></div>
+          <div
+            className='absolute bottom-20 left-10 w-16 h-16 bg-primary-300 rounded-full opacity-40 animate-pulse pointer-events-none'
+            style={{ animationDelay: '2s' }}
+          ></div>
         </div>
       </div>
     </Layout>
