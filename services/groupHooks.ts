@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import { showSuccessToast, showErrorToast } from './toastService';
-import { parseTbdPlayers } from './reactQueryHooks';
 import { GroupLogsResponse } from '../utils/logTypes';
 import { fetchGroupLogs } from '../lib/client';
 
@@ -87,10 +86,7 @@ const fetchGroupNextMatch = async (groupId: string) => {
           });
         }
         return response.json().then((data) => {
-          // Ensure TBD players are properly formatted
-          if (data.nextMatchDetails) {
-            data.nextMatchDetails = parseTbdPlayers(data.nextMatchDetails);
-          }
+          // Return data as-is from the API to maintain original format
           return data;
         });
       })
@@ -261,14 +257,7 @@ export const useGroupBasicInfo = (
 export const useGroupNextMatch = (groupId?: string, options?: any) => {
   return useQuery({
     queryKey: ['group', 'nextMatch', groupId],
-    queryFn: async () => {
-      if (!groupId) throw new Error('Group ID is required');
-      const response = await fetch(`/api/groups/${groupId}/next-match`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch next match');
-      }
-      return response.json();
-    },
+    queryFn: () => fetchGroupNextMatch(groupId as string),
     enabled: !!groupId,
     staleTime: 30 * 1000, // 30 segundos de stale time
     gcTime: 5 * 60 * 1000, // 5 minutos de tiempo de caché

@@ -339,89 +339,41 @@ export default async function handler(
         };
       });
 
-    // Procesar los TBD players
-    let tbdPlayers: TbdPlayer[] = [];
+    // Procesar los TBD players - mantener la estructura original de la base de datos
+    let tbdPlayers: any = null;
 
     // Intentar extraer y parsear tbdPlayers almacenados
     if (match.tbdPlayers) {
       try {
         // Si es un string, intentar parsearlo como JSON
         if (typeof match.tbdPlayers === 'string' && match.tbdPlayers !== '') {
-          const parsed = JSON.parse(match.tbdPlayers);
-
-          // Si es un array, usarlo directamente
-          if (Array.isArray(parsed)) {
-            tbdPlayers = parsed;
-          }
-          // Si es un objeto con teamA/teamB, procesarlo
-          else if (parsed.teamA || parsed.teamB) {
-            const teamATbd = Array.isArray(parsed.teamA) ? parsed.teamA : [];
-            const teamBTbd = Array.isArray(parsed.teamB) ? parsed.teamB : [];
-
-            tbdPlayers = [
-              ...teamATbd.map((p: any) => ({
-                ...p,
-                isTeamA: true,
-                playerType: 'TBD',
-              })),
-              ...teamBTbd.map((p: any) => ({
-                ...p,
-                isTeamA: false,
-                playerType: 'TBD',
-              })),
-            ];
-          }
+          tbdPlayers = JSON.parse(match.tbdPlayers);
         }
-        // Si ya es un array, usarlo directamente
-        else if (Array.isArray(match.tbdPlayers)) {
-          tbdPlayers = match.tbdPlayers.map((p: any) => ({
-            id:
-              p.id ||
-              `tbd-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-            name: p.name || 'TBD Player',
-            avatar: p.avatar || null,
-            isTeamA: typeof p.isTeamA === 'boolean' ? p.isTeamA : true,
-            playerType: 'TBD',
-          }));
+        // Si ya es un objeto o array, usarlo directamente
+        else {
+          tbdPlayers = match.tbdPlayers;
         }
       } catch (error) {
         console.error('Error parsing tbdPlayers:', error);
-        // En caso de error, continuar con tbdPlayers como array vacío
-        tbdPlayers = [];
+        // En caso de error, continuar con tbdPlayers como null
+        tbdPlayers = null;
       }
     }
 
-    // Si no hay TBD players o no pudimos parsearlos, generar nuevos si son necesarios
-    if (tbdPlayers.length === 0) {
-      const requiredPlayersPerTeam = Math.ceil(group.requiredPlayers / 2) || 5;
+    // Si no hay TBD players o no pudimos parsearlos, inicializar estructura vacía
+    if (!tbdPlayers) {
+      tbdPlayers = { teamA: [], teamB: [] };
+    }
 
-      // Generar TBD players para el equipo A si es necesario
-      if (teamAPlayers.length < requiredPlayersPerTeam) {
-        const missingA = requiredPlayersPerTeam - teamAPlayers.length;
-        for (let i = 0; i < missingA; i++) {
-          tbdPlayers.push({
-            id: `tbd-${Date.now()}-a-${i}`,
-            name: `TBD A${i + 1}`,
-            avatar: null,
-            isTeamA: true,
-            playerType: 'TBD',
-          });
-        }
-      }
-
-      // Generar TBD players para el equipo B si es necesario
-      if (teamBPlayers.length < requiredPlayersPerTeam) {
-        const missingB = requiredPlayersPerTeam - teamBPlayers.length;
-        for (let i = 0; i < missingB; i++) {
-          tbdPlayers.push({
-            id: `tbd-${Date.now()}-b-${i}`,
-            name: `TBD B${i + 1}`,
-            avatar: null,
-            isTeamA: false,
-            playerType: 'TBD',
-          });
-        }
-      }
+    // Asegurar que tbdPlayers tenga la estructura correcta
+    if (Array.isArray(tbdPlayers)) {
+      // Si es un array, convertir a estructura {teamA: [], teamB: []}
+      const teamATbd = tbdPlayers.filter((p: any) => p.isTeamA);
+      const teamBTbd = tbdPlayers.filter((p: any) => !p.isTeamA);
+      tbdPlayers = { teamA: teamATbd, teamB: teamBTbd };
+    } else if (!tbdPlayers.teamA && !tbdPlayers.teamB) {
+      // Si no tiene la estructura esperada, inicializar
+      tbdPlayers = { teamA: [], teamB: [] };
     }
 
     // Calcular promedios de edad para cada equipo

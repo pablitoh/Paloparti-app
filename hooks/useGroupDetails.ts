@@ -197,10 +197,11 @@ export function useGroupDetails(groupId: string | string[] | undefined) {
       }
     }
 
-    // Return a copy of the match with properly formatted tbdPlayers
+    // Return a copy of the match with tbdPlayers in the original database format
+    // Keep the original format to maintain consistency with backend expectations
     return {
       ...match,
-      tbdPlayers: parsedTbdPlayers,
+      tbdPlayers: match.tbdPlayers, // Keep original format from database
     } as MatchInterface;
   };
 

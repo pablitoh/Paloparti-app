@@ -102,16 +102,22 @@ export default async function handler(
     // Create new TBD players
     const newTbdPlayers: TbdPlayer[] = Array.from(
       { length: missingPlayers },
-      (_, i) => ({
-        id: `tbd-${Date.now()}-${i}-${Math.random()
-          .toString(36)
-          .substring(2, 9)}`,
-        name: `TBD Player ${i + 1}`,
-        isTeamA: i % 2 === 0, // Alternate between teams
-        playerType: 'TBD',
-        avatar: null,
-        age: null,
-      })
+      (_, i) => {
+        const isTeamA = i % 2 === 0; // Alternate between teams
+        const teamIndex = Math.floor(i / 2);
+        const team = isTeamA ? 'A' : 'B';
+
+        return {
+          id: `tbd-${Date.now()}-${i}-${Math.random()
+            .toString(36)
+            .substring(2, 9)}`,
+          name: `Fantasma ${team}${teamIndex + 1}`,
+          isTeamA,
+          playerType: 'TBD',
+          avatar: null,
+          age: null,
+        };
+      }
     );
 
     // Get existing TBD players

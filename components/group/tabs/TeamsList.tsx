@@ -1,7 +1,10 @@
 import React from 'react';
 import { Avatar } from '@mui/material';
-import { UserIcon } from '@heroicons/react/24/outline';
-import { UserPlusIcon } from '@heroicons/react/24/outline';
+import {
+  UserIcon,
+  UserPlusIcon,
+  ArrowsRightLeftIcon,
+} from '@heroicons/react/24/outline';
 import { PLAYER_ROLES } from '../AttendanceConfirmation';
 import StarRating from '../../StarRating';
 
@@ -83,6 +86,7 @@ interface TeamsListProps {
   teamBName: string;
   currentUserIsAdmin: boolean;
   onReplaceTbd?: (playerId: string) => void;
+  onSwapPlayer?: (playerId: string, isTeamA: boolean) => void;
   teamAAvgAge?: number; // Promedio de edad del equipo A
   teamBAvgAge?: number; // Promedio de edad del equipo B
   teamAAvgRating?: number; // Promedio de star rating del equipo A
@@ -93,6 +97,7 @@ interface PlayerItemProps {
   player: Player | TbdPlayer;
   isTbd?: boolean;
   showReplaceButton?: boolean;
+  isTeamA: boolean;
 }
 
 interface TeamSectionProps {
@@ -156,6 +161,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
   teamBName,
   currentUserIsAdmin,
   onReplaceTbd,
+  onSwapPlayer,
   teamAAvgAge,
   teamBAvgAge,
   teamAAvgRating,
@@ -252,6 +258,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
     player,
     isTbd = false,
     showReplaceButton = false,
+    isTeamA,
   }) => {
     // Obtener roles del jugador y determinar el rol principal
     const playerRoles = getPlayerRoles(player);
@@ -341,14 +348,27 @@ const TeamsList: React.FC<TeamsListProps> = ({
           </div>
         </div>
 
-        {showReplaceButton && currentUserIsAdmin && onReplaceTbd && (
-          <button
-            onClick={() => onReplaceTbd(player.id)}
-            className='p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors'
-            title='Reemplazar jugador'
-          >
-            <UserPlusIcon className='h-4 w-4 sm:h-5 sm:w-5' />
-          </button>
+        {currentUserIsAdmin && (
+          <div className='flex space-x-1'>
+            {showReplaceButton && onReplaceTbd && (
+              <button
+                onClick={() => onReplaceTbd(player.id)}
+                className='p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors'
+                title='Reemplazar jugador'
+              >
+                <UserPlusIcon className='h-4 w-4 sm:h-5 sm:w-5' />
+              </button>
+            )}
+            {onSwapPlayer && (
+              <button
+                onClick={() => onSwapPlayer(player.id, isTeamA)}
+                className='p-1.5 rounded-full bg-green-50 text-green-600 hover:bg-green-100 transition-colors'
+                title='Intercambiar jugador entre equipos'
+              >
+                <ArrowsRightLeftIcon className='h-4 w-4 sm:h-5 sm:w-5' />
+              </button>
+            )}
+          </div>
         )}
       </li>
     );
@@ -410,6 +430,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
               key={player.id}
               player={player}
               showReplaceButton={player.playerType === 'TBD'}
+              isTeamA={teamName === teamAName}
             />
           ))}
 
@@ -420,6 +441,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
               player={player}
               isTbd={true}
               showReplaceButton={true}
+              isTeamA={teamName === teamAName}
             />
           ))}
         </ul>

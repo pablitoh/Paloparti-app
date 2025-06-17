@@ -44,6 +44,7 @@ const actionToGroup: Record<string, string> = {
   [LogAction.TEAM_SORTED]: 'teams',
   [LogAction.TEAM_RESORTED]: 'teams',
   [LogAction.PLAYER_REPLACED]: 'teams',
+  [LogAction.PLAYER_SWAPPED]: 'teams',
 };
 
 // Mapeo de tipos de acción a mensajes legibles
@@ -56,6 +57,12 @@ const actionMessages: Record<string, (details: any) => string> = {
     `reemplazó a **${details.oldPlayer?.name || 'TBD'}** por **${
       details.newPlayer?.name || 'un jugador'
     }**`,
+  [LogAction.PLAYER_SWAPPED]: (details) =>
+    `intercambió a **${details.player1?.name || 'un jugador'}** (Equipo ${
+      details.player1?.originalTeam || '?'
+    }) con **${details.player2?.name || 'un jugador'}** (Equipo ${
+      details.player2?.originalTeam || '?'
+    })`,
   [LogAction.ATTENDANCE_RESET]: () => 'reinició la asistencia del partido',
   [LogAction.GROUP_EDITED]: () => 'editó la información del grupo',
   [LogAction.MATCH_EDITED]: () => 'editó la información del partido',

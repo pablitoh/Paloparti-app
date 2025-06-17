@@ -25,6 +25,7 @@ import {
   showLoadingToast,
 } from '../../../services/toastService';
 import type { ParticipantStatus } from '../../../types/group';
+import { normalizeTbdPlayers } from '../../../utils/tbdPlayersUtils';
 
 // Import our new components
 import TeamsList from './TeamsList';
@@ -119,6 +120,10 @@ interface NextMatchTabProps {
   currentUserIsAdmin: boolean;
   isUserInGroup: boolean;
   setShowReplaceTbdModal: (id: string) => void;
+  setShowSwapPlayersModal: (value: boolean) => void;
+  setPreSelectedPlayer: (
+    player: { playerId: string; isTeamA: boolean } | null
+  ) => void;
   handleGroupAttendance?: (
     status: ParticipantStatus,
     playerRoles?: string[]
@@ -177,6 +182,8 @@ export default function NextMatchTab({
   currentUserIsAdmin,
   isUserInGroup,
   setShowReplaceTbdModal,
+  setShowSwapPlayersModal,
+  setPreSelectedPlayer,
   handleGroupAttendance,
   handleSortTeams,
   handleAddResults,
@@ -237,87 +244,27 @@ export default function NextMatchTab({
     []
   );
 
-  // Extract and normalize TBD players
+  // Extract and normalize TBD players using our utility
   useEffect(() => {
     if (!matchDetails) {
       setNormalizedTbdPlayers([]);
       return;
     }
 
-    let tbdPlayers: TbdPlayer[] = [];
+    // Use our utility function to normalize TBD players
+    const normalizedData = normalizeTbdPlayers(matchDetails.tbdPlayers);
 
-    // Handle different formats that might come from the API
-    if (matchDetails.tbdPlayers) {
-      console.log('Processing tbdPlayers:', matchDetails.tbdPlayers);
-
-      // If it's already an array
-      if (Array.isArray(matchDetails.tbdPlayers)) {
-        tbdPlayers = matchDetails.tbdPlayers;
-      }
-      // If it's a string, try to parse it
-      else if (typeof matchDetails.tbdPlayers === 'string') {
-        try {
-          const parsed = JSON.parse(matchDetails.tbdPlayers);
-
-          // Si el resultado parseado es un objeto con teamA/teamB
-          if (
-            parsed &&
-            typeof parsed === 'object' &&
-            (parsed.teamA || parsed.teamB)
-          ) {
-            const teamA = parsed.teamA || [];
-            const teamB = parsed.teamB || [];
-
-            tbdPlayers = [
-              ...teamA.map((p: any) => ({
-                ...p,
-                isTeamA: true,
-                playerType: 'TBD',
-              })),
-              ...teamB.map((p: any) => ({
-                ...p,
-                isTeamA: false,
-                playerType: 'TBD',
-              })),
-            ];
-          } else if (Array.isArray(parsed)) {
-            // Si ya es un array, usarlo directamente
-            tbdPlayers = parsed;
-          }
-        } catch (e) {
-          console.error('Failed to parse TBD players string:', e);
-        }
-      }
-      // If it's an object with teamA/teamB properties
-      else if (
-        typeof matchDetails.tbdPlayers === 'object' &&
-        matchDetails.tbdPlayers !== null
-      ) {
-        // Type cast to an object with teamA and teamB properties
-        const tbdPlayerObj = matchDetails.tbdPlayers as {
-          teamA?: Array<any>;
-          teamB?: Array<any>;
-        };
-
-        if (tbdPlayerObj.teamA || tbdPlayerObj.teamB) {
-          const teamA = tbdPlayerObj.teamA || [];
-          const teamB = tbdPlayerObj.teamB || [];
-
-          tbdPlayers = [
-            ...teamA.map((p: any) => ({
-              ...p,
-              isTeamA: true,
-              playerType: 'TBD',
-            })),
-            ...teamB.map((p: any) => ({
-              ...p,
-              isTeamA: false,
-              playerType: 'TBD',
-            })),
-          ];
-        }
-      }
-    }
+    // Convert to flat array format expected by this component
+    const tbdPlayers: TbdPlayer[] = [
+      ...normalizedData.teamA.map((p) => ({
+        ...p,
+        avatar: p.avatar || null,
+      })),
+      ...normalizedData.teamB.map((p) => ({
+        ...p,
+        avatar: p.avatar || null,
+      })),
+    ];
 
     console.log('Normalized TBD players:', tbdPlayers);
     setNormalizedTbdPlayers(tbdPlayers);
@@ -1308,6 +1255,10 @@ export default function NextMatchTab({
                   teamBName={group.teamBName || 'Equipo B'}
                   currentUserIsAdmin={currentUserIsAdmin}
                   onReplaceTbd={(playerId) => setShowReplaceTbdModal(playerId)}
+                  onSwapPlayer={(playerId, isTeamA) => {
+                    setPreSelectedPlayer({ playerId, isTeamA });
+                    setShowSwapPlayersModal(true);
+                  }}
                   teamAAvgAge={finalTeamAAvgAge}
                   teamBAvgAge={finalTeamBAvgAge}
                 />

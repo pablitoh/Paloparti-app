@@ -38,6 +38,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { Group, ParticipantStatus } from '../../types/group';
 import type { MatchInterface } from '../../types/match';
 import ManualTeamFormationModal from '../../components/group/modals/ManualTeamFormationModal';
+import SwapPlayersModal from '../../components/group/modals/SwapPlayersModal';
 import Link from 'next/link';
 
 // Add AuthUser interface
@@ -63,6 +64,10 @@ interface LazyNextMatchTabProps extends LazyTabProps {
   handleRandomTeams: (confirmedPlayers?: any[]) => Promise<void>;
   handleDeleteMatch: (matchId: string) => Promise<void>;
   setShowReplaceTbdModal: (id: string) => void;
+  setShowSwapPlayersModal: (value: boolean) => void;
+  setPreSelectedPlayer: (
+    player: { playerId: string; isTeamA: boolean } | null
+  ) => void;
   allowFillIn: boolean;
   setAllowFillIn: (value: boolean) => void;
   router: any;
@@ -156,6 +161,8 @@ const LazyNextMatchTab = ({
   handleRandomTeams,
   handleDeleteMatch,
   setShowReplaceTbdModal,
+  setShowSwapPlayersModal,
+  setPreSelectedPlayer,
   allowFillIn,
   setAllowFillIn,
   router,
@@ -244,6 +251,8 @@ const LazyNextMatchTab = ({
         currentUserIsAdmin={currentUserIsAdmin}
         isUserInGroup={isUserInGroup}
         setShowReplaceTbdModal={setShowReplaceTbdModal}
+        setShowSwapPlayersModal={setShowSwapPlayersModal}
+        setPreSelectedPlayer={setPreSelectedPlayer}
         handleGroupAttendance={handleGroupAttendance}
         handleSortTeams={handleTeamSorting}
         handleAddResults={() =>
@@ -436,6 +445,12 @@ export default function GroupDetails() {
   // Estados para la UI
   const [selectedTab, setSelectedTab] = useState(0);
   const [showReplaceTbdModal, setShowReplaceTbdModal] = useState<string>('');
+  const [showSwapPlayersModal, setShowSwapPlayersModal] =
+    useState<boolean>(false);
+  const [preSelectedPlayer, setPreSelectedPlayer] = useState<{
+    playerId: string;
+    isTeamA: boolean;
+  } | null>(null);
   const [isCopying, setIsCopying] = useState(false);
   const [inviteUrl, setInviteUrl] = useState('');
   const [allowFillIn, setAllowFillIn] = useState(false);
@@ -487,6 +502,10 @@ export default function GroupDetails() {
             setSelectedTab={setSelectedTab}
             showReplaceTbdModal={showReplaceTbdModal}
             setShowReplaceTbdModal={setShowReplaceTbdModal}
+            showSwapPlayersModal={showSwapPlayersModal}
+            setShowSwapPlayersModal={setShowSwapPlayersModal}
+            preSelectedPlayer={preSelectedPlayer}
+            setPreSelectedPlayer={setPreSelectedPlayer}
             allowFillIn={allowFillIn}
             setAllowFillIn={setAllowFillIn}
             onRefreshData={refetchBasicInfo}
@@ -511,6 +530,10 @@ const GroupContent = ({
   setSelectedTab,
   showReplaceTbdModal,
   setShowReplaceTbdModal,
+  showSwapPlayersModal,
+  setShowSwapPlayersModal,
+  preSelectedPlayer,
+  setPreSelectedPlayer,
   allowFillIn,
   setAllowFillIn,
   onRefreshData,
@@ -525,6 +548,12 @@ const GroupContent = ({
   setSelectedTab: (tab: number) => void;
   showReplaceTbdModal: string;
   setShowReplaceTbdModal: (id: string) => void;
+  showSwapPlayersModal: boolean;
+  setShowSwapPlayersModal: (value: boolean) => void;
+  preSelectedPlayer: { playerId: string; isTeamA: boolean } | null;
+  setPreSelectedPlayer: (
+    player: { playerId: string; isTeamA: boolean } | null
+  ) => void;
   allowFillIn: boolean;
   setAllowFillIn: (value: boolean) => void;
   onRefreshData: () => void;
@@ -752,6 +781,8 @@ const GroupContent = ({
             handleRandomTeams={handleRandomTeams}
             handleDeleteMatch={handleDeleteMatch}
             setShowReplaceTbdModal={setShowReplaceTbdModal}
+            setShowSwapPlayersModal={setShowSwapPlayersModal}
+            setPreSelectedPlayer={setPreSelectedPlayer}
             allowFillIn={allowFillIn}
             setAllowFillIn={setAllowFillIn}
             router={router}
@@ -809,6 +840,7 @@ const GroupContent = ({
     allowFillIn,
     setAllowFillIn,
     setShowReplaceTbdModal,
+    setShowSwapPlayersModal,
     router,
     setShowManualTeamFormationModal,
   ]);
@@ -945,6 +977,38 @@ const GroupContent = ({
                 currentData
               );
             }, 500);
+          }}
+        />
+      )}
+
+      {showSwapPlayersModal && groupBasicData && (
+        <SwapPlayersModal
+          isOpen={showSwapPlayersModal}
+          onClose={() => {
+            setShowSwapPlayersModal(false);
+            setPreSelectedPlayer(null);
+          }}
+          group={{
+            ...groupBasicData,
+            nextMatchDetails:
+              (nextMatchData as ApiResponse | undefined)?.nextMatchDetails ||
+              groupBasicData.nextMatchDetails,
+          }}
+          preSelectedPlayer={preSelectedPlayer}
+          onSuccess={() => {
+            console.log('Player swap successful, refreshing data...');
+            // Invalidate the next match query to refresh team data
+            queryClient.invalidateQueries({
+              queryKey: ['group', 'nextMatch', groupId],
+              exact: true,
+              refetchType: 'all',
+            });
+
+            // Call the generic refresh function
+            onRefreshData();
+
+            // Reset pre-selected player
+            setPreSelectedPlayer(null);
           }}
         />
       )}
