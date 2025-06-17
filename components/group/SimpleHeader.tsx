@@ -72,29 +72,32 @@ const SimpleHeader: React.FC<SimpleHeaderProps> = ({
   };
 
   return (
-    <div className='sticky top-0 z-10 bg-white rounded-xl shadow-sm p-4 mb-0'>
+    <div
+      className='sticky top-0 z-10 bg-primary-500 rounded-xl shadow-green-lg p-4 mb-0 border border-primary-300'
+      style={{ backgroundColor: '#10b981 !important' }}
+    >
       <div className='flex items-center justify-between flex-wrap gap-3'>
         <div className='flex items-center gap-2'>
           <button
             onClick={() => router.push('/groups')}
-            className='flex-shrink-0 flex items-center justify-center p-2 rounded-full text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-all'
+            className='flex-shrink-0 flex items-center justify-center p-2 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-all'
           >
             <ArrowLeftIcon className='h-5 w-5' />
           </button>
           <div className='min-w-0'>
             <div className='flex items-center gap-2'>
-              <h1 className='text-xl font-bold text-gray-800 truncate'>
+              <h1 className='text-xl font-bold text-white truncate'>
                 {group.name}
               </h1>
               {recurrenceText && (
-                <span className='hidden sm:inline text-sm text-gray-500'>
-                  ({recurrenceText})
+                <span className='hidden sm:inline text-sm text-white/90 bg-white/20 px-2 py-1 rounded-lg'>
+                  {recurrenceText}
                 </span>
               )}
             </div>
           </div>
           {currentUserIsAdmin && (
-            <span className='hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800'>
+            <span className='hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/20 text-white'>
               Admin
             </span>
           )}
@@ -104,7 +107,7 @@ const SimpleHeader: React.FC<SimpleHeaderProps> = ({
           {/* Mobile menu button - visible only on mobile */}
           <button
             onClick={onToggleDrawer}
-            className='md:hidden flex items-center justify-center p-2 rounded-full text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-all'
+            className='md:hidden flex items-center justify-center p-2 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-all'
           >
             <Bars3Icon className='h-6 w-6' />
           </button>
@@ -112,7 +115,7 @@ const SimpleHeader: React.FC<SimpleHeaderProps> = ({
           {/* Invite link button - hidden on small mobile */}
           <button
             onClick={copyInviteLink}
-            className='hidden sm:flex items-center space-x-1 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors'
+            className='hidden sm:flex items-center space-x-1 px-3 py-1.5 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors'
             title='Copiar enlace de invitación'
           >
             <ClipboardIcon className='h-4 w-4' />
@@ -128,7 +131,7 @@ const SimpleHeader: React.FC<SimpleHeaderProps> = ({
             isUserInGroup && (
               <button
                 onClick={() => setShowLeaveModal(true)}
-                className='hidden sm:inline-flex px-3 py-1.5 text-sm text-red-600 hover:text-white hover:bg-red-600 border border-red-600 rounded-lg transition-all duration-200'
+                className='hidden sm:inline-flex px-3 py-1.5 text-sm text-red-200 hover:text-white hover:bg-red-600/80 border border-red-200 rounded-lg transition-all duration-200'
               >
                 Salir del grupo
               </button>
@@ -140,14 +143,14 @@ const SimpleHeader: React.FC<SimpleHeaderProps> = ({
             <>
               <button
                 onClick={() => router.push(`/edit-group/${group.id}`)}
-                className='p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all'
+                className='p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-all'
                 title='Editar grupo'
               >
                 <PencilIcon className='h-5 w-5' />
               </button>
               <button
                 onClick={() => setShowDeleteModal(true)}
-                className='hidden sm:flex p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all'
+                className='hidden sm:flex p-2 text-white/60 hover:text-red-200 hover:bg-red-600/20 rounded-lg transition-all'
                 title='Eliminar grupo'
                 disabled={isDeleting}
               >

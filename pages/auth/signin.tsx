@@ -117,19 +117,12 @@ export default function SignIn({ error, callbackUrl }: SignInProps) {
       <div className='w-full max-w-sm'>
         {/* Logo/Shield */}
         <div className='text-center mb-8'>
-          <div className='mx-auto w-24 h-24 bg-primary-600 rounded-xl flex items-center justify-center mb-6 shadow-lg border-2 border-primary-700'>
-            <svg
-              className='w-12 h-12 text-white'
-              fill='currentColor'
-              viewBox='0 0 24 24'
-            >
-              <path d='M12 1L3 5v6c0 5.55 3.84 10.74 9 12c5.16-1.26 9-6.45 9-12V5l-9-4z' />
-              <circle cx='12' cy='10' r='3' fill='white' />
-              <path
-                d='M12 13c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'
-                fill='white'
-              />
-            </svg>
+          <div className='mx-auto w-32 h-32 mb-6'>
+            <img
+              src='/logo.png'
+              alt='Paloparti Logo'
+              className='w-full h-full object-contain drop-shadow-lg'
+            />
           </div>
           <h1 className='text-4xl font-bold text-white mb-2 tracking-wide'>
             PALOPARTI
