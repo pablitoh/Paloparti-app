@@ -6,6 +6,7 @@ import React, {
 } from 'react';
 import { useSession } from 'next-auth/react';
 import { toast } from 'react-hot-toast';
+import Avatar from './Avatar';
 
 interface AvatarUploadProps {
   currentAvatar?: string | null;
@@ -14,6 +15,7 @@ interface AvatarUploadProps {
   size?: 'small' | 'medium' | 'large';
   className?: string;
   autoUpload?: boolean;
+  fallbackText?: string;
 }
 
 interface AvatarUploadRef {
@@ -29,6 +31,7 @@ const AvatarUpload = forwardRef<AvatarUploadRef, AvatarUploadProps>(
       size = 'medium',
       className = '',
       autoUpload = true,
+      fallbackText,
     },
     ref
   ) => {
@@ -37,6 +40,12 @@ const AvatarUpload = forwardRef<AvatarUploadRef, AvatarUploadProps>(
     const [preview, setPreview] = useState<string | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const avatarSizeMapping: Record<string, 'md' | 'lg' | 'xl'> = {
+      small: 'md',
+      medium: 'lg',
+      large: 'xl',
+    };
 
     const sizeClasses: Record<string, string> = {
       small: 'w-16 h-16',
@@ -213,26 +222,14 @@ const AvatarUpload = forwardRef<AvatarUploadRef, AvatarUploadProps>(
 
     return (
       <div className={`relative ${className}`}>
-        <div
-          className={`${sizeClasses[size]} rounded-full overflow-hidden border-2 border-gray-300 bg-gray-100 flex items-center justify-center`}
-        >
-          {displayAvatar ? (
-            <img
-              src={displayAvatar}
-              alt='Avatar'
-              className='w-full h-full object-cover'
-            />
-          ) : (
-            <div className='text-gray-400'>
-              <svg className='w-8 h-8' fill='currentColor' viewBox='0 0 20 20'>
-                <path
-                  fillRule='evenodd'
-                  d='M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z'
-                  clipRule='evenodd'
-                />
-              </svg>
-            </div>
-          )}
+        <div className='relative'>
+          <Avatar
+            src={displayAvatar}
+            alt='Avatar'
+            size={avatarSizeMapping[size]}
+            fallbackText={fallbackText}
+            className={`${sizeClasses[size]} border-2 border-gray-300`}
+          />
         </div>
 
         {/* Botones de acción */}

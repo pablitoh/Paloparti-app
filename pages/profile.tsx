@@ -4,6 +4,7 @@ import { GetServerSideProps } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './api/auth/[...nextauth]';
 import Layout from '../components/Layout';
+import Avatar from '../components/Avatar';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -262,15 +263,17 @@ export default function Profile({ user: serverUser }: ProfileProps) {
           {/* User Info */}
           <div className='flex flex-col sm:flex-row sm:items-center justify-between mb-6 sm:mb-8 gap-4'>
             <div className='flex flex-col sm:flex-row items-center sm:items-start gap-4'>
-              <img
-                src={
-                  profileData?.user.image ||
-                  serverUser.image ||
-                  '/default-avatar.png'
-                }
-                alt={profileData?.user.name || serverUser.name || 'User'}
-                className='w-20 h-20 sm:w-24 sm:h-24 rounded-full mx-auto sm:mx-0'
-              />
+              <div className='mx-auto sm:mx-0'>
+                <Avatar
+                  src={profileData?.user.image || serverUser.image}
+                  alt={profileData?.user.name || serverUser.name || 'User'}
+                  size='xl'
+                  fallbackText={
+                    profileData?.user.name || serverUser.name || 'U'
+                  }
+                  className='w-20 h-20 sm:w-24 sm:h-24'
+                />
+              </div>
               <div className='text-center sm:text-left'>
                 <h1 className='text-xl sm:text-2xl font-bold'>
                   {profileData?.user.name || serverUser.name || 'Usuario'}

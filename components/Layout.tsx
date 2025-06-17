@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useAuth } from '../contexts/AuthContext';
+import Avatar from './Avatar';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,7 +13,7 @@ export default function Layout({ children }: LayoutProps) {
   const { logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [avatarKey, setAvatarKey] = useState(0);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
   const mobileDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -38,24 +39,6 @@ export default function Layout({ children }: LayoutProps) {
     };
   }, []);
 
-  // Efecto para detectar cambios en la imagen del usuario y forzar re-render
-  useEffect(() => {
-    if (session?.user?.image) {
-      console.log('Imagen de sesión actualizada:', session.user.image);
-      setAvatarKey((prev) => prev + 1);
-    }
-  }, [session?.user?.image]);
-
-  // Generate avatar URL based on user name
-  const getAvatarUrl = (name: string) => {
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}`;
-  };
-
-  // Helper function to get the current avatar URL
-  const getCurrentAvatarUrl = () => {
-    return session?.user?.image || getAvatarUrl(session?.user?.name || '');
-  };
-
   return (
     <div className='min-h-screen bg-gray-50'>
       <nav className='bg-white shadow-sm'>
@@ -80,15 +63,12 @@ export default function Layout({ children }: LayoutProps) {
                     className='flex items-center space-x-1 focus:outline-none'
                     onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                   >
-                    <img
-                      key={`${session.user.image || 'default'}-${avatarKey}`}
-                      src={getCurrentAvatarUrl()}
+                    <Avatar
+                      src={session.user.image}
                       alt={session.user.name || ''}
-                      className='h-8 w-8 rounded-full'
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = getAvatarUrl(session.user.name || '');
-                      }}
+                      size='sm'
+                      fallbackText={session.user.name || 'U'}
+                      className='h-8 w-8'
                     />
                     <svg
                       className='w-4 h-4 text-gray-500'
@@ -148,15 +128,12 @@ export default function Layout({ children }: LayoutProps) {
                     className='flex items-center space-x-2 focus:outline-none'
                     onClick={() => setDropdownOpen(!dropdownOpen)}
                   >
-                    <img
-                      key={`${session.user.image || 'default'}-${avatarKey}`}
-                      src={getCurrentAvatarUrl()}
+                    <Avatar
+                      src={session.user.image}
                       alt={session.user.name || ''}
-                      className='h-8 w-8 rounded-full'
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = getAvatarUrl(session.user.name || '');
-                      }}
+                      size='sm'
+                      fallbackText={session.user.name || 'U'}
+                      className='h-8 w-8'
                     />
                     <span className='text-gray-700'>{session.user.name}</span>
                     <svg

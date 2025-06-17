@@ -1,6 +1,7 @@
 import React from 'react';
 import { useRouter } from 'next/router';
 import { Participant, ParticipantStatus } from '../types/participant';
+import Avatar from './Avatar';
 
 interface ParticipantCardProps {
   participant: Participant;
@@ -42,17 +43,13 @@ export default function ParticipantCard({
   return (
     <div className='flex items-center justify-between p-3 bg-white rounded-lg shadow-sm'>
       <div className='flex items-center gap-3'>
-        <div className='w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden'>
-          {participant.avatar ? (
-            <img
-              src={participant.avatar}
-              alt={participant.name}
-              className='w-full h-full object-cover'
-            />
-          ) : (
-            <span className='text-gray-400'>👤</span>
-          )}
-        </div>
+        <Avatar
+          src={participant.avatar}
+          alt={participant.name}
+          size='sm'
+          fallbackText={participant.name}
+          className='w-10 h-10'
+        />
         <div className='flex items-center gap-2'>
           <button
             onClick={handleProfileClick}

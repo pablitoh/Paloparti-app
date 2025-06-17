@@ -364,6 +364,7 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
                   onFileSelect={handleFileSelect}
                   size='large'
                   autoUpload={false}
+                  fallbackText={userData.name || serverUser.name || 'U'}
                 />
               </div>
             </div>

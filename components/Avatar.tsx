@@ -20,7 +20,7 @@ const Avatar: React.FC<AvatarProps> = ({
     sm: 'w-8 h-8 text-sm',
     md: 'w-12 h-12 text-base',
     lg: 'w-16 h-16 text-lg',
-    xl: 'w-24 h-24 text-xl',
+    xl: 'w-24 h-24 text-2xl',
   };
 
   const iconSizes = {
@@ -46,7 +46,7 @@ const Avatar: React.FC<AvatarProps> = ({
 
   return (
     <div
-      className={`${sizeClasses[size]} rounded-full overflow-hidden bg-gray-100 flex items-center justify-center ${className}`}
+      className={`${sizeClasses[size]} rounded-full overflow-hidden bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center ${className}`}
     >
       {src ? (
         <img
@@ -54,25 +54,39 @@ const Avatar: React.FC<AvatarProps> = ({
           alt={alt}
           className='w-full h-full object-cover'
           onError={(e) => {
-            // Si falla la carga de la imagen, ocultar el elemento img
-            e.currentTarget.style.display = 'none';
+            // Si falla la carga de la imagen, ocultar el elemento img y mostrar fallback
+            const target = e.currentTarget as HTMLImageElement;
+            target.style.display = 'none';
+            // Trigger re-render to show fallback
+            if (target.parentElement) {
+              target.parentElement.classList.add(
+                'bg-gradient-to-br',
+                'from-blue-400',
+                'to-purple-500'
+              );
+            }
           }}
         />
-      ) : fallbackInitials ? (
-        <span className='font-medium text-gray-600'>{fallbackInitials}</span>
-      ) : (
-        <svg
-          className={`${iconSizes[size]} text-gray-400`}
-          fill='currentColor'
-          viewBox='0 0 20 20'
-        >
-          <path
-            fillRule='evenodd'
-            d='M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z'
-            clipRule='evenodd'
-          />
-        </svg>
-      )}
+      ) : null}
+
+      {(!src || src === '') &&
+        (fallbackInitials ? (
+          <span className='font-bold text-white drop-shadow-sm'>
+            {fallbackInitials}
+          </span>
+        ) : (
+          <svg
+            className={`${iconSizes[size]} text-white drop-shadow-sm`}
+            fill='currentColor'
+            viewBox='0 0 20 20'
+          >
+            <path
+              fillRule='evenodd'
+              d='M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z'
+              clipRule='evenodd'
+            />
+          </svg>
+        ))}
     </div>
   );
 };
