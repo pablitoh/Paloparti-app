@@ -307,6 +307,221 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
                   </div>
 
                   {/* Mostrar detalles adicionales para ciertas acciones */}
+                  {(log.action === LogAction.MATCH_RESULT_EDITED ||
+                    log.action === LogAction.PLAYER_SWAPPED) &&
+                    log.details && (
+                      <div className='mt-2 pl-6 text-xs text-gray-500'>
+                        <details>
+                          <summary className='cursor-pointer hover:text-blue-600 font-medium'>
+                            Ver más detalles
+                          </summary>
+                          <div className='mt-2 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200'>
+                            {/* Información del partido */}
+                            <div className='mb-3 pb-2 border-b border-blue-200'>
+                              <p className='font-semibold text-blue-800 text-sm mb-1'>
+                                📅 Información del Partido
+                              </p>
+                              <div className='space-y-1'>
+                                {log.details.matchDate && (
+                                  <p className='text-gray-700'>
+                                    <span className='font-medium'>Fecha:</span>{' '}
+                                    {new Date(
+                                      log.details.matchDate
+                                    ).toLocaleDateString('es-ES', {
+                                      weekday: 'long',
+                                      year: 'numeric',
+                                      month: 'long',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })}
+                                  </p>
+                                )}
+                                {log.details.matchLocation && (
+                                  <p className='text-gray-700'>
+                                    <span className='font-medium'>
+                                      Ubicación:
+                                    </span>{' '}
+                                    {log.details.matchLocation}
+                                  </p>
+                                )}
+                                {log.details.teamAName &&
+                                  log.details.teamBName && (
+                                    <p className='text-gray-700'>
+                                      <span className='font-medium'>
+                                        Equipos:
+                                      </span>{' '}
+                                      {log.details.teamAName} vs{' '}
+                                      {log.details.teamBName}
+                                    </p>
+                                  )}
+                              </div>
+                            </div>
+
+                            {/* Detalles específicos por tipo de acción */}
+                            {log.action === LogAction.MATCH_RESULT_EDITED && (
+                              <div>
+                                <p className='font-semibold text-blue-800 text-sm mb-2'>
+                                  ⚽ Cambios Realizados
+                                </p>
+                                {log.details.action === 'score_updated' &&
+                                  log.details.previousScore &&
+                                  log.details.newScore && (
+                                    <div className='bg-white p-2 rounded border border-blue-100'>
+                                      <p className='text-gray-700'>
+                                        <span className='font-medium'>
+                                          Resultado anterior:
+                                        </span>{' '}
+                                        <span className='bg-red-100 text-red-800 px-2 py-0.5 rounded'>
+                                          {log.details.previousScore.scoreA} -{' '}
+                                          {log.details.previousScore.scoreB}
+                                        </span>
+                                      </p>
+                                      <p className='text-gray-700 mt-1'>
+                                        <span className='font-medium'>
+                                          Resultado nuevo:
+                                        </span>{' '}
+                                        <span className='bg-green-100 text-green-800 px-2 py-0.5 rounded'>
+                                          {log.details.newScore.scoreA} -{' '}
+                                          {log.details.newScore.scoreB}
+                                        </span>
+                                      </p>
+                                    </div>
+                                  )}
+                                {log.details.action === 'goals_updated' &&
+                                  log.details.goals && (
+                                    <div className='bg-white p-2 rounded border border-blue-100'>
+                                      <p className='font-medium text-gray-700 mb-1'>
+                                        Goleadores:
+                                      </p>
+                                      <div className='grid grid-cols-2 gap-2'>
+                                        <div>
+                                          <p className='text-xs font-medium text-green-700'>
+                                            {log.details.teamAName}:
+                                          </p>
+                                          <ul className='text-xs text-gray-600'>
+                                            {log.details.goals
+                                              .filter((g: any) => g.isTeamA)
+                                              .map((goal: any, idx: number) => (
+                                                <li key={idx}>
+                                                  • {goal.scorerName}
+                                                  {goal.minute
+                                                    ? ` (${goal.minute}')`
+                                                    : ''}
+                                                </li>
+                                              ))}
+                                            {log.details.goals.filter(
+                                              (g: any) => g.isTeamA
+                                            ).length === 0 && (
+                                              <li className='text-gray-400'>
+                                                Sin goles
+                                              </li>
+                                            )}
+                                          </ul>
+                                        </div>
+                                        <div>
+                                          <p className='text-xs font-medium text-blue-700'>
+                                            {log.details.teamBName}:
+                                          </p>
+                                          <ul className='text-xs text-gray-600'>
+                                            {log.details.goals
+                                              .filter((g: any) => !g.isTeamA)
+                                              .map((goal: any, idx: number) => (
+                                                <li key={idx}>
+                                                  • {goal.scorerName}
+                                                  {goal.minute
+                                                    ? ` (${goal.minute}')`
+                                                    : ''}
+                                                </li>
+                                              ))}
+                                            {log.details.goals.filter(
+                                              (g: any) => !g.isTeamA
+                                            ).length === 0 && (
+                                              <li className='text-gray-400'>
+                                                Sin goles
+                                              </li>
+                                            )}
+                                          </ul>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                              </div>
+                            )}
+
+                            {log.action === LogAction.PLAYER_SWAPPED && (
+                              <div>
+                                <p className='font-semibold text-blue-800 text-sm mb-2'>
+                                  🔄 Intercambio de Jugadores
+                                </p>
+                                <div className='bg-white p-2 rounded border border-blue-100 space-y-2'>
+                                  <div className='flex items-center justify-between'>
+                                    <div className='text-center flex-1'>
+                                      <p className='font-medium text-gray-700'>
+                                        {log.details.player1?.name}
+                                      </p>
+                                      <p className='text-xs text-gray-500'>
+                                        Equipo{' '}
+                                        {log.details.player1?.originalTeam} →
+                                        Equipo {log.details.player1?.newTeam}
+                                      </p>
+                                    </div>
+                                    <div className='px-2'>
+                                      <span className='text-blue-500 font-bold'>
+                                        ↔
+                                      </span>
+                                    </div>
+                                    <div className='text-center flex-1'>
+                                      <p className='font-medium text-gray-700'>
+                                        {log.details.player2?.name}
+                                      </p>
+                                      <p className='text-xs text-gray-500'>
+                                        Equipo{' '}
+                                        {log.details.player2?.originalTeam} →
+                                        Equipo {log.details.player2?.newTeam}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  {log.details.resultUpdated && (
+                                    <div className='pt-2 border-t border-gray-100'>
+                                      <p className='text-xs font-medium text-gray-600 mb-1'>
+                                        Cambio en el resultado:
+                                      </p>
+                                      <div className='flex items-center justify-center space-x-2'>
+                                        <span className='bg-red-100 text-red-800 px-2 py-0.5 rounded text-xs'>
+                                          {
+                                            log.details.resultUpdated
+                                              .previousScore.scoreA
+                                          }{' '}
+                                          -{' '}
+                                          {
+                                            log.details.resultUpdated
+                                              .previousScore.scoreB
+                                          }
+                                        </span>
+                                        <span className='text-gray-400'>→</span>
+                                        <span className='bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs'>
+                                          {
+                                            log.details.resultUpdated.newScore
+                                              .scoreA
+                                          }{' '}
+                                          -{' '}
+                                          {
+                                            log.details.resultUpdated.newScore
+                                              .scoreB
+                                          }
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </details>
+                      </div>
+                    )}
+
                   {log.action === LogAction.TEAM_RESORTED &&
                     log.details.previousTeams && (
                       <div className='mt-2 pl-6 text-xs text-gray-500'>

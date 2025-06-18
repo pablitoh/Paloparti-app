@@ -165,10 +165,14 @@ async function handleUpdateScore(
   // Registrar en el log
   await logGroupEvent(match.groupId, user.id, LogAction.MATCH_RESULT_EDITED, {
     matchId,
+    matchDate: match.date,
+    matchLocation: match.location,
     previousScore: { scoreA: previousScoreA, scoreB: previousScoreB },
     newScore: { scoreA, scoreB },
     teamAName: match.teamA,
     teamBName: match.teamB,
+    action: 'score_updated',
+    details: `Resultado editado de ${previousScoreA}-${previousScoreB} a ${scoreA}-${scoreB}`,
   });
 
   return res.status(200).json({
@@ -286,6 +290,8 @@ async function handleSwapPlayers(
   // Registrar en el log
   await logGroupEvent(match.groupId, user.id, LogAction.PLAYER_SWAPPED, {
     matchId,
+    matchDate: match.date,
+    matchLocation: match.location,
     player1: {
       id: player1Id,
       name: player1?.user?.name || 'Jugador desconocido',
@@ -304,6 +310,7 @@ async function handleSwapPlayers(
       previousScore: { scoreA: match.scoreA, scoreB: match.scoreB },
       newScore: { scoreA: goalsTeamA, scoreB: goalsTeamB },
     },
+    details: `Intercambio: ${player1?.user?.name} (${match.teamA} → ${match.teamB}) ↔ ${player2?.user?.name} (${match.teamB} → ${match.teamA}). Resultado: ${match.scoreA}-${match.scoreB} → ${goalsTeamA}-${goalsTeamB}`,
   });
 
   // Obtener el partido actualizado
@@ -396,10 +403,27 @@ async function handleUpdateGoals(
   // Registrar en el log
   await logGroupEvent(match.groupId, user.id, LogAction.MATCH_RESULT_EDITED, {
     matchId,
+    matchDate: match.date,
+    matchLocation: match.location,
     action: 'goals_updated',
     goals: goalScorers,
     teamAName: match.teamA,
     teamBName: match.teamB,
+    goalsCount: {
+      teamA: goalScorers.filter((g) => g.isTeamA).length,
+      teamB: goalScorers.filter((g) => !g.isTeamA).length,
+    },
+    details: `Goles editados. ${match.teamA}: ${
+      goalScorers
+        .filter((g) => g.isTeamA)
+        .map((g) => g.scorerName)
+        .join(', ') || 'Sin goles'
+    }. ${match.teamB}: ${
+      goalScorers
+        .filter((g) => !g.isTeamA)
+        .map((g) => g.scorerName)
+        .join(', ') || 'Sin goles'
+    }`,
   });
 
   // Obtener el partido actualizado

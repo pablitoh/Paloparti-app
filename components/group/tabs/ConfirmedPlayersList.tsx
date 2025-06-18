@@ -51,68 +51,50 @@ const ConfirmedPlayersList: React.FC<ConfirmedPlayersListProps> = ({
     <div className='space-y-6'>
       {/* Confirmed Players Section */}
       <div>
-        <div className='flex items-center justify-between mb-3'>
-          <h3 className='text-lg font-medium text-gray-900'>
+        <div className='mb-4'>
+          <h3 className='text-lg font-semibold text-gray-900 mb-3'>
             Jugadores Confirmados
           </h3>
-          <span className='px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full'>
-            {confirmedPlayers.length} confirmados
-          </span>
         </div>
 
-        <div className='bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden'>
-          {confirmedPlayers.length > 0 ? (
-            <ul className='divide-y divide-gray-100'>
-              {confirmedPlayers.map((player) => (
-                <li
-                  key={player.id}
-                  className='p-3 flex items-center justify-between'
+        {confirmedPlayers.length > 0 ? (
+          <div className='grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4'>
+            {confirmedPlayers.map((player) => (
+              <div
+                key={player.id}
+                className='flex flex-col items-center p-3 bg-white rounded-lg border border-gray-200 hover:border-green-300 hover:shadow-md transition-all duration-200'
+              >
+                <Avatar
+                  src={player.avatar || ''}
+                  alt={player.name || 'Jugador'}
+                  className='h-12 w-12 mb-2 border-2 border-green-200'
                 >
-                  <div className='flex items-center gap-3'>
-                    <Avatar
-                      src={player.avatar || ''}
-                      alt={player.name || 'Jugador'}
-                      className='h-10 w-10 rounded-full'
-                    >
-                      {player.name
-                        ? player.name
-                            .split(' ')
-                            .map((n) => n[0])
-                            .filter((char) => /[A-Za-z]/.test(char))
-                            .join('')
-                            .toUpperCase() || 'J'
-                        : 'J'}
-                    </Avatar>
-                    <span className='font-medium text-gray-800'>
-                      {player.name || 'Jugador sin nombre'}
-                    </span>
-                  </div>
-                  <div className='flex items-center'>
-                    <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800'>
-                      <CheckCircleIcon className='mr-1 h-4 w-4' />
-                      Confirmado
-                    </span>
-
-                    {currentUserIsAdmin && (
-                      <button
-                        onClick={() => handleDeclineAttendance(player.id)}
-                        className='ml-2 text-xs text-red-600 hover:text-red-900 p-1 hover:bg-red-50 rounded-full transition-colors'
-                        title='Quitar asistencia'
-                        aria-label='Quitar asistencia de este jugador'
-                      >
-                        <XCircleIcon className='h-5 w-5' />
-                      </button>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className='p-4 text-center text-gray-500'>
-              No hay jugadores confirmados
+                  {player.name
+                    ? player.name
+                        .split(' ')
+                        .map((n) => n[0])
+                        .filter((char) => /[A-Za-z]/.test(char))
+                        .join('')
+                        .toUpperCase() || 'J'
+                    : 'J'}
+                </Avatar>
+                <span className='text-sm font-medium text-gray-800 text-center leading-tight'>
+                  {player.name || 'Jugador'}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className='p-8 text-center text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300'>
+            <div className='w-12 h-12 mx-auto mb-3 text-gray-400'>
+              <CheckCircleIcon />
             </div>
-          )}
-        </div>
+            <p className='text-sm font-medium'>No hay jugadores confirmados</p>
+            <p className='text-xs text-gray-400 mt-1'>
+              Los jugadores confirmados aparecerán aquí
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Pending Players Section */}
