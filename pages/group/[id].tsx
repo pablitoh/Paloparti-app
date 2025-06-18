@@ -74,7 +74,9 @@ interface LazyNextMatchTabProps extends LazyTabProps {
   setShowManualTeamFormationModal: (value: boolean) => void;
 }
 
-interface LazyHistoryTabProps extends LazyTabProps {}
+interface LazyHistoryTabProps extends LazyTabProps {
+  currentUserIsAdmin: boolean;
+}
 
 interface LazyStatsTabProps extends LazyTabProps {
   type: 'goals' | 'mvps';
@@ -269,7 +271,10 @@ const LazyNextMatchTab = ({
   );
 };
 
-const LazyHistoryTab = ({ groupId }: LazyHistoryTabProps) => {
+const LazyHistoryTab = ({
+  groupId,
+  currentUserIsAdmin,
+}: LazyHistoryTabProps) => {
   const { data, isLoading } = useGroupHistory(groupId, 1, 10, {
     enabled: !!groupId,
     staleTime: 5 * 60 * 1000,
@@ -300,6 +305,7 @@ const LazyHistoryTab = ({ groupId }: LazyHistoryTabProps) => {
         getScoreForTeam={getScoreForTeam}
         getPlayerGoals={getPlayerGoals}
         renderGoalBalls={renderGoalBalls}
+        currentUserIsAdmin={currentUserIsAdmin}
       />
     </div>
   );
@@ -840,7 +846,12 @@ const GroupContent = ({
           />
         );
       case 1:
-        return <LazyHistoryTab groupId={groupId} />;
+        return (
+          <LazyHistoryTab
+            groupId={groupId}
+            currentUserIsAdmin={currentUserIsAdmin}
+          />
+        );
       case 2:
         return <LazyStatsTab groupId={groupId} type='goals' />;
       case 3:
