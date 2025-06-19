@@ -91,6 +91,7 @@ interface TeamsListProps {
   teamBAvgAge?: number; // Promedio de edad del equipo B
   teamAAvgRating?: number; // Promedio de star rating del equipo A
   teamBAvgRating?: number; // Promedio de star rating del equipo B
+  sortCount?: number; // Contador de sorteos para forzar regeneración
 }
 
 interface PlayerItemProps {
@@ -166,6 +167,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
   teamBAvgAge,
   teamAAvgRating,
   teamBAvgRating,
+  sortCount = 0,
 }) => {
   // Logs para depuración
   console.log('TeamsList renderizado con props:', {
@@ -451,9 +453,10 @@ const TeamsList: React.FC<TeamsListProps> = ({
 
   return (
     <div
-      id='teams-list-container'
+      id={`teams-list-container-${sortCount}`}
       className='bg-white rounded-lg shadow-sm border border-gray-200 overflow-visible min-w-[800px]'
       style={{ minWidth: '800px' }}
+      data-sort-count={sortCount}
     >
       {/* En móvil: equipos apilados verticalmente */}
       {/* En tablet/desktop: equipos lado a lado */}

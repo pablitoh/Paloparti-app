@@ -1265,6 +1265,7 @@ export default function NextMatchTab({
                     teamAName={group.teamAName || 'Equipo A'}
                     teamBName={group.teamBName || 'Equipo B'}
                     className='text-sm'
+                    sortCount={matchDetails?.sortCount || 0}
                   />
                   {currentUserIsAdmin && (
                     <div className='flex space-x-2'>
@@ -1317,6 +1318,7 @@ export default function NextMatchTab({
                   }}
                   teamAAvgAge={finalTeamAAvgAge}
                   teamBAvgAge={finalTeamBAvgAge}
+                  sortCount={matchDetails?.sortCount || 0}
                 />
               </div>
             </div>

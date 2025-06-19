@@ -9,6 +9,7 @@ interface ShareTeamsButtonProps {
   teamAName: string;
   teamBName: string;
   className?: string;
+  sortCount?: number;
 }
 
 const ShareTeamsButton: React.FC<ShareTeamsButtonProps> = ({
@@ -17,9 +18,10 @@ const ShareTeamsButton: React.FC<ShareTeamsButtonProps> = ({
   teamAName,
   teamBName,
   className = '',
+  sortCount = 0,
 }) => {
   const [isSharing, setIsSharing] = useState(false);
-  const { shareToWhatsApp } = useScreenshotShare();
+  const { shareTeamsScreenshot } = useScreenshotShare();
 
   const handleShare = async () => {
     if (isSharing) return;
@@ -27,30 +29,39 @@ const ShareTeamsButton: React.FC<ShareTeamsButtonProps> = ({
     setIsSharing(true);
 
     try {
-      await shareToWhatsApp(elementId, {
+      const shareData = {
         text: `Equipos sorteados en ${groupName}`,
         groupName,
         teamAName,
         teamBName,
-      });
+      };
+
+      await shareTeamsScreenshot(sortCount, shareData);
     } finally {
       setIsSharing(false);
     }
   };
 
   return (
-    <button
+    <Button
+      variant='primary'
       onClick={handleShare}
       disabled={isSharing}
-      className={`inline-flex items-center justify-center w-10 h-10 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm ${className}`}
-      title='Compartir equipos'
+      size='sm'
+      className={`flex items-center text-xs ${className}`}
     >
       {isSharing ? (
-        <div className='animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent'></div>
+        <>
+          <div className='animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2'></div>
+          Generando...
+        </>
       ) : (
-        <ShareIcon className='h-5 w-5' />
+        <>
+          <ShareIcon className='h-4 w-4 mr-2' />
+          Compartir
+        </>
       )}
-    </button>
+    </Button>
   );
 };
 
