@@ -74,7 +74,8 @@ div[id^='teams-list-container'] {
   position: relative;
 }
 
-div[id^='teams-list-container'] .admin-buttons {
+/* Solo ocultar botones de admin durante capturas de pantalla */
+div[id^='teams-list-container'].screenshot-mode .admin-buttons {
   display: none !important;
 }
 

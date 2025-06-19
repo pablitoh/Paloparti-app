@@ -85,13 +85,8 @@ export const useScreenshotShare = () => {
                 avatarElement.style.border = '1px solid #e5e7eb';
               });
 
-              // Ocultar botones de admin
-              const adminButtons = clonedElement.querySelectorAll(
-                '.admin-buttons, .admin-button'
-              );
-              adminButtons.forEach((btn) => {
-                (btn as HTMLElement).style.display = 'none';
-              });
+              // Agregar clase para ocultar botones de admin via CSS
+              clonedElement.classList.add('screenshot-mode');
             }
           },
         });

@@ -5,12 +5,14 @@ import Layout from '../../components/Layout';
 import { useSession } from 'next-auth/react';
 import { RecurrenceType } from '../../types/match';
 import DeleteGroupModal from '../../components/group/modals/DeleteGroupModal';
+import { isGhostPlayer, deleteGhostPlayer } from '../../lib/ghostPlayerUtils';
 
 interface Member {
   id: string;
   userId: string;
   name: string | null;
   avatar: string | null;
+  email: string | null;
   role: string;
 }
 
@@ -378,6 +380,61 @@ export default function EditGroup() {
       console.error('Error:', error);
       setError(
         error instanceof Error ? error.message : 'Error al realizar la acción'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Función para eliminar jugador fantasma
+  const handleDeleteGhostPlayer = async (
+    userId: string,
+    memberName: string
+  ) => {
+    if (!isAdmin || !group || !id) return;
+
+    // Confirmar eliminación
+    if (
+      !confirm(
+        `¿Estás seguro de eliminar al jugador fantasma "${memberName}"? Esta acción no se puede deshacer.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setError(null);
+      setSuccess(null);
+
+      const response = await fetch(`/api/groups/${id}/ghost-players`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.message || 'Error al eliminar jugador fantasma'
+        );
+      }
+
+      // Actualizar la lista de miembros localmente
+      const updatedMembers = members.filter(
+        (member) => member.userId !== userId
+      );
+      setMembers(updatedMembers);
+
+      setSuccess('Jugador fantasma eliminado exitosamente');
+    } catch (error) {
+      console.error('Error deleting ghost player:', error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : 'Error al eliminar jugador fantasma'
       );
     } finally {
       setIsSubmitting(false);
@@ -784,6 +841,14 @@ export default function EditGroup() {
                               (Tú)
                             </span>
                           )}
+                          {isGhostPlayer({
+                            email: member.email,
+                            image: member.avatar,
+                          }) && (
+                            <span className='ml-2 text-xs text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full'>
+                              Fantasma
+                            </span>
+                          )}
                         </p>
                         <p className='text-xs text-gray-500'>
                           {member.role === 'ADMIN'
@@ -796,45 +861,68 @@ export default function EditGroup() {
                     {/* Acciones para miembros */}
                     {member.userId !== session?.user?.id && (
                       <div className='flex space-x-2'>
-                        {member.role === 'MEMBER' ? (
+                        {/* Botón especial para jugadores fantasma */}
+                        {isGhostPlayer({
+                          email: member.email,
+                          image: member.avatar,
+                        }) ? (
                           <Button
-                            variant='outline'
+                            variant='danger'
                             size='sm'
                             onClick={() =>
-                              handleMemberAction(member.userId, 'promote')
+                              handleDeleteGhostPlayer(
+                                member.userId,
+                                member.name || 'Jugador fantasma'
+                              )
                             }
                             disabled={isSubmitting}
                           >
-                            Hacer admin
+                            Eliminar Fantasma
                           </Button>
                         ) : (
-                          <Button
-                            variant='outline'
-                            size='sm'
-                            onClick={() =>
-                              handleMemberAction(member.userId, 'demote')
-                            }
-                            disabled={isSubmitting}
-                          >
-                            Quitar admin
-                          </Button>
+                          <>
+                            {/* Botones normales para usuarios reales */}
+                            {member.role === 'MEMBER' ? (
+                              <Button
+                                variant='outline'
+                                size='sm'
+                                onClick={() =>
+                                  handleMemberAction(member.userId, 'promote')
+                                }
+                                disabled={isSubmitting}
+                              >
+                                Hacer admin
+                              </Button>
+                            ) : (
+                              <Button
+                                variant='outline'
+                                size='sm'
+                                onClick={() =>
+                                  handleMemberAction(member.userId, 'demote')
+                                }
+                                disabled={isSubmitting}
+                              >
+                                Quitar admin
+                              </Button>
+                            )}
+                            <Button
+                              variant='danger'
+                              size='sm'
+                              onClick={() => {
+                                if (
+                                  confirm(
+                                    '¿Estás seguro de eliminar a este miembro del grupo?'
+                                  )
+                                ) {
+                                  handleMemberAction(member.userId, 'remove');
+                                }
+                              }}
+                              disabled={isSubmitting}
+                            >
+                              Eliminar
+                            </Button>
+                          </>
                         )}
-                        <Button
-                          variant='danger'
-                          size='sm'
-                          onClick={() => {
-                            if (
-                              confirm(
-                                '¿Estás seguro de eliminar a este miembro del grupo?'
-                              )
-                            ) {
-                              handleMemberAction(member.userId, 'remove');
-                            }
-                          }}
-                          disabled={isSubmitting}
-                        >
-                          Eliminar
-                        </Button>
                       </div>
                     )}
                   </div>

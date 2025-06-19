@@ -10,9 +10,11 @@ import {
   ChevronUpDownIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  UserPlusIcon,
 } from '@heroicons/react/24/outline';
 import RoleSelectionModal from '../modals/RoleSelectionModal';
 import LeaveGroupModal from '../modals/LeaveGroupModal';
+import AddGhostPlayerModal from '../modals/AddGhostPlayerModal';
 import StarRating from '../../StarRating';
 import { updateMemberRating } from '../../../services/groupService';
 import {
@@ -22,6 +24,8 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { createLogEntry } from '../../../services/logService';
 import { LogAction } from '../../../utils/logTypes';
+import { isGhostPlayer } from '../../../lib/ghostPlayerUtils';
+import Button from '../../Button';
 
 interface MembersTabProps {
   group: GroupWithRelations;
@@ -80,6 +84,10 @@ export default function MembersTab({
   // Estado para el modal de salir del grupo
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [isLocalLeaving, setIsLocalLeaving] = useState(false);
+
+  // Estado para el modal de jugador fantasma
+  const [showGhostPlayerModal, setShowGhostPlayerModal] = useState(false);
+  const [isCreatingGhostPlayer, setIsCreatingGhostPlayer] = useState(false);
 
   // Get the queryClient instance at the component level
   const queryClient = useQueryClient();
@@ -338,8 +346,15 @@ export default function MembersTab({
       membersConfirmationStatus[member.userId] ?? isConfirmedForNextMatch;
     const isProcessing = processingButton?.id === member.id;
 
+    // Verificar si es jugador fantasma
+    const ghostPlayer = isGhostPlayer({
+      email: member.email,
+      image: member.avatar,
+    });
+
     return (
       <div className='flex gap-2 mt-2 md:mt-0 flex-wrap justify-end'>
+        {/* Botones normales para todos los usuarios (incluidos fantasma) */}
         {!isConfirmed && (
           <button
             onClick={() => onOpenRoleModal(member)}
@@ -443,12 +458,83 @@ export default function MembersTab({
     );
   };
 
+  // Función para crear jugador fantasma
+  const handleCreateGhostPlayer = async (name: string, age: number) => {
+    if (!group?.id || !user?.id) return;
+
+    setIsCreatingGhostPlayer(true);
+    try {
+      const response = await fetch(`/api/groups/${group.id}/ghost-players`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, age }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Error al crear jugador fantasma');
+      }
+
+      const result = await response.json();
+
+      showSuccessToast('Jugador fantasma creado exitosamente');
+
+      // Invalidar y refrescar la consulta del grupo para actualizar la lista de miembros
+      queryClient.invalidateQueries({ queryKey: ['group', group.id] });
+      queryClient.invalidateQueries({
+        queryKey: ['group', 'members', group.id],
+      });
+
+      // Log de la acción
+      if (user) {
+        await createLogEntry({
+          groupId: group.id,
+          action: LogAction.GHOST_PLAYER_CREATED,
+          performedBy: user.id,
+          performedByName: user.name || 'Usuario',
+          targetUserId: result.ghostPlayer.id,
+          targetUserName: result.ghostPlayer.name,
+          details: {
+            ghostPlayerName: result.ghostPlayer.name,
+            ghostPlayerId: result.ghostPlayer.id,
+            age: age,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (error) {
+      console.error('Error creating ghost player:', error);
+      showErrorToast(
+        error instanceof Error
+          ? error.message
+          : 'Error al crear jugador fantasma'
+      );
+      throw error; // Re-throw para que el modal maneje el error
+    } finally {
+      setIsCreatingGhostPlayer(false);
+    }
+  };
+
   return (
     <div className='space-y-4'>
       <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2'>
         <h3 className='text-lg font-semibold'>
           Miembros ({localConfirmedCount} confirmados para el próximo partido)
         </h3>
+        {currentUserIsAdmin && (
+          <Button
+            onClick={() => setShowGhostPlayerModal(true)}
+            variant='primary'
+            size='sm'
+            disabled={isCreatingGhostPlayer}
+            className='flex items-center shadow-green'
+          >
+            <UserPlusIcon className='h-4 w-4 mr-2' />
+            {isCreatingGhostPlayer ? 'Creando...' : 'Agregar Miembro Fantasma'}
+          </Button>
+        )}
       </div>
 
       {/* Buscador */}
@@ -573,11 +659,16 @@ export default function MembersTab({
                               </span>
                             )}
                           </div>
-                          {currentUserIsAdmin && member.email && (
-                            <div className='text-sm text-primary-600'>
-                              {member.email}
-                            </div>
-                          )}
+                          {currentUserIsAdmin &&
+                            member.email &&
+                            !isGhostPlayer({
+                              email: member.email,
+                              image: member.avatar,
+                            }) && (
+                              <div className='text-sm text-primary-600'>
+                                {member.email}
+                              </div>
+                            )}
                         </div>
                       </div>
                     </td>
@@ -694,11 +785,16 @@ export default function MembersTab({
                         </span>
                       )}
                     </div>
-                    {currentUserIsAdmin && member.email && (
-                      <div className='text-sm text-primary-600 mt-1'>
-                        {member.email}
-                      </div>
-                    )}
+                    {currentUserIsAdmin &&
+                      member.email &&
+                      !isGhostPlayer({
+                        email: member.email,
+                        image: member.avatar,
+                      }) && (
+                        <div className='text-sm text-primary-600 mt-1'>
+                          {member.email}
+                        </div>
+                      )}
                     <div className='mt-1'>
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
@@ -781,6 +877,14 @@ export default function MembersTab({
         onConfirm={handleLeaveConfirm}
         groupName={group.name}
         isLeaving={isLocalLeaving}
+      />
+
+      {/* Modal de jugador fantasma */}
+      <AddGhostPlayerModal
+        isOpen={showGhostPlayerModal}
+        onClose={() => setShowGhostPlayerModal(false)}
+        onConfirm={handleCreateGhostPlayer}
+        isLoading={isCreatingGhostPlayer}
       />
     </div>
   );
