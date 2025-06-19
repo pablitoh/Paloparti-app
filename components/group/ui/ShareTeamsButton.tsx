@@ -53,12 +53,12 @@ const ShareTeamsButton: React.FC<ShareTeamsButtonProps> = ({
       {isSharing ? (
         <>
           <div className='animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2'></div>
-          Generando...
+          <span className='hidden sm:inline'>Generando...</span>
         </>
       ) : (
         <>
-          <ShareIcon className='h-4 w-4 mr-2' />
-          Compartir
+          <ShareIcon className='h-4 w-4 sm:mr-2' />
+          <span className='hidden sm:inline'>Compartir</span>
         </>
       )}
     </Button>
