@@ -393,17 +393,20 @@ const TeamsList: React.FC<TeamsListProps> = ({
     const sortedTbdPlayers = sortPlayersByRole(tbdPlayers);
 
     return (
-      <div className='p-4 w-full'>
+      <div className='p-3 sm:p-4 w-full'>
         <div className='text-center mb-4'>
+          {/* Rating promedio */}
           {avgRating !== undefined && (
-            <div className='mb-1'>
-              <div className='inline-flex items-center bg-yellow-50 px-3 py-1 rounded-md'>
-                <span className='text-yellow-700 font-medium'>{avgRating}</span>
+            <div className='mb-2'>
+              <div className='inline-flex items-center bg-yellow-50 px-2 sm:px-3 py-1 rounded-md'>
+                <span className='text-yellow-700 font-medium text-sm sm:text-base'>
+                  {avgRating}
+                </span>
                 <svg
                   xmlns='http://www.w3.org/2000/svg'
                   viewBox='0 0 24 24'
                   fill='currentColor'
-                  className='w-5 h-5 ml-1 text-yellow-500'
+                  className='w-4 h-4 sm:w-5 sm:h-5 ml-1 text-yellow-500'
                 >
                   <path
                     fillRule='evenodd'
@@ -414,14 +417,21 @@ const TeamsList: React.FC<TeamsListProps> = ({
               </div>
             </div>
           )}
-          <h3 className={`text-lg sm:text-xl font-bold ${colorClass}`}>
+
+          {/* Nombre del equipo */}
+          <h3
+            className={`text-base sm:text-lg md:text-xl font-bold ${colorClass} mb-1`}
+          >
             {teamName}
           </h3>
-          {/* Mostrar el promedio de edad con un estilo más visible para depurar */}
+
+          {/* Promedio de edad */}
           {avgAge !== undefined ? (
-            <p className='text-sm font-medium text-gray-500 mt-1'>({avgAge})</p>
+            <p className='text-sm sm:text-base font-medium text-gray-600'>
+              Edad promedio: {avgAge} años
+            </p>
           ) : (
-            <p className='text-xs text-gray-400 mt-1'>(—)</p>
+            <p className='text-xs sm:text-sm text-gray-400'>Edad promedio: —</p>
           )}
         </div>
 
@@ -454,8 +464,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
   return (
     <div
       id={`teams-list-container-${sortCount}`}
-      className='bg-white rounded-lg shadow-sm border border-gray-200 overflow-visible min-w-[800px]'
-      style={{ minWidth: '800px' }}
+      className='bg-white rounded-lg shadow-sm border border-gray-200 overflow-visible w-full'
       data-sort-count={sortCount}
     >
       {/* En móvil: equipos apilados verticalmente */}

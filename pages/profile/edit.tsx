@@ -87,6 +87,7 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
   const maxDate = format(subYears(new Date(), 12), 'yyyy-MM-dd');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isGoogleUser, setIsGoogleUser] = useState(false);
   const [userData, setUserData] = useState<{
     name: string;
     birthdate: string;
@@ -191,6 +192,7 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
 
         setUserData(initialData);
         setOriginalUserData(initialData);
+        setIsGoogleUser(data.user.isGoogleUser || false);
       } catch (error) {
         console.error('Error fetching user data:', error);
         showErrorToast('Error al cargar los datos del usuario');
@@ -399,6 +401,41 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
             </div>
           </div>
 
+          {/* Banner informativo para usuarios de Google */}
+          {isGoogleUser && (
+            <div className='bg-blue-50 border-l-4 border-blue-400 p-4 mb-6'>
+              <div className='flex'>
+                <div className='flex-shrink-0'>
+                  <svg className='h-5 w-5 text-blue-400' viewBox='0 0 24 24'>
+                    <path
+                      fill='#4285F4'
+                      d='M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z'
+                    />
+                    <path
+                      fill='#34A853'
+                      d='M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z'
+                    />
+                    <path
+                      fill='#FBBC05'
+                      d='M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z'
+                    />
+                    <path
+                      fill='#EA4335'
+                      d='M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z'
+                    />
+                  </svg>
+                </div>
+                <div className='ml-3'>
+                  <p className='text-sm text-blue-700'>
+                    <strong>Cuenta de Google:</strong> Has iniciado sesión con
+                    Google. Puedes actualizar tu información personal aquí, pero
+                    la autenticación se maneja a través de Google.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Card principal de información personal */}
           <div className='bg-white rounded-2xl shadow-green-lg overflow-hidden mb-6'>
             {/* Header de la sección */}
@@ -528,101 +565,155 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
             </div>
           </div>
 
-          {/* Card de cambio de contraseña */}
-          <div className='bg-white rounded-2xl shadow-green-lg overflow-hidden'>
-            {/* Header de la sección */}
-            <div className='bg-gradient-green-light p-6 border-b border-primary-100'>
-              <div className='flex items-center gap-3'>
-                <div className='w-10 h-10 bg-primary-500 rounded-xl flex items-center justify-center'>
-                  <svg
-                    className='w-6 h-6 text-white'
-                    fill='none'
-                    stroke='currentColor'
-                    viewBox='0 0 24 24'
-                  >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      strokeWidth='2'
-                      d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
-                    />
-                  </svg>
+          {/* Card de cambio de contraseña - Solo para usuarios no Google */}
+          {!isGoogleUser && (
+            <div className='bg-white rounded-2xl shadow-green-lg overflow-hidden'>
+              {/* Header de la sección */}
+              <div className='bg-gradient-green-light p-6 border-b border-primary-100'>
+                <div className='flex items-center gap-3'>
+                  <div className='w-10 h-10 bg-primary-500 rounded-xl flex items-center justify-center'>
+                    <svg
+                      className='w-6 h-6 text-white'
+                      fill='none'
+                      stroke='currentColor'
+                      viewBox='0 0 24 24'
+                    >
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        strokeWidth='2'
+                        d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
+                      />
+                    </svg>
+                  </div>
+                  <h2 className='text-xl font-semibold text-gray-900'>
+                    Cambiar Contraseña
+                  </h2>
                 </div>
-                <h2 className='text-xl font-semibold text-gray-900'>
-                  Cambiar Contraseña
-                </h2>
               </div>
-            </div>
 
-            <div className='p-6'>
-              <form onSubmit={updatePassword} className='space-y-6'>
-                <div>
-                  <label
-                    htmlFor='current'
-                    className='block text-sm font-medium text-gray-700 mb-2'
-                  >
-                    Contraseña Actual
-                  </label>
-                  <input
-                    id='current'
-                    name='current'
-                    type='password'
-                    value={password.current}
-                    onChange={handlePasswordChange}
-                    required
-                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors'
-                    placeholder='Ingresa tu contraseña actual'
-                  />
-                </div>
+              <div className='p-6'>
+                <form onSubmit={updatePassword} className='space-y-6'>
+                  <div>
+                    <label
+                      htmlFor='current'
+                      className='block text-sm font-medium text-gray-700 mb-2'
+                    >
+                      Contraseña Actual
+                    </label>
+                    <input
+                      id='current'
+                      name='current'
+                      type='password'
+                      value={password.current}
+                      onChange={handlePasswordChange}
+                      required
+                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors'
+                      placeholder='Ingresa tu contraseña actual'
+                    />
+                  </div>
 
-                <div>
-                  <label
-                    htmlFor='new'
-                    className='block text-sm font-medium text-gray-700 mb-2'
-                  >
-                    Nueva Contraseña
-                  </label>
-                  <input
-                    id='new'
-                    name='new'
-                    type='password'
-                    value={password.new}
-                    onChange={handlePasswordChange}
-                    required
-                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors'
-                    placeholder='Ingresa tu nueva contraseña'
-                  />
-                </div>
+                  <div>
+                    <label
+                      htmlFor='new'
+                      className='block text-sm font-medium text-gray-700 mb-2'
+                    >
+                      Nueva Contraseña
+                    </label>
+                    <input
+                      id='new'
+                      name='new'
+                      type='password'
+                      value={password.new}
+                      onChange={handlePasswordChange}
+                      required
+                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors'
+                      placeholder='Ingresa tu nueva contraseña'
+                    />
+                  </div>
 
-                <div>
-                  <label
-                    htmlFor='confirm'
-                    className='block text-sm font-medium text-gray-700 mb-2'
-                  >
-                    Confirmar Nueva Contraseña
-                  </label>
-                  <input
-                    id='confirm'
-                    name='confirm'
-                    type='password'
-                    value={password.confirm}
-                    onChange={handlePasswordChange}
-                    required
-                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none transition-colors ${
-                      password.confirm &&
+                  <div>
+                    <label
+                      htmlFor='confirm'
+                      className='block text-sm font-medium text-gray-700 mb-2'
+                    >
+                      Confirmar Nueva Contraseña
+                    </label>
+                    <input
+                      id='confirm'
+                      name='confirm'
+                      type='password'
+                      value={password.confirm}
+                      onChange={handlePasswordChange}
+                      required
+                      className={`w-full px-4 py-3 border rounded-xl focus:outline-none transition-colors ${
+                        password.confirm &&
+                        password.new &&
+                        password.new !== password.confirm
+                          ? 'border-error-300 bg-error-50 focus:ring-2 focus:ring-error-500 focus:border-error-500'
+                          : 'border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500'
+                      }`}
+                      placeholder='Confirma tu nueva contraseña'
+                    />
+                    {password.confirm &&
                       password.new &&
-                      password.new !== password.confirm
-                        ? 'border-error-300 bg-error-50 focus:ring-2 focus:ring-error-500 focus:border-error-500'
-                        : 'border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500'
+                      password.new !== password.confirm && (
+                        <div className='mt-2 flex items-center text-error-600'>
+                          <svg
+                            className='w-4 h-4 mr-2'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                          >
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth='2'
+                              d='M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                            />
+                          </svg>
+                          <p className='text-sm'>
+                            Las contraseñas no coinciden
+                          </p>
+                        </div>
+                      )}
+                  </div>
+
+                  <button
+                    type='submit'
+                    disabled={isSaving || !isPasswordFormValid()}
+                    className={`w-full py-3 px-6 rounded-xl font-medium transition-all duration-200 transform ${
+                      isSaving || !isPasswordFormValid()
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-gradient-green text-white hover:shadow-green focus:outline-none focus:ring-4 focus:ring-primary-200 active:scale-95'
                     }`}
-                    placeholder='Confirma tu nueva contraseña'
-                  />
-                  {password.confirm &&
-                    password.new &&
-                    password.new !== password.confirm && (
-                      <div className='mt-2 flex items-center text-error-600'>
+                  >
+                    {isSaving ? (
+                      <div className='flex items-center justify-center'>
+                        <div className='animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2'></div>
+                        Actualizando...
+                      </div>
+                    ) : isPasswordFormValid() ? (
+                      <div className='flex items-center justify-center'>
                         <svg
-                          className='w-4 h-4 mr-2'
+                          className='w-5 h-5 mr-2'
+                          fill='none'
+                          stroke='currentColor'
+                          viewBox='0 0 24 24'
+                        >
+                          <path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            strokeWidth='2'
+                            d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
+                          />
+                        </svg>
+                        Actualizar Contraseña
+                      </div>
+                    ) : hasPasswordData() ? (
+                      <div className='flex items-center justify-center'>
+                        <svg
+                          className='w-5 h-5 mr-2'
                           fill='none'
                           stroke='currentColor'
                           viewBox='0 0 24 24'
@@ -634,81 +725,31 @@ export default function EditProfile({ user: serverUser }: EditProfileProps) {
                             d='M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
                           />
                         </svg>
-                        <p className='text-sm'>Las contraseñas no coinciden</p>
+                        Complete todos los campos
+                      </div>
+                    ) : (
+                      <div className='flex items-center justify-center'>
+                        <svg
+                          className='w-5 h-5 mr-2'
+                          fill='none'
+                          stroke='currentColor'
+                          viewBox='0 0 24 24'
+                        >
+                          <path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            strokeWidth='2'
+                            d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
+                          />
+                        </svg>
+                        Actualizar Contraseña
                       </div>
                     )}
-                </div>
-
-                <button
-                  type='submit'
-                  disabled={isSaving || !isPasswordFormValid()}
-                  className={`w-full py-3 px-6 rounded-xl font-medium transition-all duration-200 transform ${
-                    isSaving || !isPasswordFormValid()
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-gradient-green text-white hover:shadow-green focus:outline-none focus:ring-4 focus:ring-primary-200 active:scale-95'
-                  }`}
-                >
-                  {isSaving ? (
-                    <div className='flex items-center justify-center'>
-                      <div className='animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2'></div>
-                      Actualizando...
-                    </div>
-                  ) : isPasswordFormValid() ? (
-                    <div className='flex items-center justify-center'>
-                      <svg
-                        className='w-5 h-5 mr-2'
-                        fill='none'
-                        stroke='currentColor'
-                        viewBox='0 0 24 24'
-                      >
-                        <path
-                          strokeLinecap='round'
-                          strokeLinejoin='round'
-                          strokeWidth='2'
-                          d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
-                        />
-                      </svg>
-                      Actualizar Contraseña
-                    </div>
-                  ) : hasPasswordData() ? (
-                    <div className='flex items-center justify-center'>
-                      <svg
-                        className='w-5 h-5 mr-2'
-                        fill='none'
-                        stroke='currentColor'
-                        viewBox='0 0 24 24'
-                      >
-                        <path
-                          strokeLinecap='round'
-                          strokeLinejoin='round'
-                          strokeWidth='2'
-                          d='M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
-                        />
-                      </svg>
-                      Complete todos los campos
-                    </div>
-                  ) : (
-                    <div className='flex items-center justify-center'>
-                      <svg
-                        className='w-5 h-5 mr-2'
-                        fill='none'
-                        stroke='currentColor'
-                        viewBox='0 0 24 24'
-                      >
-                        <path
-                          strokeLinecap='round'
-                          strokeLinejoin='round'
-                          strokeWidth='2'
-                          d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
-                        />
-                      </svg>
-                      Actualizar Contraseña
-                    </div>
-                  )}
-                </button>
-              </form>
+                  </button>
+                </form>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </Layout>

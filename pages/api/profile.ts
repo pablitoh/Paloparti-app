@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../lib/prisma';
 import { getCurrentUser } from '../../lib/auth';
 import { calculateAge } from '../../lib/utils';
+import { isGoogleUser } from '../../lib/userProfileUtils';
 
 interface UserWithBirthdate {
   id: string;
@@ -191,6 +192,7 @@ export default async function handler(
         image: userData.image,
         birthdate: userData.birthdate,
         age: age,
+        isGoogleUser: userData.password === null,
       },
       groups: userGroups.map((member: GroupMemberWithGroup) => ({
         id: member.group.id,

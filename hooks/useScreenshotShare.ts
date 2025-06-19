@@ -62,12 +62,43 @@ export const useScreenshotShare = () => {
             console.log('Found cloned element:', clonedElement);
 
             if (clonedElement) {
-              // Asegurar visibilidad
+              // Asegurar visibilidad y responsive design
               clonedElement.style.display = 'block';
               clonedElement.style.visibility = 'visible';
               clonedElement.style.opacity = '1';
               clonedElement.style.position = 'static';
               clonedElement.style.transform = 'none';
+              clonedElement.style.width = '100%';
+              clonedElement.style.maxWidth = '100%';
+              clonedElement.style.overflow = 'visible';
+
+              // Mejorar tipografía para screenshots
+              const headings = clonedElement.querySelectorAll('h3');
+              headings.forEach((heading) => {
+                const h = heading as HTMLElement;
+                h.style.fontSize = window.innerWidth < 768 ? '16px' : '18px';
+                h.style.fontWeight = 'bold';
+                h.style.lineHeight = '1.2';
+                h.style.marginBottom = '4px';
+              });
+
+              // Mejorar visibilidad del texto de edad promedio
+              const ageTexts = clonedElement.querySelectorAll('.text-gray-600');
+              ageTexts.forEach((text) => {
+                const t = text as HTMLElement;
+                t.style.fontSize = window.innerWidth < 768 ? '13px' : '14px';
+                t.style.fontWeight = '500';
+                t.style.color = '#4b5563';
+              });
+
+              // Mejorar ratings
+              const ratings = clonedElement.querySelectorAll('.bg-yellow-50');
+              ratings.forEach((rating) => {
+                const r = rating as HTMLElement;
+                r.style.fontSize = window.innerWidth < 768 ? '13px' : '14px';
+                r.style.padding =
+                  window.innerWidth < 768 ? '3px 6px' : '4px 8px';
+              });
 
               // Arreglar avatares
               const avatars = clonedElement.querySelectorAll('.MuiAvatar-root');

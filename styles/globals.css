@@ -72,6 +72,9 @@ div[id^='teams-list-container'] {
   font-size: 16px;
   background: white;
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow: visible;
 }
 
 /* Solo ocultar botones de admin durante capturas de pantalla */
@@ -79,6 +82,7 @@ div[id^='teams-list-container'].screenshot-mode .admin-buttons {
   display: none !important;
 }
 
+/* Mejorar texto para screenshots en móvil */
 div[id^='teams-list-container'] p {
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -88,6 +92,32 @@ div[id^='teams-list-container'] p {
 div[id^='teams-list-container'] .player-name {
   max-width: none;
   white-space: normal;
+}
+
+/* Asegurar que los títulos se vean bien en móvil */
+div[id^='teams-list-container'] h3 {
+  font-size: 18px;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+/* Estilos específicos para la información de los equipos en móvil */
+div[id^='teams-list-container'] .text-center {
+  padding: 8px;
+}
+
+/* Rating promedio en móvil */
+div[id^='teams-list-container'] .bg-yellow-50 {
+  font-size: 14px;
+  padding: 4px 8px;
+  margin-bottom: 8px;
+}
+
+/* Edad promedio más visible en móvil */
+div[id^='teams-list-container'] .text-gray-600 {
+  font-size: 14px;
+  font-weight: 500;
+  color: #4b5563;
 }
 
 /* Avatars styling for screenshots */
@@ -101,4 +131,25 @@ div[id^='teams-list-container'] .MuiAvatar-root {
 
 div[id^='teams-list-container'] .MuiAvatar-root svg {
   color: #6b7280;
+}
+
+/* Responsive layout para screenshots */
+@media (max-width: 768px) {
+  div[id^='teams-list-container'] {
+    padding: 0;
+    margin: 0;
+  }
+
+  div[id^='teams-list-container'] h3 {
+    font-size: 16px;
+  }
+
+  div[id^='teams-list-container'] .text-gray-600 {
+    font-size: 13px;
+  }
+
+  div[id^='teams-list-container'] .bg-yellow-50 {
+    font-size: 13px;
+    padding: 3px 6px;
+  }
 }
