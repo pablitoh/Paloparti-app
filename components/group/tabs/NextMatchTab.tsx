@@ -35,6 +35,7 @@ import AttendanceConfirmation from '../AttendanceConfirmation';
 import TeamFormationNotification from '../TeamFormationNotification';
 import UnassignedPlayersManager from '../UnassignedPlayersManager';
 import DeleteMatchModal from '../modals/DeleteMatchModal';
+import ShareTeamsButton from '../ui/ShareTeamsButton';
 
 // Definición de roles de jugador para ordenar por posición
 const PLAYER_ROLE_PRIORITY = {
@@ -1256,35 +1257,44 @@ export default function NextMatchTab({
                   </p>
                 </div>
 
-                {/* Admin actions for the teams section */}
-                {currentUserIsAdmin && (
-                  <div className='flex space-x-2'>
-                    <Button
-                      variant='primary'
-                      onClick={handleAddResults}
-                      className={`flex items-center text-xs ${
-                        !teamsHavePlayers
-                          ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                          : ''
-                      }`}
-                      size='sm'
-                      disabled={!teamsHavePlayers}
-                    >
-                      Terminar partido
-                    </Button>
+                {/* Share and Admin actions for the teams section */}
+                <div className='flex items-center gap-2'>
+                  <ShareTeamsButton
+                    elementId='teams-list-container'
+                    groupName={group.name || 'Grupo'}
+                    teamAName={group.teamAName || 'Equipo A'}
+                    teamBName={group.teamBName || 'Equipo B'}
+                    className='text-sm'
+                  />
+                  {currentUserIsAdmin && (
+                    <div className='flex space-x-2'>
+                      <Button
+                        variant='primary'
+                        onClick={handleAddResults}
+                        className={`flex items-center text-xs ${
+                          !teamsHavePlayers
+                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                            : ''
+                        }`}
+                        size='sm'
+                        disabled={!teamsHavePlayers}
+                      >
+                        Terminar partido
+                      </Button>
 
-                    <Button
-                      variant='danger'
-                      onClick={() => setShowDeleteModal(true)}
-                      className='p-1.5 rounded-full'
-                      size='sm'
-                      title='Eliminar partido'
-                      disabled={deleteLoading}
-                    >
-                      <TrashIcon className='h-5 w-5' />
-                    </Button>
-                  </div>
-                )}
+                      <Button
+                        variant='danger'
+                        onClick={() => setShowDeleteModal(true)}
+                        className='p-1.5 rounded-full'
+                        size='sm'
+                        title='Eliminar partido'
+                        disabled={deleteLoading}
+                      >
+                        <TrashIcon className='h-5 w-5' />
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>

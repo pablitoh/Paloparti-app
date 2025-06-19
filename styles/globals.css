@@ -66,3 +66,56 @@
     font-weight: 500;
   }
 }
+
+/* Estilos adicionales para mejorar screenshots */
+@media print, screen {
+  #teams-list-container {
+    font-size: 16px !important;
+  }
+
+  #teams-list-container .admin-buttons {
+    display: none !important;
+  }
+
+  #teams-list-container p {
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    hyphens: auto !important;
+  }
+
+  #teams-list-container .player-name {
+    max-width: none !important;
+    white-space: normal !important;
+  }
+}
+
+/* Mejoras específicas para screenshots */
+.screenshot-mode #teams-list-container {
+  min-width: 900px !important;
+  max-width: 1200px !important;
+  font-size: 18px !important;
+}
+
+.screenshot-mode #teams-list-container .admin-buttons,
+.screenshot-mode #teams-list-container button {
+  display: none !important;
+}
+
+.screenshot-mode #teams-list-container p {
+  font-size: 16px !important;
+  line-height: 1.4 !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+.screenshot-mode #teams-list-container .rounded-full {
+  border: 1px solid #e5e7eb !important;
+  background-color: #f3f4f6 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.screenshot-mode #teams-list-container svg {
+  color: #6b7280 !important;
+}

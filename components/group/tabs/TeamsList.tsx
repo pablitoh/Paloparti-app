@@ -279,7 +279,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
 
     return (
       <li className='py-2 flex items-center justify-between'>
-        <div className='flex items-center gap-2 sm:gap-3'>
+        <div className='flex items-center gap-2 sm:gap-3 flex-grow min-w-0'>
           {isTbd ? (
             <div className='h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gray-200 flex items-center justify-center'>
               <UserIcon className='h-5 w-5 sm:h-6 sm:w-6 text-gray-500' />
@@ -291,9 +291,9 @@ const TeamsList: React.FC<TeamsListProps> = ({
               className='h-8 w-8 sm:h-10 sm:w-10 rounded-full'
             />
           )}
-          <div className='min-w-0'>
-            <div className='flex items-center'>
-              <p className='font-medium text-gray-800 text-sm sm:text-base truncate max-w-[120px] sm:max-w-full'>
+          <div className='min-w-0 flex-grow'>
+            <div className='flex items-center flex-wrap'>
+              <p className='font-medium text-gray-800 text-sm sm:text-base break-words max-w-none leading-tight player-name'>
                 {player.name || (isTbd ? 'TBD' : 'Jugador sin nombre')}
                 {player.age && !isTbd && (
                   <span className='text-gray-400 font-normal ml-1'>
@@ -349,11 +349,11 @@ const TeamsList: React.FC<TeamsListProps> = ({
         </div>
 
         {currentUserIsAdmin && (
-          <div className='flex space-x-1'>
+          <div className='flex space-x-1 admin-buttons'>
             {showReplaceButton && onReplaceTbd && (
               <button
                 onClick={() => onReplaceTbd(player.id)}
-                className='p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors'
+                className='p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors admin-button'
                 title='Reemplazar jugador'
               >
                 <UserPlusIcon className='h-4 w-4 sm:h-5 sm:w-5' />
@@ -362,7 +362,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
             {onSwapPlayer && (
               <button
                 onClick={() => onSwapPlayer(player.id, isTeamA)}
-                className='p-1.5 rounded-full bg-green-50 text-green-600 hover:bg-green-100 transition-colors'
+                className='p-1.5 rounded-full bg-green-50 text-green-600 hover:bg-green-100 transition-colors admin-button'
                 title='Intercambiar jugador entre equipos'
               >
                 <ArrowsRightLeftIcon className='h-4 w-4 sm:h-5 sm:w-5' />
@@ -450,7 +450,11 @@ const TeamsList: React.FC<TeamsListProps> = ({
   };
 
   return (
-    <div className='bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden'>
+    <div
+      id='teams-list-container'
+      className='bg-white rounded-lg shadow-sm border border-gray-200 overflow-visible min-w-[800px]'
+      style={{ minWidth: '800px' }}
+    >
       {/* En móvil: equipos apilados verticalmente */}
       {/* En tablet/desktop: equipos lado a lado */}
       <div className='flex flex-col md:flex-row md:justify-center'>
