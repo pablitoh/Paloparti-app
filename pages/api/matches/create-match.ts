@@ -2673,6 +2673,20 @@ export default async function handler(
           id: m.id,
           name: m.name,
           playerRoles: m.playerRoles,
+          primaryRole: getPrimaryRole(m.playerRoles),
+        }))
+      );
+
+      // Log específico para arqueros
+      const goalkeepers = mappedMembers.filter((m) => {
+        const primaryRole = getPrimaryRole(m.playerRoles);
+        return primaryRole === PLAYER_ROLES.GOALKEEPER;
+      });
+      console.log(
+        'Jugadores que eligieron ARQUERO como prioridad 1:',
+        goalkeepers.map((g) => ({
+          name: g.name,
+          playerRoles: g.playerRoles,
         }))
       );
 
