@@ -5,6 +5,10 @@ import { prisma } from '../../lib/prisma';
 import { logGroupEvent } from '../../utils/serverLogEvents';
 import { LogAction } from '../../utils/logTypes';
 import { PLAYER_ROLES } from '../../components/group/AttendanceConfirmation';
+import {
+  PlayerRole,
+  normalizePlayerRoles,
+} from '../../lib/teambuilder/constants';
 
 interface ConfirmedPlayer {
   id: string;
@@ -70,20 +74,16 @@ export default async function handler(
     }
 
     // Validar y procesar playerRoles
-    let validatedRoles: string[] = [];
+    let validatedRoles: PlayerRole[] = [];
     if (status === 'CONFIRMED') {
-      // Usar exactamente los roles que llegaron, si es un array
-      if (Array.isArray(playerRoles) && playerRoles.length > 0) {
-        // Hacer una copia para evitar mutaciones
-        validatedRoles = [...playerRoles];
-        console.log('USANDO ROLES DEL CLIENTE:', validatedRoles);
+      if (playerRoles && playerRoles.length > 0) {
+        // Normalizar roles (maneja tanto string[] como PlayerRole[])
+        validatedRoles = normalizePlayerRoles(playerRoles);
+        console.log('ROLES NORMALIZADOS:', validatedRoles);
       } else {
-        // Si no es un array o está vacío, usar el valor por defecto
-        validatedRoles = [PLAYER_ROLES.WILDCARD];
-        console.log(
-          'NO ES ARRAY O ESTÁ VACÍO - USANDO VALOR DEFAULT:',
-          validatedRoles
-        );
+        // Si no se proporcionan roles, usar valor por defecto
+        validatedRoles = [{ role: PLAYER_ROLES.WILDCARD, priority: 1 }];
+        console.log('USANDO VALOR DEFAULT:', validatedRoles);
       }
     }
 
@@ -223,7 +223,7 @@ export default async function handler(
         await logGroupEvent(
           targetGroupId,
           session.user.id,
-          LogAction.ADMIN_ATTENDANCE_UPDATED,
+          LogAction.ADMIN_CONFIRMED_ATTENDANCE,
           {
             matchId,
             userId: targetUserId,

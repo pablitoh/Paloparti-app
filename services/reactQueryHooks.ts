@@ -313,13 +313,21 @@ export const useAdminAttendanceMutation = () => {
       matchId,
       status,
       groupId,
+      playerRoles,
     }: {
       userId: string;
       matchId: string;
       status: string;
       groupId?: string;
+      playerRoles?: any;
     }) => {
-      const response = await fetch('/api/attendances/admin', {
+      console.log('======= ADMIN ATTENDANCE MUTATION =======');
+      console.log('USER ID:', userId);
+      console.log('MATCH ID:', matchId);
+      console.log('STATUS:', status);
+      console.log('PLAYER ROLES:', playerRoles);
+
+      const response = await fetch('/api/attendances', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -328,6 +336,8 @@ export const useAdminAttendanceMutation = () => {
           userId,
           matchId,
           status,
+          groupId,
+          playerRoles,
         }),
       });
 

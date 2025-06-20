@@ -298,11 +298,18 @@ export const useGroupActions = ({
         effectiveRoles = normalizePlayerRoles(playerRoles);
       }
 
+      console.log('======= HANDLE ADMIN ATTENDANCE =======');
+      console.log('STATUS:', status);
+      console.log('USER ID:', userId);
+      console.log('PLAYER ROLES:', playerRoles);
+      console.log('EFFECTIVE ROLES:', effectiveRoles);
+
       await adminAttendanceMutation.mutateAsync({
         groupId,
         matchId: nextMatchId || '',
         userId,
         status,
+        playerRoles: effectiveRoles,
       });
 
       const statusMessage = status === 'CONFIRMED' ? 'confirmada' : 'cancelada';
