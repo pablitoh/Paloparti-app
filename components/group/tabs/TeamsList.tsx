@@ -711,48 +711,43 @@ const TeamsList: React.FC<TeamsListProps> = ({
             const playerA = sortedPlayersA[index];
             const playerB = sortedPlayersB[index];
 
-            // Preparar textos
+            // Preparar textos - sin prefijo TBD para fantasmas
             const textA = playerA
               ? `(${getRoleSymbol(
                   playerA.playerRoles,
                   playerA.assignedRole
-                )}) ${
-                  playerA.playerType === 'TBD'
-                    ? `TBD-${playerA.name}`
-                    : getLastName(playerA.name || '')
-                }`
+                )}) ${getLastName(playerA.name || '')}`
               : '—';
 
             const textB = playerB
-              ? `${
-                  playerB.playerType === 'TBD'
-                    ? `TBD-${playerB.name}`
-                    : getLastName(playerB.name || '')
-                } (${getRoleSymbol(playerB.playerRoles, playerB.assignedRole)})`
+              ? `${getLastName(playerB.name || '')} (${getRoleSymbol(
+                  playerB.playerRoles,
+                  playerB.assignedRole
+                )})`
               : '—';
 
             return (
               <div
                 key={index}
-                className='grid grid-cols-12 items-center gap-2 min-h-[2.5rem]'
+                className='grid grid-cols-12 items-center gap-2 min-h-[1.5rem]'
               >
                 {/* Jugador Equipo A - ocupa 5 columnas */}
                 <div className='col-span-5 text-right'>
-                  <span className='text-gray-800 font-medium text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl truncate block'>
+                  <span className='text-gray-800 font-medium text-xs sm:text-sm md:text-base lg:text-lg truncate block'>
                     {textA}
                   </span>
                 </div>
 
                 {/* Separador fijo - ocupa 2 columnas */}
                 <div className='col-span-2 flex justify-center'>
-                  <div className='text-gray-400 text-2xl sm:text-3xl md:text-4xl font-light'>
+                  <div className='text-gray-400 text-sm sm:text-base md:text-lg font-light'>
                     |
                   </div>
                 </div>
 
                 {/* Jugador Equipo B - ocupa 5 columnas */}
                 <div className='col-span-5 text-left'>
-                  <span className='text-gray-800 font-medium text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl truncate block'>
+                  <span className='text-gray-800 font-medium text-xs sm:text-sm md:text-base lg:text-lg truncate block'>
                     {textB}
                   </span>
                 </div>
