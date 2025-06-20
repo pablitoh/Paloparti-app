@@ -138,7 +138,54 @@ export class RoleBalanceStrategy implements BalanceStrategy {
     playersByRole: Record<string, Member[]>,
     team: Member[]
   ): void {
-    // Buscar en otras posiciones empezando por las menos críticas
+    // NUEVO: Primero buscar jugadores que tengan arquero como rol secundario
+    const findPlayerWithSecondaryGoalkeeperRole = (): Member | null => {
+      const allPositions = [
+        PLAYER_ROLES.MIDFIELDER,
+        PLAYER_ROLES.DEFENDER,
+        PLAYER_ROLES.FORWARD,
+        PLAYER_ROLES.WILDCARD,
+      ];
+
+      for (const position of allPositions) {
+        const playersInPosition = playersByRole[position] || [];
+        for (let i = 0; i < playersInPosition.length; i++) {
+          const player = playersInPosition[i];
+
+          // Verificar si el jugador tiene arquero en sus roles (cualquier prioridad)
+          const hasGoalkeeperRole = player.playerRoles?.some((role) => {
+            if (typeof role === 'string') {
+              return role === PLAYER_ROLES.GOALKEEPER;
+            } else if (role && typeof role === 'object' && 'role' in role) {
+              return role.role === PLAYER_ROLES.GOALKEEPER;
+            }
+            return false;
+          });
+
+          if (hasGoalkeeperRole) {
+            console.log(
+              `🥅 Encontrado jugador con rol secundario de arquero: ${player.name} (rol principal: ${position})`
+            );
+            // Remover el jugador de su posición original
+            playersByRole[position].splice(i, 1);
+            return player;
+          }
+        }
+      }
+      return null;
+    };
+
+    // Intentar encontrar un jugador con rol secundario de arquero
+    const playerWithGoalkeeperRole = findPlayerWithSecondaryGoalkeeperRole();
+    if (playerWithGoalkeeperRole) {
+      team.push({
+        ...playerWithGoalkeeperRole,
+        assignedRole: PLAYER_ROLES.GOALKEEPER,
+      });
+      return;
+    }
+
+    // Si no hay jugadores con rol secundario de arquero, buscar en otras posiciones (lógica original)
     const positionOrder = [
       PLAYER_ROLES.MIDFIELDER,
       PLAYER_ROLES.DEFENDER,
@@ -147,6 +194,9 @@ export class RoleBalanceStrategy implements BalanceStrategy {
 
     for (const position of positionOrder) {
       if (playersByRole[position] && playersByRole[position].length > 0) {
+        console.log(
+          `🥅 Asignando jugador de ${position} como arquero por necesidad`
+        );
         team.push({
           ...playersByRole[position].shift()!,
           assignedRole: PLAYER_ROLES.GOALKEEPER,
@@ -533,9 +583,17 @@ export class RoleBalanceStrategy implements BalanceStrategy {
       if (candidatesForForward.length > 0) {
         // Elegir preferentemente un jugador que tenga el rol de delantero entre sus roles
         const idealCandidate =
-          candidatesForForward.find(
-            (p) => p.playerRoles && p.playerRoles.includes(PLAYER_ROLES.FORWARD)
-          ) || candidatesForForward[0];
+          candidatesForForward.find((p) => {
+            if (!p.playerRoles) return false;
+            return p.playerRoles.some((role) => {
+              if (typeof role === 'string') {
+                return role === PLAYER_ROLES.FORWARD;
+              } else if (role && typeof role === 'object' && 'role' in role) {
+                return role.role === PLAYER_ROLES.FORWARD;
+              }
+              return false;
+            });
+          }) || candidatesForForward[0];
 
         const index = team.findIndex((p) => p.id === idealCandidate.id);
         if (index !== -1) {
@@ -795,6 +853,67 @@ export class CombinedBalanceStrategy implements BalanceStrategy {
       ...playersWithoutRole,
       ...(playersByRole[PLAYER_ROLES.WILDCARD] || []),
     ];
+
+    // MEJORA: Verificar si algún equipo necesita arquero antes de distribuir comodines
+    const teamAHasGK = teamA.some(
+      (p) => p.assignedRole === PLAYER_ROLES.GOALKEEPER
+    );
+    const teamBHasGK = teamB.some(
+      (p) => p.assignedRole === PLAYER_ROLES.GOALKEEPER
+    );
+
+    if (!teamAHasGK || !teamBHasGK) {
+      console.log(
+        `🥅 Verificando arqueros después de distribución principal: A=${teamAHasGK}, B=${teamBHasGK}`
+      );
+
+      // Buscar jugadores con rol secundario de arquero en los sobrantes
+      const goalkeeperCandidates = remainingWithWildcards.filter((player) => {
+        return player.playerRoles?.some((role) => {
+          if (typeof role === 'string') {
+            return role === PLAYER_ROLES.GOALKEEPER;
+          } else if (role && typeof role === 'object' && 'role' in role) {
+            return role.role === PLAYER_ROLES.GOALKEEPER;
+          }
+          return false;
+        });
+      });
+
+      // Asignar arqueros a equipos que los necesiten
+      if (goalkeeperCandidates.length > 0) {
+        if (!teamAHasGK && goalkeeperCandidates.length > 0) {
+          const gkForA = goalkeeperCandidates.shift()!;
+          teamA.push({ ...gkForA, assignedRole: PLAYER_ROLES.GOALKEEPER });
+          console.log(
+            `🥅 Asignado arquero secundario ${gkForA.name} al equipo A`
+          );
+
+          // Remover de la lista de sobrantes
+          const indexToRemove = remainingWithWildcards.findIndex(
+            (p) => p.id === gkForA.id
+          );
+          if (indexToRemove !== -1) {
+            remainingWithWildcards.splice(indexToRemove, 1);
+          }
+        }
+
+        if (!teamBHasGK && goalkeeperCandidates.length > 0) {
+          const gkForB = goalkeeperCandidates.shift()!;
+          teamB.push({ ...gkForB, assignedRole: PLAYER_ROLES.GOALKEEPER });
+          console.log(
+            `🥅 Asignado arquero secundario ${gkForB.name} al equipo B`
+          );
+
+          // Remover de la lista de sobrantes
+          const indexToRemove = remainingWithWildcards.findIndex(
+            (p) => p.id === gkForB.id
+          );
+          if (indexToRemove !== -1) {
+            remainingWithWildcards.splice(indexToRemove, 1);
+          }
+        }
+      }
+    }
 
     // Ordenar jugadores restantes por combinación de edad y rating
     const sortedRemaining = [...remainingWithWildcards].sort((a, b) => {

@@ -3799,23 +3799,22 @@ export default async function handler(
         }
       }
 
-      // Check if we have enough players across BOTH teams before adding TBD players
-      const totalRealPlayers = finalTeamA.length + finalTeamB.length;
-      const totalRequiredPlayers = requiredPlayersPerTeam * 2;
-
-      if (totalRealPlayers >= totalRequiredPlayers) {
-        return []; // No TBD players needed if we have enough real players across both teams
-      }
-
-      // If we're below the total required but this specific team has enough, still don't add TBD
+      // CORREGIDO: Verificar si ESTE equipo específico necesita TBD players
+      // independientemente del total global de jugadores
       if (team.length >= requiredPlayersPerTeam) {
         return []; // No need for TBD players on this team
       }
 
-      // For teams with insufficient players, calculate how many TBD to add
+      // Calcular cuántos TBD players se necesitan para este equipo específico
       const tbdCount = requiredPlayersPerTeam - team.length;
 
-      // Fallback: crear jugadores TBD genéricos
+      console.log(
+        `🔧 Generando ${tbdCount} jugadores TBD para equipo ${
+          isTeamA ? 'A' : 'B'
+        } (tiene ${team.length}/${requiredPlayersPerTeam})`
+      );
+
+      // Crear jugadores TBD genéricos
       const generatedTbdPlayers: TbdPlayer[] = [];
 
       // Añadir jugadores TBD hasta completar el número requerido
@@ -3823,9 +3822,13 @@ export default async function handler(
         team.length + generatedTbdPlayers.length <
         requiredPlayersPerTeam
       ) {
+        const tbdIndex = generatedTbdPlayers.length;
+        const teamLetter = isTeamA ? 'A' : 'B';
         generatedTbdPlayers.push({
-          id: `tbd-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          name: 'A determinar',
+          id: `tbd-${Date.now()}-${tbdIndex}-${Math.random()
+            .toString(36)
+            .substring(2, 9)}`,
+          name: `Fantasma ${teamLetter}${tbdIndex + 1}`,
           isTeamA,
           avatar: null,
           playerType: 'TBD',
