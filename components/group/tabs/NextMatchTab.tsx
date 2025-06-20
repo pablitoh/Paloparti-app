@@ -210,6 +210,8 @@ export default function NextMatchTab({
   const [balanceByRole, setBalanceByRole] = useState(true);
   // Estado para balance por star rating
   const [balanceByRating, setBalanceByRating] = useState(false);
+  // Estado para modo aleatorio
+  const [isRandomMode, setIsRandomMode] = useState(false);
 
   // Estado para el modal de eliminar partido
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -585,13 +587,15 @@ export default function NextMatchTab({
       if (handleSortTeams) {
         // Pasar el estado balanceByAge como contexto al handler personalizado
         // a través del contexto global, ya que no podemos modificar la firma de la función
-        (window as any).__balanceByAge = balanceByAge;
+        (window as any).__balanceByAge = balanceByAge && !isRandomMode;
         // Pasar el estado balanceByRole de la misma manera
-        (window as any).__balanceByRole = balanceByRole;
+        (window as any).__balanceByRole = balanceByRole && !isRandomMode;
         // Pasar el estado balanceByRating de la misma manera
-        (window as any).__balanceByRating = balanceByRating;
+        (window as any).__balanceByRating = balanceByRating && !isRandomMode;
         // Pasar el estado allowFillIn de la misma manera
         (window as any).__allowTbdPlayers = allowFillIn;
+        // Pasar el estado de modo aleatorio
+        (window as any).__isRandomMode = isRandomMode;
         await handleSortTeams();
         // The parent component handles invalidation/refetch
       } else {
@@ -601,7 +605,7 @@ export default function NextMatchTab({
         // Si no, usamos la mutación directamente
         // This mutation internally handles cache updates
         const useRandomAlgorithm =
-          !balanceByAge && !balanceByRole && !balanceByRating;
+          isRandomMode || (!balanceByAge && !balanceByRole && !balanceByRating);
 
         // Ensure we have a valid matchId before proceeding
         if (!matchDetails?.id) {
@@ -614,9 +618,9 @@ export default function NextMatchTab({
         const response = await randomizeTeamsMutation.mutateAsync({
           groupId: id,
           matchId: matchDetails.id,
-          balanceByAge: balanceByAge,
-          balanceByRole: balanceByRole,
-          balanceByRating: balanceByRating,
+          balanceByAge: balanceByAge && !isRandomMode,
+          balanceByRole: balanceByRole && !isRandomMode,
+          balanceByRating: balanceByRating && !isRandomMode,
           allowTbdPlayers: allowFillIn,
           useRandomAlgorithm: useRandomAlgorithm, // Si no hay criterios de balance, usar algoritmo aleatorio
         });
@@ -1335,6 +1339,8 @@ _Generado con Paloparti_ 🚀`;
                 setBalanceByRole={setBalanceByRole}
                 balanceByRating={balanceByRating}
                 setBalanceByRating={setBalanceByRating}
+                isRandomMode={isRandomMode}
+                setIsRandomMode={setIsRandomMode}
               />
             </div>
           )}

@@ -27,6 +27,8 @@ interface TeamFormationNotificationProps {
   setBalanceByRole?: (value: boolean) => void;
   balanceByRating?: boolean;
   setBalanceByRating?: (value: boolean) => void;
+  isRandomMode?: boolean;
+  setIsRandomMode?: (value: boolean) => void;
 }
 
 const TeamFormationNotification = ({
@@ -46,6 +48,8 @@ const TeamFormationNotification = ({
   setBalanceByRole,
   balanceByRating = false,
   setBalanceByRating,
+  isRandomMode = false,
+  setIsRandomMode,
 }: TeamFormationNotificationProps) => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
@@ -169,26 +173,67 @@ const TeamFormationNotification = ({
     onRandomizeTeams();
   };
 
-  // Función para renderizar un botón toggle
-  const renderToggleButton = (
+  // Función para manejar el toggle aleatorio
+  const handleRandomToggle = (value: boolean) => {
+    setIsRandomMode?.(value);
+    if (value) {
+      // Si se activa aleatorio, desactivar todos los demás
+      setBalanceByAge?.(false);
+      setBalanceByRole?.(false);
+      setBalanceByRating?.(false);
+    }
+  };
+
+  // Función para manejar los otros toggles
+  const handleOtherToggle = (
+    setter: ((value: boolean) => void) | undefined,
+    value: boolean
+  ) => {
+    if (isRandomMode && value) {
+      // Si está en modo aleatorio y se intenta activar otro, desactivar aleatorio
+      setIsRandomMode?.(false);
+    }
+    setter?.(value);
+  };
+
+  // Función para renderizar un toggle moderno tipo iOS
+  const renderToggle = (
     checked: boolean,
     onChange: (checked: boolean) => void,
     title: string,
-    icon: string
+    icon: string,
+    isRandom: boolean = false
   ) => (
-    <button
-      onClick={() => onChange(!checked)}
-      className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-medium transition-all duration-200 border ${
-        checked
-          ? 'bg-blue-500 text-white border-blue-500 shadow-md hover:bg-blue-600'
-          : 'bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50'
-      }`}
-    >
-      <span className='flex items-center'>
-        <span className='mr-1 sm:mr-1.5'>{icon}</span>
-        <span className='whitespace-nowrap'>{title}</span>
-      </span>
-    </button>
+    <div className='flex items-center justify-between py-2 px-1'>
+      <div className='flex items-center'>
+        <span className='text-lg mr-3'>{icon}</span>
+        <span
+          className={`text-sm font-medium ${
+            isRandom ? 'text-teal-700' : 'text-gray-700'
+          }`}
+        >
+          {title}
+        </span>
+      </div>
+      <button
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+          checked
+            ? isRandom
+              ? 'bg-teal-500 focus:ring-teal-500'
+              : 'bg-blue-500 focus:ring-blue-500'
+            : 'bg-gray-200 focus:ring-gray-300'
+        }`}
+        role='switch'
+        aria-checked={checked}
+      >
+        <span
+          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+            checked ? 'translate-x-5' : 'translate-x-0'
+          }`}
+        />
+      </button>
+    </div>
   );
 
   return (
@@ -220,49 +265,51 @@ const TeamFormationNotification = ({
                     Formación de Equipos
                   </h3>
                 </div>
-                <p className={`text-sm ${textColor} mb-3`}>{message}</p>
+                <p className={`text-sm ${textColor} mb-4`}>{message}</p>
 
-                {/* Opciones como botones toggle */}
+                {/* Opciones como toggles modernos */}
                 <div className='mb-3 sm:mb-0'>
-                  <div className='flex flex-wrap gap-1.5 sm:gap-2'>
-                    {/* Opción para equilibrar por rol */}
+                  <div className='bg-white/80 backdrop-blur-sm rounded-xl p-3 space-y-1 border border-white/40 shadow-sm'>
+                    {/* Toggle aleatorio */}
+                    {setIsRandomMode &&
+                      renderToggle(
+                        isRandomMode,
+                        handleRandomToggle,
+                        'Aleatorio',
+                        '🎲',
+                        true
+                      )}
+
+                    {/* Separador visual */}
+                    <div className='h-px bg-gray-200 my-2' />
+
+                    {/* Opción para equilibrar por posición */}
                     {setBalanceByRole &&
-                      renderToggleButton(
-                        balanceByRole,
-                        setBalanceByRole,
+                      renderToggle(
+                        balanceByRole && !isRandomMode,
+                        (value) => handleOtherToggle(setBalanceByRole, value),
                         'Por posición',
                         '⚽'
                       )}
 
                     {/* Opción para equilibrar por edad */}
                     {setBalanceByAge &&
-                      renderToggleButton(
-                        balanceByAge,
-                        setBalanceByAge,
+                      renderToggle(
+                        balanceByAge && !isRandomMode,
+                        (value) => handleOtherToggle(setBalanceByAge, value),
                         'Por edad',
                         '👥'
                       )}
 
                     {/* Opción para equilibrar por nivel */}
                     {setBalanceByRating &&
-                      renderToggleButton(
-                        balanceByRating,
-                        setBalanceByRating,
+                      renderToggle(
+                        balanceByRating && !isRandomMode,
+                        (value) => handleOtherToggle(setBalanceByRating, value),
                         'Por nivel',
                         '⭐'
                       )}
                   </div>
-
-                  {/* Nota informativa compacta con asterisco */}
-                  {setBalanceByAge &&
-                    setBalanceByRole &&
-                    setBalanceByRating && (
-                      <div className='mt-2'>
-                        <p className='text-xs text-gray-500'>
-                          * Sin criterios = sorteo aleatorio
-                        </p>
-                      </div>
-                    )}
                 </div>
               </div>
             </div>
