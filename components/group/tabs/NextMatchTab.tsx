@@ -198,7 +198,7 @@ export default function NextMatchTab({
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const { shareTeamsScreenshot } = useScreenshotShare();
-  const [unassignedPlayers, setUnassignedPlayers] = useState<Player[]>([]);
+  // ELIMINADO: useState innecesario, ahora usamos directamente unassignedPlayersCalculated
   // Estado controlado para teamsFormed
   const [forceTeamsFormed, setForceTeamsFormed] = useState(false);
   // Estados para almacenar equipos después de un sorteo
@@ -1010,10 +1010,8 @@ _Generado con Paloparti_ 🚀`;
     requiredPlayers,
   ]);
 
-  // Actualizar el estado solo cuando el cálculo cambie
-  useEffect(() => {
-    setUnassignedPlayers(unassignedPlayersCalculated);
-  }, [unassignedPlayersCalculated]);
+  // ELIMINADO: useEffect problemático que causaba bucles infinitos
+  // Ahora usamos directamente unassignedPlayersCalculated en lugar de estado separado
 
   // Reset forceTeamsFormed when matchDetails.id changes
   useEffect(() => {
@@ -1324,7 +1322,7 @@ _Generado con Paloparti_ 🚀`;
                 }
                 requiredPlayers={group?.requiredPlayers || 10}
                 sortCount={matchDetails?.sortCount || 0}
-                unassignedCount={unassignedPlayers.length}
+                unassignedCount={unassignedPlayersCalculated.length}
                 cancelledFromTeamsCount={cancelledFromTeamsCount}
                 onRandomizeTeams={handleSortTeamsClick}
                 isLoading={sortTeamsLoading}
@@ -1512,7 +1510,7 @@ _Generado con Paloparti_ 🚀`;
           {/* Mostrar el gestor de jugadores sin asignar solo si sortCount > 0 */}
           {matchDetails?.sortCount &&
           matchDetails.sortCount > 0 &&
-          unassignedPlayers.length > 0 ? (
+          unassignedPlayersCalculated.length > 0 ? (
             <div>
               <UnassignedPlayersManager
                 confirmedPlayers={confirmedPlayers}
