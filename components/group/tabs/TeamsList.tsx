@@ -661,23 +661,6 @@ const TeamsList: React.FC<TeamsListProps> = ({
     }
   };
 
-  // Función para formatear jugadores en vista compacta
-  const formatPlayersCompact = (players: (Player | TbdPlayer)[]): string => {
-    return players
-      .map((player) => {
-        const roleSymbol = getRoleSymbol(
-          player.playerRoles,
-          player.assignedRole
-        );
-        const displayName =
-          player.playerType === 'TBD'
-            ? `TBD-${player.name}`
-            : player.name || 'Sin nombre';
-        return `(${roleSymbol}) ${displayName}`;
-      })
-      .join(' | ');
-  };
-
   // Componente para vista compacta
   const CompactView = () => {
     const allPlayersA = [...playersA, ...teamATbdPlayers];
@@ -685,11 +668,14 @@ const TeamsList: React.FC<TeamsListProps> = ({
     const sortedPlayersA = sortPlayersByRole(allPlayersA);
     const sortedPlayersB = sortPlayersByRole(allPlayersB);
 
+    // Determinar el número máximo de jugadores para emparejar líneas
+    const maxPlayers = Math.max(sortedPlayersA.length, sortedPlayersB.length);
+
     return (
-      <div className='bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mx-auto max-w-4xl'>
-        {/* Header con promedios */}
+      <div className='bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mx-auto max-w-5xl'>
+        {/* Header con nombres de equipos y promedios */}
         <div className='flex justify-between items-center mb-6'>
-          <div className='text-center'>
+          <div className='text-center flex-1'>
             <h3 className='text-xl font-bold text-primary-900 mb-1'>
               {teamAName}
             </h3>
@@ -700,9 +686,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
             </div>
           </div>
 
-          <div className='w-px h-16 bg-gray-300'></div>
-
-          <div className='text-center'>
+          <div className='text-center flex-1'>
             <h3 className='text-xl font-bold text-lime-900 mb-1'>
               {teamBName}
             </h3>
@@ -714,26 +698,54 @@ const TeamsList: React.FC<TeamsListProps> = ({
           </div>
         </div>
 
-        {/* Lista de jugadores */}
-        <div className='flex justify-center'>
-          <div className='flex items-start gap-8 max-w-full'>
-            {/* Equipo A */}
-            <div className='flex-1 text-right'>
-              <div className='text-lg leading-relaxed font-medium text-gray-800 break-words'>
-                {formatPlayersCompact(sortedPlayersA)}
-              </div>
-            </div>
+        {/* Lista de jugadores emparejados */}
+        <div className='space-y-3'>
+          {Array.from({ length: maxPlayers }, (_, index) => {
+            const playerA = sortedPlayersA[index];
+            const playerB = sortedPlayersB[index];
 
-            {/* Línea divisoria vertical */}
-            <div className='w-px bg-primary-300 self-stretch min-h-[100px] flex-shrink-0'></div>
+            return (
+              <div
+                key={index}
+                className='flex items-center justify-between text-lg font-medium'
+              >
+                {/* Jugador Equipo A */}
+                <div className='flex-1 text-right pr-4'>
+                  {playerA ? (
+                    <span className='text-gray-800'>
+                      (
+                      {getRoleSymbol(playerA.playerRoles, playerA.assignedRole)}
+                      ){' '}
+                      {playerA.playerType === 'TBD'
+                        ? `TBD-${playerA.name}`
+                        : playerA.name || 'Sin nombre'}
+                    </span>
+                  ) : (
+                    <span className='text-gray-400'>—</span>
+                  )}
+                </div>
 
-            {/* Equipo B */}
-            <div className='flex-1 text-left'>
-              <div className='text-lg leading-relaxed font-medium text-gray-800 break-words'>
-                {formatPlayersCompact(sortedPlayersB)}
+                {/* Separador */}
+                <div className='text-gray-400 text-xl font-light px-2'>|</div>
+
+                {/* Jugador Equipo B */}
+                <div className='flex-1 text-left pl-4'>
+                  {playerB ? (
+                    <span className='text-gray-800'>
+                      {playerB.playerType === 'TBD'
+                        ? `TBD-${playerB.name}`
+                        : playerB.name || 'Sin nombre'}{' '}
+                      (
+                      {getRoleSymbol(playerB.playerRoles, playerB.assignedRole)}
+                      )
+                    </span>
+                  ) : (
+                    <span className='text-gray-400'>—</span>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })}
         </div>
       </div>
     );
