@@ -294,6 +294,13 @@ const TeamsList: React.FC<TeamsListProps> = ({
 
     const userSelectedRoles = getUserSelectedRoles();
 
+    // Debug log para ver qué roles se están procesando
+    console.log(`Player ${player.name}:`, {
+      playerRoles: player.playerRoles,
+      userSelectedRoles,
+      assignedRole: player.assignedRole,
+    });
+
     // Priorizar el rol asignado si existe, seguido por las elecciones del usuario
     let displayRoles: string[] = [];
 

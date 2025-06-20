@@ -362,11 +362,16 @@ const balanceTeamPositions = (team: Member[]): Member[] => {
 };
 
 // Función para obtener el rol principal de un jugador (el de mayor prioridad)
-const getPrimaryRole = (playerRoles?: PlayerRole[]): string | undefined => {
-  if (!playerRoles || playerRoles.length === 0) return undefined;
+const getPrimaryRole = (
+  playerRoles?: PlayerRole[] | string[]
+): string | undefined => {
+  const normalizedRoles = normalizePlayerRoles(playerRoles);
+  if (normalizedRoles.length === 0) return undefined;
 
   // Ordenar por prioridad (menor número = mayor prioridad) y devolver el primer rol
-  const sortedRoles = [...playerRoles].sort((a, b) => a.priority - b.priority);
+  const sortedRoles = [...normalizedRoles].sort(
+    (a, b) => a.priority - b.priority
+  );
   return sortedRoles[0].role;
 };
 
@@ -1006,7 +1011,8 @@ const createBalancedTeamsByMultiCriteria = (
     // Calcular versatilidad (0-1)
     const rolesCount = member.playerRoles?.length || 0;
     const isWildcard =
-      member.playerRoles?.includes(PLAYER_ROLES.WILDCARD) || false;
+      member.playerRoles?.some((role) => role.role === PLAYER_ROLES.WILDCARD) ||
+      false;
     const versatilityNormalized = isWildcard ? 1 : Math.min(1, rolesCount / 3);
 
     // Puntaje ponderado: 60% habilidad + 30% edad + 10% versatilidad
@@ -1566,8 +1572,9 @@ const createBalancedTeamsByMultiCriteria = (
       const findPotentialGK = (team: Member[]) => {
         return team.findIndex(
           (p) =>
-            p.playerRoles?.includes(PLAYER_ROLES.GOALKEEPER) &&
-            p.assignedRole !== PLAYER_ROLES.GOALKEEPER
+            p.playerRoles?.some(
+              (role) => role.role === PLAYER_ROLES.GOALKEEPER
+            ) && p.assignedRole !== PLAYER_ROLES.GOALKEEPER
         );
       };
 
@@ -1575,8 +1582,9 @@ const createBalancedTeamsByMultiCriteria = (
       const findWildcardForGK = (team: Member[]) => {
         return team.findIndex(
           (p) =>
-            p.playerRoles?.includes(PLAYER_ROLES.WILDCARD) &&
-            p.assignedRole !== PLAYER_ROLES.GOALKEEPER
+            p.playerRoles?.some(
+              (role) => role.role === PLAYER_ROLES.WILDCARD
+            ) && p.assignedRole !== PLAYER_ROLES.GOALKEEPER
         );
       };
 
@@ -3771,8 +3779,16 @@ export default async function handler(
 
     // Añadir jugadores TBD si es necesario
     const addTbdPlayers = (team: any[], isTeamA: boolean) => {
+      console.log(`🔍 addTbdPlayers called for Team ${isTeamA ? 'A' : 'B'}:`, {
+        teamSize: team.length,
+        allowTbdPlayers,
+        requiredPlayersPerTeam,
+        tbdPlayersInput,
+      });
+
       // Si no se permite añadir TBD players, retornar array vacío
       if (allowTbdPlayers === false) {
+        console.log('❌ TBD players not allowed, returning empty array');
         return [];
       }
 
