@@ -31,9 +31,6 @@ export async function createNextMatch(groupId: string) {
     let nextMatchDate = new Date();
     nextMatchDate.setHours(0, 0, 0, 0); // Resetear a 00:00:00
 
-    // Por defecto, añadir 7 días para el próximo partido
-    nextMatchDate.setDate(nextMatchDate.getDate() + 7);
-
     // Si hay configuración de recurrencia, usarla
     if (
       group.recurrenceType === 'WEEKLY' &&
@@ -41,17 +38,44 @@ export async function createNextMatch(groupId: string) {
       group.recurrenceDays.length > 0
     ) {
       // Encontrar el próximo día de la semana configurado
-      const today = new Date().getDay(); // 0 = domingo, 1 = lunes, etc.
+      const now = new Date();
+      const today = now.getDay(); // 0 = domingo, 1 = lunes, etc.
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+
       const recurrenceDays = group.recurrenceDays.map(Number);
 
-      // Ordenar los días de recurrencia y encontrar el próximo
-      recurrenceDays.sort((a, b) => a - b);
-      const nextDay = recurrenceDays.find((day) => day > today);
+      // Obtener la hora configurada para comparar
+      let configuredHour = 18; // Default 6 PM
+      let configuredMinute = 0;
+      if (group.recurrenceTime) {
+        const [hours, minutes] = group.recurrenceTime.split(':').map(Number);
+        configuredHour = hours;
+        configuredMinute = minutes;
+      }
 
-      if (nextDay !== undefined) {
-        // Si hay un día configurado después del actual
-        const daysToAdd = nextDay - today;
-        nextMatchDate.setDate(nextMatchDate.getDate() - 7 + daysToAdd);
+      // Ordenar los días de recurrencia
+      recurrenceDays.sort((a, b) => a - b);
+
+      // Buscar el próximo día disponible considerando también la hora
+      let nextDayThisWeek = recurrenceDays.find((day) => {
+        if (day > today) {
+          return true; // Cualquier día después de hoy está bien
+        } else if (day === today) {
+          // Si es el mismo día, verificar si la hora ya pasó
+          const configuredTimeInMinutes =
+            configuredHour * 60 + configuredMinute;
+          const currentTimeInMinutes = currentHour * 60 + currentMinute;
+          // Solo considera el mismo día si falta al menos 2 horas (120 minutos) para el partido
+          return configuredTimeInMinutes > currentTimeInMinutes + 120;
+        }
+        return false;
+      });
+
+      if (nextDayThisWeek !== undefined) {
+        // Si hay un día configurado después del actual en esta semana
+        const daysToAdd = nextDayThisWeek - today;
+        nextMatchDate.setDate(nextMatchDate.getDate() + daysToAdd);
       } else {
         // Si no hay un día después del actual, usar el primer día de la siguiente semana
         const daysToAdd = 7 - today + recurrenceDays[0];
@@ -63,6 +87,9 @@ export async function createNextMatch(groupId: string) {
         const [hours, minutes] = group.recurrenceTime.split(':').map(Number);
         nextMatchDate.setHours(hours, minutes, 0, 0);
       }
+    } else {
+      // Si no hay configuración de recurrencia, añadir 7 días por defecto
+      nextMatchDate.setDate(nextMatchDate.getDate() + 7);
     }
 
     // Usar una transacción para crear el partido y actualizar el grupo
