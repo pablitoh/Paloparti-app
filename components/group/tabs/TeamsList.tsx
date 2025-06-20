@@ -661,6 +661,13 @@ const TeamsList: React.FC<TeamsListProps> = ({
     }
   };
 
+  // Función para obtener solo el apellido
+  const getLastName = (fullName: string): string => {
+    if (!fullName) return 'Sin nombre';
+    const nameParts = fullName.trim().split(' ');
+    return nameParts[nameParts.length - 1];
+  };
+
   // Componente para vista compacta
   const CompactView = () => {
     const allPlayersA = [...playersA, ...teamATbdPlayers];
@@ -699,49 +706,55 @@ const TeamsList: React.FC<TeamsListProps> = ({
         </div>
 
         {/* Lista de jugadores emparejados */}
-        <div className='space-y-3'>
+        <div className='space-y-2'>
           {Array.from({ length: maxPlayers }, (_, index) => {
             const playerA = sortedPlayersA[index];
             const playerB = sortedPlayersB[index];
 
+            // Preparar textos
+            const textA = playerA
+              ? `(${getRoleSymbol(
+                  playerA.playerRoles,
+                  playerA.assignedRole
+                )}) ${
+                  playerA.playerType === 'TBD'
+                    ? `TBD-${playerA.name}`
+                    : getLastName(playerA.name || '')
+                }`
+              : '—';
+
+            const textB = playerB
+              ? `${
+                  playerB.playerType === 'TBD'
+                    ? `TBD-${playerB.name}`
+                    : getLastName(playerB.name || '')
+                } (${getRoleSymbol(playerB.playerRoles, playerB.assignedRole)})`
+              : '—';
+
             return (
               <div
                 key={index}
-                className='flex items-center justify-between text-lg font-medium'
+                className='grid grid-cols-12 items-center gap-2 min-h-[2.5rem]'
               >
-                {/* Jugador Equipo A */}
-                <div className='flex-1 text-right pr-4'>
-                  {playerA ? (
-                    <span className='text-gray-800'>
-                      (
-                      {getRoleSymbol(playerA.playerRoles, playerA.assignedRole)}
-                      ){' '}
-                      {playerA.playerType === 'TBD'
-                        ? `TBD-${playerA.name}`
-                        : playerA.name || 'Sin nombre'}
-                    </span>
-                  ) : (
-                    <span className='text-gray-400'>—</span>
-                  )}
+                {/* Jugador Equipo A - ocupa 5 columnas */}
+                <div className='col-span-5 text-right'>
+                  <span className='text-gray-800 font-medium text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl truncate block'>
+                    {textA}
+                  </span>
                 </div>
 
-                {/* Separador */}
-                <div className='text-gray-400 text-xl font-light px-2'>|</div>
+                {/* Separador fijo - ocupa 2 columnas */}
+                <div className='col-span-2 flex justify-center'>
+                  <div className='text-gray-400 text-2xl sm:text-3xl md:text-4xl font-light'>
+                    |
+                  </div>
+                </div>
 
-                {/* Jugador Equipo B */}
-                <div className='flex-1 text-left pl-4'>
-                  {playerB ? (
-                    <span className='text-gray-800'>
-                      {playerB.playerType === 'TBD'
-                        ? `TBD-${playerB.name}`
-                        : playerB.name || 'Sin nombre'}{' '}
-                      (
-                      {getRoleSymbol(playerB.playerRoles, playerB.assignedRole)}
-                      )
-                    </span>
-                  ) : (
-                    <span className='text-gray-400'>—</span>
-                  )}
+                {/* Jugador Equipo B - ocupa 5 columnas */}
+                <div className='col-span-5 text-left'>
+                  <span className='text-gray-800 font-medium text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl truncate block'>
+                    {textB}
+                  </span>
                 </div>
               </div>
             );
