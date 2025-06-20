@@ -7,6 +7,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { PLAYER_ROLES } from '../AttendanceConfirmation';
 import StarRating from '../../StarRating';
+import { PlayerRole } from '../../../lib/teambuilder/constants';
 
 // Mapeo de roles a iconos y prioridad (para ordenamiento)
 const ROLE_ICONS: Record<
@@ -60,7 +61,7 @@ interface Player {
   name: string | null;
   avatar: string | null;
   playerType?: string;
-  playerRoles?: string[]; // Array de roles del jugador
+  playerRoles?: PlayerRole[]; // Array de roles del jugador con prioridades
   assignedRole?: string; // Rol asignado para la formación
   age?: number;
   starRating?: number; // Nivel de habilidad del jugador
@@ -72,7 +73,7 @@ interface TbdPlayer {
   isTeamA: boolean;
   avatar?: string | null;
   playerType?: string;
-  playerRoles?: string[]; // Array de roles del jugador
+  playerRoles?: PlayerRole[]; // Array de roles del jugador con prioridades
   assignedRole?: string; // Rol asignado para la formación
   age?: number;
   starRating?: number; // Nivel de habilidad del jugador
@@ -111,15 +112,12 @@ interface TeamSectionProps {
 }
 
 // Función para obtener el rol principal de un jugador (el de mayor prioridad)
-const getPrimaryRole = (playerRoles?: string[]): string | undefined => {
+const getPrimaryRole = (playerRoles?: PlayerRole[]): string | undefined => {
   if (!playerRoles || playerRoles.length === 0) return undefined;
 
-  // Encontrar el rol con la prioridad más alta (número más bajo tiene mayor prioridad)
-  return playerRoles.reduce((primaryRole, currentRole) => {
-    const primaryPriority = ROLE_ICONS[primaryRole]?.priority ?? 999;
-    const currentPriority = ROLE_ICONS[currentRole]?.priority ?? 999;
-    return currentPriority < primaryPriority ? currentRole : primaryRole;
-  }, playerRoles[0]);
+  // Ordenar por prioridad (menor número = mayor prioridad) y devolver el primer rol
+  const sortedRoles = [...playerRoles].sort((a, b) => a.priority - b.priority);
+  return sortedRoles[0].role;
 };
 
 // Función para ordenar jugadores por rol
@@ -145,9 +143,18 @@ const sortPlayersByRole = (
 
 // Función para obtener roles del jugador desde datos adicionales
 const getPlayerRoles = (player: Player | TbdPlayer): string[] => {
-  // Si el jugador tiene roles directamente definidos, usarlos
+  // Si el jugador tiene roles directamente definidos, extraer los roles
   if (player.playerRoles && Array.isArray(player.playerRoles)) {
-    return player.playerRoles;
+    // Si es PlayerRole[], extraer solo los roles
+    if (
+      player.playerRoles.length > 0 &&
+      typeof player.playerRoles[0] === 'object' &&
+      'role' in player.playerRoles[0]
+    ) {
+      return (player.playerRoles as PlayerRole[]).map((pr) => pr.role);
+    }
+    // Si es string[] (formato antiguo), devolverlo directamente
+    return player.playerRoles as string[];
   }
 
   // Si no tiene roles, devolver array vacío
