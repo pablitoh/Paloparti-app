@@ -7,6 +7,10 @@ import { LogAction } from '../../../utils/logTypes';
 import { TeamBuilder } from '../../../lib/teambuilder';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
+import {
+  PlayerRole,
+  normalizePlayerRoles,
+} from '../../../lib/teambuilder/constants';
 
 // Interfaces tipo Member
 type Member = {
@@ -15,7 +19,7 @@ type Member = {
   birthdate: Date | null;
   age: number | null;
   role: string;
-  playerRoles?: string[]; // Roles elegidos por el usuario
+  playerRoles?: PlayerRole[]; // Roles elegidos por el usuario con prioridades
   assignedRole?: string; // Rol asignado para la formación
   starRating?: number; // Nivel de habilidad del jugador (0-5)
 };
@@ -358,15 +362,12 @@ const balanceTeamPositions = (team: Member[]): Member[] => {
 };
 
 // Función para obtener el rol principal de un jugador (el de mayor prioridad)
-const getPrimaryRole = (playerRoles?: string[]): string | undefined => {
+const getPrimaryRole = (playerRoles?: PlayerRole[]): string | undefined => {
   if (!playerRoles || playerRoles.length === 0) return undefined;
 
-  // Encontrar el rol con la prioridad más alta (número más bajo tiene mayor prioridad)
-  return playerRoles.reduce((primaryRole, currentRole) => {
-    const primaryPriority = ROLE_PRIORITY[primaryRole] ?? 999;
-    const currentPriority = ROLE_PRIORITY[currentRole] ?? 999;
-    return currentPriority < primaryPriority ? currentRole : primaryRole;
-  }, playerRoles[0]);
+  // Ordenar por prioridad (menor número = mayor prioridad) y devolver el primer rol
+  const sortedRoles = [...playerRoles].sort((a, b) => a.priority - b.priority);
+  return sortedRoles[0].role;
 };
 
 // Función para balancear equipos por rol y edad simultáneamente
@@ -2535,7 +2536,7 @@ export default async function handler(
             select: { tbdPlayers: true },
           });
 
-          let playerRoles: Record<string, string[]> = {};
+          let playerRoles: Record<string, PlayerRole[]> = {};
           if (matchData?.tbdPlayers) {
             const tbdPlayers =
               typeof matchData.tbdPlayers === 'string'
@@ -2546,7 +2547,14 @@ export default async function handler(
               tbdPlayers.playerRoles &&
               typeof tbdPlayers.playerRoles === 'object'
             ) {
-              playerRoles = tbdPlayers.playerRoles as Record<string, string[]>;
+              // Normalizar cada entrada de playerRoles para manejar formato antiguo y nuevo
+              const rawPlayerRoles = tbdPlayers.playerRoles as Record<
+                string,
+                any
+              >;
+              for (const [userId, roles] of Object.entries(rawPlayerRoles)) {
+                playerRoles[userId] = normalizePlayerRoles(roles);
+              }
             }
           }
 
@@ -2570,8 +2578,10 @@ export default async function handler(
                   calculateAge(attendance.user.birthdate) ||
                   Math.floor(Math.random() * 40) + 18,
                 role: 'MEMBER',
-                // Obtener los roles del jugador si existen
-                playerRoles: playerRoles[attendance.user.id] || [],
+                // Obtener los roles del jugador si existen, con valor por defecto
+                playerRoles: playerRoles[attendance.user.id] || [
+                  { role: PLAYER_ROLES.WILDCARD, priority: 1 },
+                ],
                 starRating: starRatingsMap[attendance.user.id] || 3,
               })
             );
