@@ -382,6 +382,9 @@ export const useGroupActions = ({
         throw new Error('No hay un partido programado');
       }
 
+      // Debug log to track allowFillIn value
+      console.log('🔍 handleRandomizeTeams - allowFillIn value:', allowFillIn);
+
       await randomizeTeamsMutation.mutateAsync({
         matchId: nextMatchId,
         groupId,

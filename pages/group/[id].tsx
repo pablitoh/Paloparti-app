@@ -465,7 +465,7 @@ export default function GroupDetails() {
   } | null>(null);
   const [isCopying, setIsCopying] = useState(false);
   const [inviteUrl, setInviteUrl] = useState('');
-  const [allowFillIn, setAllowFillIn] = useState(false);
+  const [allowFillIn, setAllowFillIn] = useState(true);
   const [showManualTeamFormationModal, setShowManualTeamFormationModal] =
     useState(false);
 

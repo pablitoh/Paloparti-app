@@ -4302,15 +4302,20 @@ export default async function handler(
         {
           teamLength: team.length,
           allowTbdPlayers,
+          allowTbdPlayersParam,
           requiredPlayersPerTeam,
           groupRequiredPlayers: group.requiredPlayers,
+          isResort,
+          sortCount: existingMatch?.sortCount,
         }
       );
 
       // Si no se permite añadir TBD players, retornar array vacío
       if (allowTbdPlayers === false) {
         console.log(
-          `🚫 TBD players deshabilitados para equipo ${isTeamA ? 'A' : 'B'}`
+          `🚫 TBD players deshabilitados para equipo ${
+            isTeamA ? 'A' : 'B'
+          } - allowTbdPlayers=${allowTbdPlayers}`
         );
         return [];
       }
@@ -4586,6 +4591,34 @@ export default async function handler(
     // Ahora sí, agregar TBD players si es necesario (después de todas las verificaciones)
     const tbdPlayersTeamA = addTbdPlayers(finalTeamA, true);
     const tbdPlayersTeamB = addTbdPlayers(finalTeamB, false);
+
+    // DEBUGGING: Log detallado del proceso de generación de TBD players
+    console.log('🔍 DEBUGGING TBD PLAYERS GENERATION:', {
+      allowTbdPlayers,
+      allowTbdPlayersParam,
+      finalTeamALength: finalTeamA.length,
+      finalTeamBLength: finalTeamB.length,
+      requiredPlayersPerTeam,
+      tbdPlayersTeamALength: tbdPlayersTeamA.length,
+      tbdPlayersTeamBLength: tbdPlayersTeamB.length,
+    });
+
+    // DEBUGGING: Si no se generaron TBD players pero deberían haberse generado
+    if (
+      allowTbdPlayers &&
+      (finalTeamA.length < requiredPlayersPerTeam ||
+        finalTeamB.length < requiredPlayersPerTeam)
+    ) {
+      console.log(
+        '🚨 WARNING: No se generaron TBD players cuando deberían haberse generado!'
+      );
+      console.log('🔍 Detalles:', {
+        'Equipo A necesita': requiredPlayersPerTeam - finalTeamA.length,
+        'Equipo B necesita': requiredPlayersPerTeam - finalTeamB.length,
+        'TBD generados equipo A': tbdPlayersTeamA.length,
+        'TBD generados equipo B': tbdPlayersTeamB.length,
+      });
+    }
 
     // Preparar los datos para la respuesta (ahora que tenemos tbdPlayersTeamA y tbdPlayersTeamB)
     const tbdPlayers = {
