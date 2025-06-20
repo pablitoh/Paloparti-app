@@ -445,6 +445,78 @@ const createRoleAndAgeBalancedTeams = (
           remaining: [],
         };
       }
+
+      // NUEVO: Si no hay arqueros principales, buscar en roles secundarios
+      console.log(
+        '🥅 No hay arqueros principales, buscando en roles secundarios...'
+      );
+
+      // Buscar jugadores con arquero como rol secundario en otras posiciones
+      const findPlayerWithSecondaryGoalkeeperRole = (
+        playersPool: Member[]
+      ): Member | null => {
+        for (const player of playersPool) {
+          const hasGoalkeeperRole = player.playerRoles?.some((playerRole) => {
+            if (typeof playerRole === 'string') {
+              return playerRole === PLAYER_ROLES.GOALKEEPER;
+            } else if (
+              playerRole &&
+              typeof playerRole === 'object' &&
+              'role' in playerRole
+            ) {
+              return playerRole.role === PLAYER_ROLES.GOALKEEPER;
+            }
+            return false;
+          });
+
+          if (hasGoalkeeperRole) {
+            console.log(
+              `🥅 Encontrado jugador con rol secundario de arquero: ${player.name}`
+            );
+            return player;
+          }
+        }
+        return null;
+      };
+
+      // Buscar en todos los otros roles
+      const allOtherPlayers: Member[] = [
+        ...(playersByRole[PLAYER_ROLES.DEFENDER] || []),
+        ...(playersByRole[PLAYER_ROLES.MIDFIELDER] || []),
+        ...(playersByRole[PLAYER_ROLES.FORWARD] || []),
+        ...(playersByRole[PLAYER_ROLES.WILDCARD] || []),
+      ];
+
+      const candidateGK =
+        findPlayerWithSecondaryGoalkeeperRole(allOtherPlayers);
+      if (candidateGK) {
+        // Asignar al equipo con menos jugadores
+        if (teamA.length <= teamB.length) {
+          forTeamA.push({ ...candidateGK, assignedRole: role });
+        } else {
+          forTeamB.push({ ...candidateGK, assignedRole: role });
+        }
+
+        // Remover de su posición original
+        Object.keys(playersByRole).forEach((pos) => {
+          const index = playersByRole[pos].findIndex(
+            (p) => p.id === candidateGK.id
+          );
+          if (index !== -1) {
+            playersByRole[pos].splice(index, 1);
+            console.log(
+              `🥅 Removido ${candidateGK.name} de ${pos} para asignarlo como arquero`
+            );
+          }
+        });
+
+        return {
+          teamA: forTeamA,
+          teamB: forTeamB,
+          remaining: [],
+        };
+      }
+
       return { teamA: [], teamB: [], remaining: sortedByAge };
     }
 
@@ -784,6 +856,114 @@ const createCombinedBalancedTeams = (
   teamA.push(...gkResult.teamA);
   teamB.push(...gkResult.teamB);
   playersWithoutRole.push(...gkResult.remaining);
+
+  // NUEVO: Verificar si algún equipo necesita arquero y buscar en roles secundarios
+  const teamAHasGK = teamA.some(
+    (p) => p.assignedRole === PLAYER_ROLES.GOALKEEPER
+  );
+  const teamBHasGK = teamB.some(
+    (p) => p.assignedRole === PLAYER_ROLES.GOALKEEPER
+  );
+
+  if (!teamAHasGK || !teamBHasGK) {
+    console.log(
+      `🥅 Verificando arqueros en createCombinedBalancedTeams: A=${teamAHasGK}, B=${teamBHasGK}`
+    );
+
+    // Buscar jugadores con rol secundario de arquero en todas las posiciones
+    const findPlayerWithSecondaryGoalkeeperRole = (
+      playersPool: Member[]
+    ): Member | null => {
+      for (const player of playersPool) {
+        const hasGoalkeeperRole = player.playerRoles?.some((playerRole) => {
+          if (typeof playerRole === 'string') {
+            return playerRole === PLAYER_ROLES.GOALKEEPER;
+          } else if (
+            playerRole &&
+            typeof playerRole === 'object' &&
+            'role' in playerRole
+          ) {
+            return playerRole.role === PLAYER_ROLES.GOALKEEPER;
+          }
+          return false;
+        });
+
+        if (hasGoalkeeperRole) {
+          console.log(
+            `🥅 Encontrado jugador con rol secundario de arquero: ${player.name}`
+          );
+          return player;
+        }
+      }
+      return null;
+    };
+
+    // Recopilar todos los jugadores disponibles de otras posiciones
+    const allAvailablePlayers: Member[] = [
+      ...(playersByRole[PLAYER_ROLES.DEFENDER] || []),
+      ...(playersByRole[PLAYER_ROLES.MIDFIELDER] || []),
+      ...(playersByRole[PLAYER_ROLES.FORWARD] || []),
+      ...(playersByRole[PLAYER_ROLES.WILDCARD] || []),
+    ];
+
+    // Asignar arqueros a equipos que los necesiten
+    if (!teamAHasGK) {
+      const candidateGK =
+        findPlayerWithSecondaryGoalkeeperRole(allAvailablePlayers);
+      if (candidateGK) {
+        teamA.push({ ...candidateGK, assignedRole: PLAYER_ROLES.GOALKEEPER });
+        console.log(
+          `🥅 Asignado arquero secundario ${candidateGK.name} al equipo A`
+        );
+
+        // Remover de su posición original
+        Object.keys(playersByRole).forEach((pos) => {
+          const index = playersByRole[pos].findIndex(
+            (p) => p.id === candidateGK.id
+          );
+          if (index !== -1) {
+            playersByRole[pos].splice(index, 1);
+            console.log(
+              `🥅 Removido ${candidateGK.name} de ${pos} para asignarlo como arquero`
+            );
+          }
+        });
+      }
+    }
+
+    if (!teamBHasGK) {
+      // Recopilar jugadores disponibles actualizados después de posible asignación anterior
+      const remainingAvailablePlayers: Member[] = [
+        ...(playersByRole[PLAYER_ROLES.DEFENDER] || []),
+        ...(playersByRole[PLAYER_ROLES.MIDFIELDER] || []),
+        ...(playersByRole[PLAYER_ROLES.FORWARD] || []),
+        ...(playersByRole[PLAYER_ROLES.WILDCARD] || []),
+      ];
+
+      const candidateGK = findPlayerWithSecondaryGoalkeeperRole(
+        remainingAvailablePlayers
+      );
+      if (candidateGK) {
+        teamB.push({ ...candidateGK, assignedRole: PLAYER_ROLES.GOALKEEPER });
+        console.log(
+          `🥅 Asignado arquero secundario ${candidateGK.name} al equipo B`
+        );
+
+        // Remover de su posición original
+        Object.keys(playersByRole).forEach((pos) => {
+          const index = playersByRole[pos].findIndex(
+            (p) => p.id === candidateGK.id
+          );
+          if (index !== -1) {
+            playersByRole[pos].splice(index, 1);
+            console.log(
+              `🥅 Removido ${candidateGK.name} de ${pos} para asignarlo como arquero`
+            );
+          }
+        });
+      }
+    }
+  }
 
   // Distribuir defensores
   const defResult = distributeRoleByAgeAndRatingFlexibly(PLAYER_ROLES.DEFENDER);
