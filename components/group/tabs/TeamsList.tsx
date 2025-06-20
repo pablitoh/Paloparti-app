@@ -336,8 +336,20 @@ const TeamsList: React.FC<TeamsListProps> = ({
     }));
 
     return (
-      <div className='flex items-center justify-between py-2 px-1'>
-        <div className='flex items-center gap-2 flex-grow min-w-0'>
+      <div
+        className={`
+        flex items-center justify-between py-3 px-3 rounded-xl transition-all duration-200
+        ${
+          isTbd
+            ? 'bg-gray-25 border border-gray-200 hover:bg-gray-50'
+            : isTeamA
+            ? 'bg-primary-25 border border-primary-100 hover:bg-primary-50 hover:border-primary-200'
+            : 'bg-coral-25 border border-coral-100 hover:bg-coral-50 hover:border-coral-200'
+        }
+        hover:shadow-md transform hover:scale-[1.01]
+      `}
+      >
+        <div className='flex items-center gap-3 flex-grow min-w-0'>
           {/* Avatar with dropdown */}
           <div className='relative' ref={dropdownRef}>
             <button
@@ -348,20 +360,20 @@ const TeamsList: React.FC<TeamsListProps> = ({
               }}
               className={`${
                 currentUserIsAdmin && onSwapPlayer && !isTbd
-                  ? 'cursor-pointer hover:ring-2 hover:ring-primary-300 transition-all'
+                  ? 'cursor-pointer hover:ring-2 hover:ring-primary-300 transition-all transform hover:scale-110'
                   : 'cursor-default'
               }`}
               disabled={!currentUserIsAdmin || !onSwapPlayer || isTbd}
             >
               {isTbd ? (
-                <div className='h-10 w-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center'>
-                  <UserIcon className='h-5 w-5 text-gray-400' />
+                <div className='h-12 w-12 rounded-full bg-gray-100 border-2 border-gray-300 flex items-center justify-center shadow-sm'>
+                  <UserIcon className='h-6 w-6 text-gray-400' />
                 </div>
               ) : (
                 <Avatar
                   src={player.avatar || ''}
                   alt={player.name || 'Jugador'}
-                  className='h-10 w-10 rounded-full border border-gray-200'
+                  className='h-12 w-12 rounded-full border-2 border-white shadow-md'
                 />
               )}
             </button>
@@ -486,12 +498,19 @@ const TeamsList: React.FC<TeamsListProps> = ({
           </div>
         </div>
 
-        {/* Admin buttons */}
+        {/* Admin buttons with better styling */}
         {currentUserIsAdmin && showReplaceButton && onReplaceTbd && (
-          <div className='flex gap-1 admin-buttons'>
+          <div className='flex gap-2 admin-buttons'>
             <button
               onClick={() => onReplaceTbd(player.id)}
-              className='p-1.5 rounded-full bg-primary-50 text-primary-600 hover:bg-primary-100 transition-colors'
+              className={`
+                p-2 rounded-xl shadow-sm border transition-all duration-200 transform hover:scale-105
+                ${
+                  isTeamA
+                    ? 'bg-primary-50 text-primary-600 border-primary-200 hover:bg-primary-100 hover:border-primary-300'
+                    : 'bg-coral-50 text-coral-600 border-coral-200 hover:bg-coral-100 hover:border-coral-300'
+                }
+              `}
               title='Reemplazar jugador'
             >
               <UserPlusIcon className='h-4 w-4' />
@@ -515,28 +534,55 @@ const TeamsList: React.FC<TeamsListProps> = ({
     const sortedTbdPlayers = sortPlayersByRole(tbdPlayers);
 
     return (
-      <div className='bg-white rounded-xl shadow-sm border border-gray-200 p-4 min-w-0 flex-shrink-0 w-full md:w-auto'>
-        {/* Team Header */}
-        <div className='text-center mb-4'>
-          <h3
-            className={`text-lg font-bold mb-2 ${
-              isTeamA ? 'text-primary-600' : 'text-coral-500'
-            }`}
+      <div
+        className={`
+        bg-white rounded-2xl shadow-green-lg border 
+        ${
+          isTeamA
+            ? 'border-primary-200 hover:border-primary-300'
+            : 'border-coral-200 hover:border-coral-300'
+        }
+        p-6 min-w-0 flex-shrink-0 w-full md:w-auto
+        transform transition-all duration-300 hover:scale-[1.02] hover:shadow-green-xl
+        ${isTeamA ? 'hover:bg-primary-25' : 'hover:bg-coral-25'}
+      `}
+      >
+        {/* Team Header with gradient */}
+        <div className='text-center mb-6'>
+          <div
+            className={`
+            inline-flex items-center justify-center w-full py-3 px-4 rounded-xl mb-3
+            ${
+              isTeamA
+                ? 'bg-gradient-to-r from-primary-500 to-lime-500 text-white'
+                : 'bg-gradient-to-r from-coral-500 to-orange-500 text-white'
+            }
+            shadow-lg transform transition-all duration-300 hover:scale-105
+          `}
           >
-            {teamName}
-          </h3>
+            <h3 className='text-lg font-bold'>{teamName}</h3>
+          </div>
 
-          {/* Team stats */}
-          <div className='flex justify-center items-center gap-4 text-sm'>
+          {/* Team stats with better design */}
+          <div className='flex justify-center items-center gap-3 text-sm'>
             {avgAge !== undefined && (
-              <div className='flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-full'>
+              <div
+                className={`
+                flex items-center gap-1 px-3 py-1.5 rounded-full transition-all duration-200
+                ${
+                  isTeamA
+                    ? 'bg-primary-50 border border-primary-200 hover:bg-primary-100'
+                    : 'bg-coral-50 border border-coral-200 hover:bg-coral-100'
+                }
+              `}
+              >
                 <span className='text-gray-600'>👥</span>
                 <span className='text-gray-700 font-medium'>{avgAge} años</span>
               </div>
             )}
 
             {avgRating !== undefined && (
-              <div className='flex items-center gap-1 bg-lime-50 px-2 py-1 rounded-full border border-lime-200'>
+              <div className='flex items-center gap-1 bg-lime-50 px-3 py-1.5 rounded-full border border-lime-200 hover:bg-lime-100 transition-all duration-200'>
                 <span className='text-lime-700 font-bold'>{avgRating}</span>
                 <span className='text-lime-600'>⭐</span>
               </div>
@@ -544,25 +590,37 @@ const TeamsList: React.FC<TeamsListProps> = ({
           </div>
         </div>
 
-        {/* Players List */}
-        <div className='space-y-1'>
-          {sortedPlayers.map((player) => (
-            <PlayerItem
+        {/* Players List with better spacing */}
+        <div className='space-y-2'>
+          {sortedPlayers.map((player, index) => (
+            <div
               key={player.id}
-              player={player}
-              showReplaceButton={player.playerType === 'TBD'}
-              isTeamA={isTeamA}
-            />
+              className='transform transition-all duration-200 hover:translate-x-1'
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <PlayerItem
+                player={player}
+                showReplaceButton={player.playerType === 'TBD'}
+                isTeamA={isTeamA}
+              />
+            </div>
           ))}
 
-          {sortedTbdPlayers.map((player) => (
-            <PlayerItem
+          {sortedTbdPlayers.map((player, index) => (
+            <div
               key={player.id}
-              player={player}
-              isTbd={true}
-              showReplaceButton={true}
-              isTeamA={isTeamA}
-            />
+              className='transform transition-all duration-200 hover:translate-x-1'
+              style={{
+                animationDelay: `${(sortedPlayers.length + index) * 50}ms`,
+              }}
+            >
+              <PlayerItem
+                player={player}
+                isTbd={true}
+                showReplaceButton={true}
+                isTeamA={isTeamA}
+              />
+            </div>
           ))}
         </div>
       </div>
@@ -572,11 +630,11 @@ const TeamsList: React.FC<TeamsListProps> = ({
   return (
     <div
       id={`teams-list-container-${sortCount}`}
-      className='w-full'
+      className='w-full px-4'
       data-sort-count={sortCount}
     >
-      {/* Desktop Layout */}
-      <div className='hidden md:flex gap-4 justify-center'>
+      {/* Desktop Layout with better spacing */}
+      <div className='hidden md:flex gap-6 justify-center max-w-6xl mx-auto'>
         <TeamCard
           players={playersA}
           tbdPlayers={teamATbdPlayers}
@@ -595,15 +653,15 @@ const TeamsList: React.FC<TeamsListProps> = ({
         />
       </div>
 
-      {/* Mobile Slider Layout */}
+      {/* Mobile Slider Layout with better spacing */}
       <div className='md:hidden'>
         {/* Slider Container */}
         <div
           ref={sliderRef}
-          className='flex overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-4 px-4'
+          className='flex overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-6 px-2'
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
-          <div className='snap-center'>
+          <div className='snap-center min-w-[300px] flex-shrink-0'>
             <TeamCard
               players={playersA}
               tbdPlayers={teamATbdPlayers}
@@ -613,7 +671,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
               avgRating={effectiveTeamAAvgRating}
             />
           </div>
-          <div className='snap-center'>
+          <div className='snap-center min-w-[300px] flex-shrink-0'>
             <TeamCard
               players={playersB}
               tbdPlayers={teamBTbdPlayers}

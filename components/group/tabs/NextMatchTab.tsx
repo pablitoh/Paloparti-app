@@ -1243,43 +1243,44 @@ export default function NextMatchTab({
           {/* Este div vacío ayudará a capturar cualquier renderizado suelto */}
           <div className='hidden'></div>
 
-          {/* Sección de equipos formados - Solo mostrar cuando sortCount > 0 o se forzó la formación de equipos */}
+          {/* Sección de equipos formados */}
           {forceTeamsFormed ||
           (matchDetails?.sortCount && matchDetails.sortCount > 0) ? (
-            <div className='bg-white rounded-2xl overflow-hidden shadow-green-lg border border-primary-100'>
-              <div className='px-6 py-4 border-b border-primary-100 bg-gradient-green-soft flex justify-between items-center'>
-                <div>
-                  <h3 className='text-lg font-semibold leading-6 text-gray-900 flex items-center'>
-                    <svg
-                      className='w-5 h-5 mr-2 text-primary-600'
-                      fill='none'
-                      stroke='currentColor'
-                      viewBox='0 0 24 24'
-                    >
-                      <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        strokeWidth='2'
-                        d='M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z'
-                      />
-                    </svg>
-                    Equipos
-                  </h3>
-                </div>
+            <div className='space-y-4'>
+              {/* Header with actions */}
+              <div className='bg-white rounded-2xl shadow-green-lg border border-primary-100 p-4 md:p-6'>
+                <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4'>
+                  <div>
+                    <h3 className='text-lg font-semibold leading-6 text-gray-900 flex items-center'>
+                      <svg
+                        className='w-5 h-5 mr-2 text-primary-600'
+                        fill='none'
+                        stroke='currentColor'
+                        viewBox='0 0 24 24'
+                      >
+                        <path
+                          strokeLinecap='round'
+                          strokeLinejoin='round'
+                          strokeWidth='2'
+                          d='M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z'
+                        />
+                      </svg>
+                      Equipos
+                    </h3>
+                  </div>
 
-                {/* Add Results button and Admin actions dropdown */}
-                <div className='flex items-center gap-2'>
+                  {/* Admin actions - responsive */}
                   {currentUserIsAdmin && (
-                    <>
-                      {/* Add Results Button */}
+                    <div className='flex items-center gap-2'>
+                      {/* Add Results Button - responsive */}
                       <Button
                         variant='primary'
                         onClick={handleAddResults}
-                        className={`flex items-center text-sm ${
+                        className={`flex items-center justify-center ${
                           !teamsHavePlayers
                             ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                             : ''
-                        }`}
+                        } text-sm sm:text-sm px-3 py-2 sm:px-4 sm:py-2`}
                         size='sm'
                         disabled={!teamsHavePlayers}
                       >
@@ -1287,7 +1288,7 @@ export default function NextMatchTab({
                           xmlns='http://www.w3.org/2000/svg'
                           viewBox='0 0 24 24'
                           fill='currentColor'
-                          className='w-4 h-4 mr-2'
+                          className='w-4 h-4 mr-2 flex-shrink-0'
                         >
                           <path
                             fillRule='evenodd'
@@ -1295,7 +1296,9 @@ export default function NextMatchTab({
                             clipRule='evenodd'
                           />
                         </svg>
-                        Agregar resultado
+                        <span className='whitespace-nowrap'>
+                          Agregar resultado
+                        </span>
                       </Button>
 
                       {/* Actions Dropdown */}
@@ -1373,7 +1376,7 @@ export default function NextMatchTab({
                           </div>
                         )}
                       </div>
-                    </>
+                    </div>
                   )}
 
                   {/* Hidden ShareTeamsButton for programmatic access */}
@@ -1391,29 +1394,27 @@ export default function NextMatchTab({
                 </div>
               </div>
 
-              <div>
-                {/* TeamsList component */}
-                <TeamsList
-                  key={teamsListKey}
-                  // @ts-ignore - Ignoramos los errores de tipo debido a conflictos entre definiciones
-                  playersA={processedPlayersA}
-                  // @ts-ignore - Ignoramos los errores de tipo debido a conflictos entre definiciones
-                  playersB={processedPlayersB}
-                  // @ts-ignore - Ignoramos los errores de tipo debido a conflictos entre definiciones
-                  tbdPlayers={normalizedTbdPlayers}
-                  teamAName={group.teamAName || 'Equipo A'}
-                  teamBName={group.teamBName || 'Equipo B'}
-                  currentUserIsAdmin={currentUserIsAdmin}
-                  onReplaceTbd={(playerId) => setShowReplaceTbdModal(playerId)}
-                  onSwapPlayer={(playerId, isTeamA) => {
-                    setPreSelectedPlayer({ playerId, isTeamA });
-                    setShowSwapPlayersModal(true);
-                  }}
-                  teamAAvgAge={finalTeamAAvgAge}
-                  teamBAvgAge={finalTeamBAvgAge}
-                  sortCount={matchDetails?.sortCount || 0}
-                />
-              </div>
+              {/* TeamsList component */}
+              <TeamsList
+                key={teamsListKey}
+                // @ts-ignore - Ignoramos los errores de tipo debido a conflictos entre definiciones
+                playersA={processedPlayersA}
+                // @ts-ignore - Ignoramos los errores de tipo debido a conflictos entre definiciones
+                playersB={processedPlayersB}
+                // @ts-ignore - Ignoramos los errores de tipo debido a conflictos entre definiciones
+                tbdPlayers={normalizedTbdPlayers}
+                teamAName={group.teamAName || 'Equipo A'}
+                teamBName={group.teamBName || 'Equipo B'}
+                currentUserIsAdmin={currentUserIsAdmin}
+                onReplaceTbd={(playerId) => setShowReplaceTbdModal(playerId)}
+                onSwapPlayer={(playerId, isTeamA) => {
+                  setPreSelectedPlayer({ playerId, isTeamA });
+                  setShowSwapPlayersModal(true);
+                }}
+                teamAAvgAge={finalTeamAAvgAge}
+                teamBAvgAge={finalTeamBAvgAge}
+                sortCount={matchDetails?.sortCount || 0}
+              />
             </div>
           ) : null}
 
