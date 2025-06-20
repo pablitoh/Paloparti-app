@@ -1074,11 +1074,10 @@ _Generado con Paloparti_ 🚀`;
       setForcedTeamB((prevTeam) => (prevTeam.length > 0 ? [] : prevTeam));
     }
   }, [
-    matchDetails?.playersA?.length,
-    matchDetails?.playersA?.map((p) => p.id).join(','),
-    matchDetails?.playersB?.length,
-    matchDetails?.playersB?.map((p) => p.id).join(','),
+    matchDetails?.id,
     matchDetails?.sortCount,
+    matchDetails?.playersA?.length,
+    matchDetails?.playersB?.length,
   ]);
 
   // Las edades promedio ahora se calculan directamente usando useMemo
@@ -1090,7 +1089,7 @@ _Generado con Paloparti_ 🚀`;
       return avgA;
     }
     return undefined;
-  }, [playersA?.length, playersA?.map((p) => p.id).join(',')]);
+  }, [playersA?.length]);
 
   const calculatedTeamBAvgAge = useMemo(() => {
     if (playersB && playersB.length > 0) {
@@ -1098,7 +1097,7 @@ _Generado con Paloparti_ 🚀`;
       return avgB;
     }
     return undefined;
-  }, [playersB?.length, playersB?.map((p) => p.id).join(',')]);
+  }, [playersB?.length]);
 
   // Usar las edades calculadas directamente o las del matchDetails si están disponibles
   const finalTeamAAvgAge =
@@ -1115,11 +1114,11 @@ _Generado con Paloparti_ 🚀`;
   // y ordenarlos por posición - usando useMemo para evitar recálculos innecesarios
   const processedPlayersA = useMemo(() => {
     return sortPlayersByRole(ensurePlayerAges(playersA));
-  }, [playersA?.length, playersA?.map((p) => p.id).join(',')]);
+  }, [playersA?.length]);
 
   const processedPlayersB = useMemo(() => {
     return sortPlayersByRole(ensurePlayerAges(playersB));
-  }, [playersB?.length, playersB?.map((p) => p.id).join(',')]);
+  }, [playersB?.length]);
 
   // Añadir un useEffect específico para observar cambios en los promedios de edad después de un sort
   useEffect(() => {
@@ -1164,7 +1163,7 @@ _Generado con Paloparti_ 🚀`;
     return () => {
       window.removeEventListener('rating-updated', handleRatingUpdate);
     };
-  }, [id, queryClient]);
+  }, [id]); // Removido queryClient de las dependencias para evitar re-renders infinitos
 
   return (
     <div className='space-y-4'>
