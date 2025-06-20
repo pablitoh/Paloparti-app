@@ -827,9 +827,6 @@ const GroupContent = ({
 
   // Renderizar el contenido de la pestaña seleccionada
   const renderTabContent = useMemo(() => {
-    // Agregar console log para depuración
-    console.log('Rendering tab content for tab:', selectedTab);
-
     switch (selectedTab) {
       case 0:
         return (
@@ -967,9 +964,7 @@ const GroupContent = ({
       />
 
       {/* Área de contenido principal */}
-      <div className='bg-white rounded-2xl shadow-green-lg p-6 sm:p-8'>
-        {renderTabContent}
-      </div>
+      <div>{renderTabContent}</div>
 
       {showReplaceTbdModal && groupBasicData && (
         <ReplaceTbdPlayerModal

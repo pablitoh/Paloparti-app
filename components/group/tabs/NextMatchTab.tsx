@@ -10,6 +10,8 @@ import {
   TrashIcon,
   ArrowPathIcon,
   UserGroupIcon,
+  PhotoIcon,
+  ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline';
 import Button from '../../../components/Button';
 import { useState, useEffect, useMemo } from 'react';
@@ -36,7 +38,7 @@ import AttendanceConfirmation from '../AttendanceConfirmation';
 import TeamFormationNotification from '../TeamFormationNotification';
 import UnassignedPlayersManager from '../UnassignedPlayersManager';
 import DeleteMatchModal from '../modals/DeleteMatchModal';
-import ShareTeamsButton from '../ui/ShareTeamsButton';
+import { useScreenshotShare } from '../../../hooks/useScreenshotShare';
 
 // Definición de roles de jugador para ordenar por posición
 const PLAYER_ROLE_PRIORITY = {
@@ -54,6 +56,7 @@ interface Player {
   avatar: string | null;
   playerType?: string;
   playerRoles?: PlayerRole[]; // Roles del jugador
+  assignedRole?: string; // Rol asignado específicamente para el partido
   age?: number | null;
   isTeamA?: boolean;
 }
@@ -194,6 +197,7 @@ export default function NextMatchTab({
   const [sortTeamsLoading, setSortTeamsLoading] = useState(false);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const { shareTeamsScreenshot } = useScreenshotShare();
   const [unassignedPlayers, setUnassignedPlayers] = useState<Player[]>([]);
   // Estado controlado para teamsFormed
   const [forceTeamsFormed, setForceTeamsFormed] = useState(false);
@@ -280,9 +284,8 @@ export default function NextMatchTab({
       })),
     ];
 
-    console.log('Normalized TBD players:', tbdPlayers);
     setNormalizedTbdPlayers(tbdPlayers);
-  }, [matchDetails, matchDetails?.tbdPlayers]);
+  }, [matchDetails?.id, matchDetails?.tbdPlayers]);
 
   // Process match details
   const confirmedPlayers = matchDetails?.confirmedPlayers || [];
@@ -363,7 +366,14 @@ export default function NextMatchTab({
         setLocalUserAttendanceStatus(undefined);
       }
     }
-  }, [matchDetails, user, confirmedPlayers, declinedPlayers, pendingPlayers]);
+  }, [
+    matchDetails?.id,
+    user?.id,
+    confirmedPlayers?.length,
+    declinedPlayers?.length,
+    pendingPlayers?.length,
+    localUserAttendanceStatus,
+  ]);
 
   // Get TBD players by team
   const tbdPlayersTeamA = normalizedTbdPlayers.filter(
@@ -395,30 +405,6 @@ export default function NextMatchTab({
         tbdPlayersTeamB.length > 0 ||
         (hasTbdTeams && (matchDetails?.tbdPlayers as any)?.teamB?.length > 0))
     );
-
-  // Debug teams state - remove in production
-  useEffect(() => {
-    if (matchDetails) {
-      console.log('Teams state updated:', {
-        teamsFormed,
-        hasTbdTeams,
-        playersACount: playersA?.length || 0,
-        playersBCount: playersB?.length || 0,
-        tbdPlayersTeamACount: tbdPlayersTeamA.length,
-        tbdPlayersTeamBCount: tbdPlayersTeamB.length,
-        tbdPlayers: matchDetails.tbdPlayers,
-        matchDetails,
-      });
-    }
-  }, [
-    matchDetails,
-    teamsFormed,
-    playersA,
-    playersB,
-    tbdPlayersTeamA,
-    tbdPlayersTeamB,
-    hasTbdTeams,
-  ]);
 
   // Format date for next match display
   const formatNextMatchDate = (date: string | Date) => {
@@ -804,6 +790,121 @@ export default function NextMatchTab({
   };
 
   // Handle deleting match
+  // Función para formatear texto de jugador
+  const formatPlayerText = (player: any): string => {
+    const name = player.name || 'Sin nombre';
+
+    const roleEmojis: { [key: string]: string } = {
+      // Inglés (para compatibilidad)
+      goalkeeper: '🧤',
+      defender: '🛡️',
+      midfielder: '⚽',
+      forward: '👟',
+      wildcard: '🔄',
+      // Español (como viene del backend)
+      Arquero: '🧤',
+      Defensor: '🛡️',
+      Mediocampo: '⚽',
+      Delantero: '👟',
+      Comodín: '🔄',
+    };
+
+    const roleNames: { [key: string]: string } = {
+      // Inglés (para compatibilidad)
+      goalkeeper: 'Arquero',
+      defender: 'Defensor',
+      midfielder: 'Mediocampo',
+      forward: 'Delantero',
+      wildcard: 'Comodín',
+      // Español (como viene del backend)
+      Arquero: 'Arquero',
+      Defensor: 'Defensor',
+      Mediocampo: 'Mediocampo',
+      Delantero: 'Delantero',
+      Comodín: 'Comodín',
+    };
+
+    // Usar assignedRole que es la posición asignada específicamente para el partido
+    const role =
+      player.assignedRole ||
+      (player.playerRoles && player.playerRoles.length > 0
+        ? player.playerRoles[0].role
+        : null);
+
+    const roleEmoji = role ? roleEmojis[role] || '' : '';
+    const roleName = role ? roleNames[role] || role : '';
+
+    if (roleEmoji && roleName) {
+      return `${roleEmoji} ${name} (${roleName})`;
+    } else if (roleEmoji) {
+      return `${roleEmoji} ${name}`;
+    } else {
+      return name;
+    }
+  };
+
+  // Función para compartir como imagen
+  const handleShareImage = async () => {
+    setShowActionsDropdown(false);
+
+    try {
+      const shareData = {
+        text: `Equipos sorteados en ${group.name}`,
+        groupName: group.name || 'Grupo',
+        teamAName: group.teamAName || 'Equipo A',
+        teamBName: group.teamBName || 'Equipo B',
+      };
+
+      await shareTeamsScreenshot(matchDetails?.sortCount || 0, shareData);
+    } catch (error) {
+      console.error('Error sharing image:', error);
+      showErrorToast('Error al compartir imagen');
+    }
+  };
+
+  // Función para compartir como texto
+  const handleShareText = async () => {
+    setShowActionsDropdown(false);
+
+    try {
+      const teamAText =
+        processedPlayersA.length > 0
+          ? processedPlayersA.map(formatPlayerText).join('\n')
+          : 'Sin jugadores asignados';
+
+      const teamBText =
+        processedPlayersB.length > 0
+          ? processedPlayersB.map(formatPlayerText).join('\n')
+          : 'Sin jugadores asignados';
+
+      const message = `⚽ *Equipos sorteados en ${group.name}*
+
+*${group.teamAName || 'Equipo A'}* (${processedPlayersA.length} jugadores)
+${teamAText}
+
+*${group.teamBName || 'Equipo B'}* (${processedPlayersB.length} jugadores)
+${teamBText}
+
+¡Que gane el mejor equipo! 💪
+
+_Generado con Paloparti_ 🚀`;
+
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Equipos Formados',
+          text: message,
+        });
+        showSuccessToast('📱 Equipos compartidos exitosamente');
+      } else {
+        await navigator.clipboard.writeText(message);
+        showSuccessToast('📋 Texto copiado al portapapeles');
+      }
+    } catch (error) {
+      console.error('Error sharing text:', error);
+      showErrorToast('Error al compartir texto');
+    }
+  };
+
   const onDeleteMatch = async () => {
     if (!matchDetails?.id) return;
 
@@ -933,8 +1034,16 @@ export default function NextMatchTab({
         // Solo actualizar si realmente ha cambiado
         setForcedTeamA((prevTeam) => {
           const newTeam = sortPlayersByRole(matchDetails.playersA || []);
-          // Comparar si realmente cambió
-          if (JSON.stringify(prevTeam) !== JSON.stringify(newTeam)) {
+          // Comparar si realmente cambió usando longitud y IDs
+          const prevIds = prevTeam
+            .map((p) => p.id)
+            .sort()
+            .join(',');
+          const newIds = newTeam
+            .map((p) => p.id)
+            .sort()
+            .join(',');
+          if (prevIds !== newIds) {
             return newTeam;
           }
           return prevTeam;
@@ -944,8 +1053,16 @@ export default function NextMatchTab({
         // Solo actualizar si realmente ha cambiado
         setForcedTeamB((prevTeam) => {
           const newTeam = sortPlayersByRole(matchDetails.playersB || []);
-          // Comparar si realmente cambió
-          if (JSON.stringify(prevTeam) !== JSON.stringify(newTeam)) {
+          // Comparar si realmente cambió usando longitud y IDs
+          const prevIds = prevTeam
+            .map((p) => p.id)
+            .sort()
+            .join(',');
+          const newIds = newTeam
+            .map((p) => p.id)
+            .sort()
+            .join(',');
+          if (prevIds !== newIds) {
             return newTeam;
           }
           return prevTeam;
@@ -956,7 +1073,13 @@ export default function NextMatchTab({
       setForcedTeamA((prevTeam) => (prevTeam.length > 0 ? [] : prevTeam));
       setForcedTeamB((prevTeam) => (prevTeam.length > 0 ? [] : prevTeam));
     }
-  }, [matchDetails?.playersA, matchDetails?.playersB, matchDetails?.sortCount]);
+  }, [
+    matchDetails?.playersA?.length,
+    matchDetails?.playersA?.map((p) => p.id).join(','),
+    matchDetails?.playersB?.length,
+    matchDetails?.playersB?.map((p) => p.id).join(','),
+    matchDetails?.sortCount,
+  ]);
 
   // Las edades promedio ahora se calculan directamente usando useMemo
 
@@ -964,20 +1087,18 @@ export default function NextMatchTab({
   const calculatedTeamAAvgAge = useMemo(() => {
     if (playersA && playersA.length > 0) {
       const avgA = calculateApproximateAge(playersA as any[]);
-      console.log('Calculando edad promedio para equipo A:', avgA);
       return avgA;
     }
     return undefined;
-  }, [playersA]);
+  }, [playersA?.length, playersA?.map((p) => p.id).join(',')]);
 
   const calculatedTeamBAvgAge = useMemo(() => {
     if (playersB && playersB.length > 0) {
       const avgB = calculateApproximateAge(playersB as any[]);
-      console.log('Calculando edad promedio para equipo B:', avgB);
       return avgB;
     }
     return undefined;
-  }, [playersB]);
+  }, [playersB?.length, playersB?.map((p) => p.id).join(',')]);
 
   // Usar las edades calculadas directamente o las del matchDetails si están disponibles
   const finalTeamAAvgAge =
@@ -994,11 +1115,11 @@ export default function NextMatchTab({
   // y ordenarlos por posición - usando useMemo para evitar recálculos innecesarios
   const processedPlayersA = useMemo(() => {
     return sortPlayersByRole(ensurePlayerAges(playersA));
-  }, [playersA]);
+  }, [playersA?.length, playersA?.map((p) => p.id).join(',')]);
 
   const processedPlayersB = useMemo(() => {
     return sortPlayersByRole(ensurePlayerAges(playersB));
-  }, [playersB]);
+  }, [playersB?.length, playersB?.map((p) => p.id).join(',')]);
 
   // Añadir un useEffect específico para observar cambios en los promedios de edad después de un sort
   useEffect(() => {
@@ -1248,8 +1369,8 @@ export default function NextMatchTab({
           (matchDetails?.sortCount && matchDetails.sortCount > 0) ? (
             <div className='space-y-4'>
               {/* Header with actions */}
-              <div className='p-4 md:p-6'>
-                <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4'>
+              <div className='mb-4'>
+                <div className='flex justify-between items-center gap-2'>
                   <div>
                     <h3 className='text-lg font-semibold leading-6 text-gray-900 flex items-center'>
                       <svg
@@ -1277,7 +1398,7 @@ export default function NextMatchTab({
                         onClick={handleAddResults}
                         disabled={!teamsHavePlayers}
                         className={`
-                          flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                          flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
                           ${
                             !teamsHavePlayers
                               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
@@ -1323,36 +1444,27 @@ export default function NextMatchTab({
 
                         {/* Dropdown Menu */}
                         {showActionsDropdown && (
-                          <div className='absolute right-0 mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[99999]'>
-                            {/* Share option */}
+                          <div className='absolute right-0 mt-2 w-52 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[99999]'>
+                            {/* Share as image option */}
                             <button
-                              onClick={() => {
-                                // Trigger ShareTeamsButton click
-                                const shareButton = document.querySelector(
-                                  '[data-share-teams-button]'
-                                ) as HTMLButtonElement;
-                                if (shareButton) {
-                                  shareButton.click();
-                                }
-                                setShowActionsDropdown(false);
-                              }}
+                              onClick={handleShareImage}
                               className='w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center'
                             >
-                              <svg
-                                className='w-4 h-4 mr-2 text-gray-500'
-                                fill='none'
-                                stroke='currentColor'
-                                viewBox='0 0 24 24'
-                              >
-                                <path
-                                  strokeLinecap='round'
-                                  strokeLinejoin='round'
-                                  strokeWidth='2'
-                                  d='M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z'
-                                />
-                              </svg>
-                              Compartir equipos
+                              <PhotoIcon className='h-4 w-4 mr-2 text-gray-500' />
+                              Compartir como imagen
                             </button>
+
+                            {/* Share as text option */}
+                            <button
+                              onClick={handleShareText}
+                              className='w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center'
+                            >
+                              <ChatBubbleLeftRightIcon className='h-4 w-4 mr-2 text-gray-500' />
+                              Compartir como texto
+                            </button>
+
+                            {/* Divider */}
+                            <div className='my-1 border-t border-gray-200'></div>
 
                             {/* Delete option */}
                             <button
@@ -1371,19 +1483,6 @@ export default function NextMatchTab({
                       </div>
                     </div>
                   )}
-
-                  {/* Hidden ShareTeamsButton for programmatic access */}
-                  <div className='hidden'>
-                    <ShareTeamsButton
-                      elementId='teams-list-container'
-                      groupName={group.name || 'Grupo'}
-                      teamAName={group.teamAName || 'Equipo A'}
-                      teamBName={group.teamBName || 'Equipo B'}
-                      className='text-sm'
-                      sortCount={matchDetails?.sortCount || 0}
-                      data-share-teams-button
-                    />
-                  </div>
                 </div>
               </div>
 
