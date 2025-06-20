@@ -112,7 +112,16 @@ export function getBaseUrl(): string {
     return window.location.origin;
   }
 
-  return process.env.NEXTAUTH_URL || process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : 'http://localhost:3000';
+  // En producción, SIEMPRE usar NEXTAUTH_URL si está definida
+  if (process.env.NODE_ENV === 'production' && process.env.NEXTAUTH_URL) {
+    return process.env.NEXTAUTH_URL;
+  }
+
+  // Solo en preview usar VERCEL_URL como fallback
+  if (process.env.VERCEL_ENV === 'preview' && process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+
+  // Fallback a NEXTAUTH_URL o desarrollo local
+  return process.env.NEXTAUTH_URL || 'http://localhost:3000';
 }
