@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import Layout from '../components/Layout';
 import Button from '../components/Button';
+import BirthdateModal from '../components/BirthdateModal';
 import { useQueryClient } from '@tanstack/react-query';
 
 // Define types for the Group interface
@@ -25,12 +26,36 @@ interface Group {
 }
 
 export default function Groups() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const router = useRouter();
   const [userGroups, setUserGroups] = useState<Group[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showBirthdateModal, setShowBirthdateModal] = useState(false);
   const queryClient = useQueryClient();
+
+  // Verificar si el usuario necesita completar su fecha de nacimiento
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user) {
+      console.log('Verificando fecha de nacimiento del usuario:', {
+        userId: session.user.id,
+        name: session.user.name,
+        email: session.user.email,
+        birthdate: session.user.birthdate,
+        birthdateType: typeof session.user.birthdate,
+        hasBirthdate: !!session.user.birthdate,
+      });
+
+      // Si el usuario no tiene fecha de nacimiento, mostrar el modal
+      if (!session.user.birthdate) {
+        console.log('Usuario sin fecha de nacimiento - Mostrando modal');
+        setShowBirthdateModal(true);
+      } else {
+        console.log('Usuario con fecha de nacimiento - No mostrar modal');
+        setShowBirthdateModal(false);
+      }
+    }
+  }, [status, session]);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -99,6 +124,25 @@ export default function Groups() {
       refetchType: 'active',
     });
     router.push(`/group/${groupId}`);
+  };
+
+  const handleBirthdateModalClose = () => {
+    // No permitir cerrar el modal si no tiene fecha de nacimiento
+    return;
+  };
+
+  const handleBirthdateModalSuccess = async () => {
+    try {
+      // Actualizar la sesión con NextAuth para obtener los datos más recientes
+      await update();
+      setShowBirthdateModal(false);
+    } catch (error) {
+      console.error('Error actualizando sesión:', error);
+      // Como fallback, recargar la página
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
+    }
   };
 
   if (status === 'loading' || isLoading) {
@@ -379,6 +423,13 @@ export default function Groups() {
           style={{ animationDelay: '2s' }}
         ></div>
       </div>
+
+      {/* Modal para completar fecha de nacimiento */}
+      <BirthdateModal
+        isOpen={showBirthdateModal}
+        onClose={handleBirthdateModalClose}
+        onSuccess={handleBirthdateModalSuccess}
+      />
     </Layout>
   );
 }

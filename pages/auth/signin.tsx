@@ -176,8 +176,7 @@ export default function SignIn({ error, callbackUrl }: SignInProps) {
           </button>
         </Link>
 
-        {/* Botones sociales - TEMPORALMENTE OCULTO */}
-        {/*
+        {/* Botón de Google habilitado */}
         <div className='space-y-3'>
           <button
             onClick={handleGoogleSignIn}
@@ -204,7 +203,6 @@ export default function SignIn({ error, callbackUrl }: SignInProps) {
             <span>Iniciar con Google</span>
           </button>
         </div>
-        */}
       </div>
     </div>
   );

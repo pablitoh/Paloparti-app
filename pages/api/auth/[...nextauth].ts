@@ -4,11 +4,11 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 import { prisma } from '../../../lib/prisma';
 import bcrypt from 'bcryptjs';
-import {
-  getGoogleExtendedProfile,
-  isAgeValid,
-  formatBirthdateForLog,
-} from '../../../lib/googleProfileUtils';
+// import {
+//   getGoogleExtendedProfile,
+//   isAgeValid,
+//   formatBirthdateForLog,
+// } from '../../../lib/googleProfileUtils';
 
 // Función para obtener la URL base correcta
 function getBaseUrl() {
@@ -42,8 +42,7 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope:
-            'openid email profile https://www.googleapis.com/auth/user.birthday.read https://www.googleapis.com/auth/user.gender.read',
+          scope: 'openid email profile',
           prompt: 'select_account',
         },
       },
@@ -152,24 +151,6 @@ export const authOptions: NextAuthOptions = {
             name: user.name,
             image: user.image,
           });
-          console.log('Account info:', {
-            access_token: !!account.access_token,
-          });
-
-          // Obtener información extendida de Google (fecha de nacimiento)
-          let extendedProfile: {
-            birthdate: Date | null;
-            fullName: string | null;
-          } = { birthdate: null, fullName: null };
-          if (account.access_token) {
-            extendedProfile = await getGoogleExtendedProfile(
-              account.access_token
-            );
-            console.log('Perfil extendido obtenido:', {
-              birthdate: formatBirthdateForLog(extendedProfile.birthdate),
-              fullName: extendedProfile.fullName,
-            });
-          }
 
           // Buscar si el usuario ya existe
           let existingUser = await prisma.user.findUnique({
@@ -177,71 +158,39 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (!existingUser) {
-            // Crear nuevo usuario con información de Google
+            // Crear nuevo usuario con información básica de Google
             const finalName =
-              extendedProfile.fullName ||
               user.name ||
               `Usuario ${
                 user.email.split('@')[0].charAt(0).toUpperCase() +
                 user.email.split('@')[0].slice(1)
               }`;
 
-            // Validar edad si se obtuvo fecha de nacimiento
-            let finalBirthdate = extendedProfile.birthdate;
-            if (finalBirthdate && !isAgeValid(finalBirthdate)) {
-              console.warn('Usuario menor de 12 años, rechazando registro:', {
-                email: user.email,
-                birthdate: formatBirthdateForLog(finalBirthdate),
-              });
-              return false; // Rechazar el registro
-            }
-
             existingUser = await prisma.user.create({
               data: {
                 email: user.email,
                 name: finalName,
                 image: user.image,
-                birthdate: finalBirthdate,
-                // No se almacena contraseña para usuarios de Google
-                password: null,
+                birthdate: null, // Se pedirá después en el modal
+                password: null, // Usuario de Google
               },
             });
 
             console.log('✅ Nuevo usuario Google creado:', existingUser.id, {
               name: existingUser.name,
               hasImage: !!existingUser.image,
-              birthdate: formatBirthdateForLog(existingUser.birthdate),
-              hasExtendedInfo: !!extendedProfile.birthdate,
+              birthdate: 'Se pedirá en modal',
             });
           } else {
-            // Lógica de unificación mejorada
+            // Actualizar datos básicos si es necesario
             const updateData: any = {};
 
-            // Priorizar datos de la aplicación sobre los de Google
-            // Solo actualizar si el campo está vacío en la aplicación
-            if (!existingUser.name && (extendedProfile.fullName || user.name)) {
-              updateData.name = extendedProfile.fullName || user.name;
+            if (!existingUser.name && user.name) {
+              updateData.name = user.name;
             }
 
-            // Para la imagen: usar Google solo si no tiene imagen propia
             if (!existingUser.image && user.image) {
               updateData.image = user.image;
-            }
-
-            // Para fecha de nacimiento: solo actualizar si no tiene y Google la proporciona
-            if (!existingUser.birthdate && extendedProfile.birthdate) {
-              // Validar edad
-              if (isAgeValid(extendedProfile.birthdate)) {
-                updateData.birthdate = extendedProfile.birthdate;
-              } else {
-                console.warn(
-                  'Usuario existente menor de 12 años, no actualizando fecha:',
-                  {
-                    email: user.email,
-                    birthdate: formatBirthdateForLog(extendedProfile.birthdate),
-                  }
-                );
-              }
             }
 
             // Solo actualizar si hay cambios
@@ -252,22 +201,21 @@ export const authOptions: NextAuthOptions = {
               });
               console.log('✅ Usuario Google actualizado:', existingUser.id, {
                 updatedFields: Object.keys(updateData),
-                name: existingUser.name,
-                hasImage: !!existingUser.image,
-                birthdate: formatBirthdateForLog(existingUser.birthdate),
               });
             } else {
               console.log('ℹ️ Usuario Google sin cambios:', existingUser.id, {
                 name: existingUser.name,
                 hasImage: !!existingUser.image,
-                birthdate: formatBirthdateForLog(existingUser.birthdate),
-                extendedInfoReceived: !!extendedProfile.birthdate,
+                birthdate: existingUser.birthdate
+                  ? existingUser.birthdate.toISOString().split('T')[0]
+                  : 'null',
               });
             }
           }
 
           // Asignar el ID de nuestra base de datos al usuario
           user.id = existingUser.id;
+          user.birthdate = existingUser.birthdate;
 
           console.log('=== Google Sign-In completado exitosamente ===');
           return true;
@@ -286,8 +234,8 @@ export const authOptions: NextAuthOptions = {
         token.birthdate = user.birthdate;
       }
 
-      // Cuando se llama update(), refrescar datos del usuario desde la base de datos
-      if (trigger === 'update' && token.id) {
+      // Siempre refrescar datos del usuario desde la base de datos si tenemos un ID
+      if (token.id) {
         try {
           const updatedUser = await prisma.user.findUnique({
             where: { id: token.id as string },
@@ -311,6 +259,7 @@ export const authOptions: NextAuthOptions = {
               name: updatedUser.name,
               email: updatedUser.email,
               image: updatedUser.image,
+              birthdate: updatedUser.birthdate ? 'Presente' : 'Ausente',
             });
           }
         } catch (error) {
@@ -328,6 +277,7 @@ export const authOptions: NextAuthOptions = {
           hasUser: !!user,
           hasToken: !!token,
           tokenId: token?.id,
+          hasBirthdate: !!token.birthdate,
           environment: process.env.VERCEL_ENV,
         });
       }
@@ -343,15 +293,20 @@ export const authOptions: NextAuthOptions = {
         session.user.birthdate = token.birthdate as Date | null;
       }
 
-      // Debug logging para preview
-      if (process.env.VERCEL_ENV === 'preview') {
+      // Debug logging para preview y desarrollo
+      if (
+        process.env.VERCEL_ENV === 'preview' ||
+        process.env.NODE_ENV === 'development'
+      ) {
         console.log('NextAuth session callback:', {
           hasSession: !!session,
           hasUser: !!session?.user,
           userId: session?.user?.id,
           userEmail: session?.user?.email,
           userImage: session?.user?.image,
+          userBirthdate: session?.user?.birthdate ? 'Presente' : 'Ausente',
           tokenId: token?.id,
+          tokenBirthdate: token?.birthdate ? 'Presente' : 'Ausente',
           environment: process.env.VERCEL_ENV,
           vercelUrl: process.env.VERCEL_URL,
         });
