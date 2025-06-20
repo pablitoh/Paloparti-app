@@ -321,12 +321,6 @@ export const useAdminAttendanceMutation = () => {
       groupId?: string;
       playerRoles?: any;
     }) => {
-      console.log('======= ADMIN ATTENDANCE MUTATION =======');
-      console.log('USER ID:', userId);
-      console.log('MATCH ID:', matchId);
-      console.log('STATUS:', status);
-      console.log('PLAYER ROLES:', playerRoles);
-
       const response = await fetch('/api/attendances', {
         method: 'POST',
         headers: {

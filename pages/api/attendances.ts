@@ -40,20 +40,6 @@ export default async function handler(
 
     const { userId, groupId, matchId, status, playerRoles } = req.body;
 
-    // Logging for debugging
-    console.log('======= BACKEND API ATTENDANCES =======');
-    console.log('USER ID:', session.user.id);
-    console.log('TARGET USER ID:', userId || session.user.id);
-    console.log('MATCH ID:', matchId);
-    console.log('STATUS:', status);
-    console.log('PLAYER ROLES:', playerRoles);
-    console.log('PLAYER ROLES TYPE:', typeof playerRoles);
-    console.log('PLAYER ROLES IS ARRAY:', Array.isArray(playerRoles));
-    if (Array.isArray(playerRoles)) {
-      console.log('PLAYER ROLES LENGTH:', playerRoles.length);
-      console.log('PLAYER ROLES CONTENT:', JSON.stringify(playerRoles));
-    }
-
     // Validate required fields
     if (!matchId || !status) {
       return res.status(400).json({
@@ -79,15 +65,11 @@ export default async function handler(
       if (playerRoles && playerRoles.length > 0) {
         // Normalizar roles (maneja tanto string[] como PlayerRole[])
         validatedRoles = normalizePlayerRoles(playerRoles);
-        console.log('ROLES NORMALIZADOS:', validatedRoles);
       } else {
         // Si no se proporcionan roles, usar valor por defecto
         validatedRoles = [{ role: PLAYER_ROLES.WILDCARD, priority: 1 }];
-        console.log('USANDO VALOR DEFAULT:', validatedRoles);
       }
     }
-
-    console.log('ROLES VALIDADOS FINAL:', validatedRoles);
 
     // Fetch match and group info in a single query
     const match = await prisma.match.findUnique({
@@ -162,7 +144,6 @@ export default async function handler(
 
         // Guardar los roles del jugador usando su ID como clave
         tbdPlayers.playerRoles[targetUserId] = validatedRoles;
-        console.log('Guardando roles en tbdPlayers:', tbdPlayers);
 
         // Actualizar el campo tbdPlayers en la tabla Match
         await prisma.match.update({
@@ -171,8 +152,6 @@ export default async function handler(
             tbdPlayers: tbdPlayers,
           },
         });
-
-        console.log('tbdPlayers actualizado correctamente');
       } catch (error) {
         console.error('Error al actualizar tbdPlayers:', error);
       }
@@ -237,8 +216,6 @@ export default async function handler(
       console.error('Error logging attendance update:', logError);
       // No interrumpimos el flujo principal si falla el log
     }
-
-    console.log('======= FIN BACKEND API ATTENDANCES =======');
 
     return res.status(200).json({
       success: true,

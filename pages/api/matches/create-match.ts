@@ -2155,16 +2155,6 @@ export default async function handler(
       useRandomAlgorithm = false, // Parámetro para usar algoritmo completamente aleatorio
     } = req.body;
 
-    console.log('🔍 Parámetros recibidos en backend:', {
-      groupId,
-      matchId,
-      mode,
-      playersCount: players.length,
-      allowTbdPlayers,
-      isResort,
-      tbdPlayersInput: tbdPlayersInput ? 'provided' : 'not provided',
-    });
-
     // Validar campos requeridos
     if (!groupId) {
       return res.status(400).json({ message: 'Se requiere el ID del grupo' });
@@ -3789,16 +3779,8 @@ export default async function handler(
 
     // Añadir jugadores TBD si es necesario
     const addTbdPlayers = (team: any[], isTeamA: boolean) => {
-      console.log(`🔍 addTbdPlayers called for Team ${isTeamA ? 'A' : 'B'}:`, {
-        teamSize: team.length,
-        allowTbdPlayers,
-        requiredPlayersPerTeam,
-        tbdPlayersInput,
-      });
-
       // Si no se permite añadir TBD players, retornar array vacío
       if (allowTbdPlayers === false) {
-        console.log('❌ TBD players not allowed, returning empty array');
         return [];
       }
 
@@ -3821,30 +3803,17 @@ export default async function handler(
       const totalRealPlayers = finalTeamA.length + finalTeamB.length;
       const totalRequiredPlayers = requiredPlayersPerTeam * 2;
 
-      console.log(
-        `Checking if TBD players are needed: ${totalRealPlayers} real players vs ${totalRequiredPlayers} required`
-      );
-
       if (totalRealPlayers >= totalRequiredPlayers) {
-        console.log('No TBD players needed, we have enough real players');
         return []; // No TBD players needed if we have enough real players across both teams
       }
 
       // If we're below the total required but this specific team has enough, still don't add TBD
       if (team.length >= requiredPlayersPerTeam) {
-        console.log(
-          `Team ${isTeamA ? 'A' : 'B'} has enough players (${
-            team.length
-          }), not adding TBD`
-        );
         return []; // No need for TBD players on this team
       }
 
       // For teams with insufficient players, calculate how many TBD to add
       const tbdCount = requiredPlayersPerTeam - team.length;
-      console.log(
-        `Adding ${tbdCount} TBD players to Team ${isTeamA ? 'A' : 'B'}`
-      );
 
       // Fallback: crear jugadores TBD genéricos
       const generatedTbdPlayers: TbdPlayer[] = [];

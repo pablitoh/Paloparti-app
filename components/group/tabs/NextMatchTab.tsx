@@ -606,13 +606,6 @@ export default function NextMatchTab({
           return;
         }
 
-        console.log('🔍 Enviando parámetros de sorteo:', {
-          allowFillIn,
-          allowTbdPlayers: allowFillIn,
-          confirmedPlayersCount: matchDetails?.confirmedPlayers?.length || 0,
-          requiredPlayers: group?.requiredPlayers || 10,
-        });
-
         const response = await randomizeTeamsMutation.mutateAsync({
           groupId: id,
           matchId: matchDetails.id,
