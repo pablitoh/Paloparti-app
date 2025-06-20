@@ -2155,6 +2155,16 @@ export default async function handler(
       useRandomAlgorithm = false, // Parámetro para usar algoritmo completamente aleatorio
     } = req.body;
 
+    console.log('🔍 Parámetros recibidos en backend:', {
+      groupId,
+      matchId,
+      mode,
+      playersCount: players.length,
+      allowTbdPlayers,
+      isResort,
+      tbdPlayersInput: tbdPlayersInput ? 'provided' : 'not provided',
+    });
+
     // Validar campos requeridos
     if (!groupId) {
       return res.status(400).json({ message: 'Se requiere el ID del grupo' });

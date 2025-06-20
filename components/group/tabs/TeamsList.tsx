@@ -299,7 +299,23 @@ const TeamsList: React.FC<TeamsListProps> = ({
       playerRoles: player.playerRoles,
       userSelectedRoles,
       assignedRole: player.assignedRole,
+      playerRolesContent: player.playerRoles,
+      userSelectedRolesContent: userSelectedRoles,
     });
+
+    // Log específico para ver el contenido de los arrays
+    if (player.playerRoles && Array.isArray(player.playerRoles)) {
+      console.log(
+        `  -> playerRoles array content:`,
+        player.playerRoles.map((role, index) =>
+          typeof role === 'object'
+            ? `${index}: {role: ${role.role}, priority: ${role.priority}}`
+            : `${index}: ${role}`
+        )
+      );
+    }
+
+    console.log(`  -> userSelectedRoles content:`, userSelectedRoles);
 
     // Priorizar el rol asignado si existe, seguido por las elecciones del usuario
     let displayRoles: string[] = [];
