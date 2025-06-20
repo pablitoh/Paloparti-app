@@ -219,6 +219,9 @@ export default function NextMatchTab({
   // Estado para el dropdown de acciones
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
 
+  // Estado para el toggle de vista compacta
+  const [isCompactView, setIsCompactView] = useState(false);
+
   // Cerrar dropdown cuando se hace clic afuera
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1374,7 +1377,7 @@ _Generado con Paloparti_ 🚀`;
               {/* Header with actions */}
               <div className='mb-4'>
                 <div className='flex justify-between items-center gap-2'>
-                  <div>
+                  <div className='flex items-center gap-3'>
                     <h3 className='text-lg font-semibold leading-6 text-gray-900 flex items-center'>
                       <svg
                         className='w-5 h-5 mr-2 text-primary-600'
@@ -1391,6 +1394,47 @@ _Generado con Paloparti_ 🚀`;
                       </svg>
                       Equipos
                     </h3>
+
+                    {/* Toggle para vista compacta */}
+                    <button
+                      onClick={() => setIsCompactView(!isCompactView)}
+                      className={`p-2 rounded-lg transition-all duration-200 ${
+                        isCompactView
+                          ? 'bg-primary-100 text-primary-600 hover:bg-primary-200'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                      title={isCompactView ? 'Vista normal' : 'Vista compacta'}
+                    >
+                      {isCompactView ? (
+                        <svg
+                          className='w-4 h-4'
+                          fill='none'
+                          stroke='currentColor'
+                          viewBox='0 0 24 24'
+                        >
+                          <path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            strokeWidth='2'
+                            d='M4 6h16M4 10h16M4 14h16M4 18h16'
+                          />
+                        </svg>
+                      ) : (
+                        <svg
+                          className='w-4 h-4'
+                          fill='none'
+                          stroke='currentColor'
+                          viewBox='0 0 24 24'
+                        >
+                          <path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            strokeWidth='2'
+                            d='M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h2a2 2 0 00-2 2'
+                          />
+                        </svg>
+                      )}
+                    </button>
                   </div>
 
                   {/* Admin actions - responsive */}
@@ -1509,6 +1553,7 @@ _Generado con Paloparti_ 🚀`;
                 teamAAvgAge={finalTeamAAvgAge}
                 teamBAvgAge={finalTeamBAvgAge}
                 sortCount={matchDetails?.sortCount || 0}
+                isCompactView={isCompactView}
               />
             </div>
           ) : null}

@@ -92,6 +92,7 @@ interface TeamsListProps {
   teamAAvgRating?: number;
   teamBAvgRating?: number;
   sortCount?: number;
+  isCompactView?: boolean;
 }
 
 interface PlayerItemProps {
@@ -165,6 +166,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
   teamAAvgRating,
   teamBAvgRating,
   sortCount = 0,
+  isCompactView = false,
 }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const sliderRef = useRef<HTMLDivElement>(null);
@@ -341,12 +343,12 @@ const TeamsList: React.FC<TeamsListProps> = ({
         flex items-center justify-between py-3 px-3 rounded-xl transition-all duration-200
         ${
           isTbd
-            ? 'bg-gray-25 border border-gray-200 hover:bg-gray-50'
+            ? 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
             : isTeamA
-            ? 'bg-primary-25 border border-primary-100 hover:bg-primary-50 hover:border-primary-200'
-            : 'bg-coral-25 border border-coral-100 hover:bg-coral-50 hover:border-coral-200'
+            ? 'bg-primary-50 border border-primary-200 hover:bg-primary-100 hover:border-primary-300'
+            : 'bg-lime-50 border border-lime-200 hover:bg-lime-100 hover:border-lime-300'
         }
-        hover:shadow-md transform hover:scale-[1.01]
+        hover:shadow-md
       `}
       >
         <div className='flex items-center gap-3 flex-grow min-w-0'>
@@ -387,7 +389,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
 
             {/* Dropdown Menu */}
             {dropdownOpen && currentUserIsAdmin && onSwapPlayer && !isTbd && (
-              <div className='absolute top-12 left-0 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[100000]'>
+              <div className='absolute top-12 left-0 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[9999999]'>
                 <button
                   onClick={() => {
                     onSwapPlayer(player.id, isTeamA);
@@ -485,7 +487,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
         {currentUserIsAdmin && showReplaceButton && onReplaceTbd && (
           <button
             onClick={() => onReplaceTbd(player.id)}
-            className='p-2 rounded-lg bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 hover:border-gray-300 transition-colors'
+            className='p-2 rounded-lg bg-primary-50 text-primary-600 border border-primary-200 hover:bg-primary-100 hover:border-primary-300 transition-colors'
             title='Reemplazar jugador'
           >
             <UserPlusIcon className='h-4 w-4' />
@@ -493,6 +495,63 @@ const TeamsList: React.FC<TeamsListProps> = ({
         )}
       </div>
     );
+  };
+
+  // Función para agrupar jugadores por posición
+  const groupPlayersByPosition = (players: (Player | TbdPlayer)[]) => {
+    const groups: { [key: string]: (Player | TbdPlayer)[] } = {};
+
+    players.forEach((player) => {
+      const role = player.assignedRole || 'Sin posición';
+      if (!groups[role]) {
+        groups[role] = [];
+      }
+      groups[role].push(player);
+    });
+
+    // Ordenar grupos por prioridad de posición
+    const orderedPositions = [
+      PLAYER_ROLES.GOALKEEPER,
+      PLAYER_ROLES.DEFENDER,
+      PLAYER_ROLES.MIDFIELDER,
+      PLAYER_ROLES.FORWARD,
+      PLAYER_ROLES.WILDCARD,
+      'Sin posición',
+    ];
+
+    const orderedGroups: {
+      position: string;
+      players: (Player | TbdPlayer)[];
+    }[] = [];
+
+    orderedPositions.forEach((position) => {
+      if (groups[position] && groups[position].length > 0) {
+        orderedGroups.push({
+          position,
+          players: groups[position],
+        });
+      }
+    });
+
+    return orderedGroups;
+  };
+
+  // Función para obtener el nombre en español de la posición
+  const getPositionName = (position: string): string => {
+    switch (position) {
+      case PLAYER_ROLES.GOALKEEPER:
+        return 'Arqueros';
+      case PLAYER_ROLES.DEFENDER:
+        return 'Defensores';
+      case PLAYER_ROLES.MIDFIELDER:
+        return 'Mediocampistas';
+      case PLAYER_ROLES.FORWARD:
+        return 'Delanteros';
+      case PLAYER_ROLES.WILDCARD:
+        return 'Comodines';
+      default:
+        return 'Sin posición';
+    }
   };
 
   // Componente para una tarjeta de equipo
@@ -504,57 +563,177 @@ const TeamsList: React.FC<TeamsListProps> = ({
     avgAge,
     avgRating,
   }) => {
-    const sortedPlayers = sortPlayersByRole(players);
-    const sortedTbdPlayers = sortPlayersByRole(tbdPlayers);
+    const allPlayers = [...players, ...tbdPlayers];
+    const groupedPlayers = groupPlayersByPosition(allPlayers);
 
     return (
-      <div className='bg-primary-25 rounded-xl shadow-sm border border-primary-300 p-5 min-w-0 flex-shrink-0 w-full md:w-auto transition-all duration-200 hover:shadow-md hover:border-primary-400'>
-        {/* Team Header - Minimalist design */}
-        <div className='text-center mb-4'>
-          <h3
-            className={`text-xl font-semibold mb-2 ${
-              isTeamA ? 'text-primary-700' : 'text-coral-600'
-            }`}
-          >
-            {teamName}
-          </h3>
+      <div className='rounded-3xl shadow-sm border border-gray-200 min-w-0 flex-shrink-0 w-full md:w-auto transition-all duration-200 hover:shadow-md hover:border-gray-300 bg-white overflow-hidden'>
+        {/* Team Header - New design with gradient */}
+        <div
+          className={`p-5 pb-8 ${
+            isTeamA
+              ? 'bg-gradient-to-b from-primary-200 via-primary-100 via-gray-50 to-white'
+              : 'bg-gradient-to-b from-lime-200 via-lime-100 via-gray-50 to-white'
+          }`}
+        >
+          {/* Team name centered - moved up */}
+          <div className='text-center mb-4'>
+            <h3
+              className={`text-xl font-bold ${
+                isTeamA ? 'text-primary-900' : 'text-lime-900'
+              }`}
+            >
+              {teamName}
+            </h3>
+          </div>
 
-          {/* Age in parentheses below team name */}
-          {avgAge !== undefined && (
-            <p className='text-sm text-gray-500 mb-3'>({avgAge})</p>
-          )}
-
-          {/* Rating badge - subtle */}
-          {avgRating !== undefined && (
-            <div className='inline-flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-md border border-gray-200'>
-              <span className='text-gray-700 text-sm font-medium'>
-                {avgRating}
-              </span>
-              <span className='text-gray-500 text-xs'>⭐</span>
+          {/* Bottom row with age and rating */}
+          <div className='flex justify-between items-center'>
+            {/* Age on the left */}
+            <div className='text-sm font-medium text-gray-700'>
+              {avgAge !== undefined ? `${avgAge} 🎂` : ''}
             </div>
-          )}
+
+            {/* Rating on the right */}
+            <div className='text-sm font-medium text-gray-700'>
+              {avgRating !== undefined ? `${avgRating} ⭐` : ''}
+            </div>
+          </div>
         </div>
 
-        {/* Players List */}
-        <div className='space-y-1.5'>
-          {sortedPlayers.map((player) => (
-            <PlayerItem
-              key={player.id}
-              player={player}
-              showReplaceButton={player.playerType === 'TBD'}
-              isTeamA={isTeamA}
-            />
-          ))}
+        {/* Players List Grouped by Position */}
+        <div className='p-5 pt-0 space-y-3'>
+          {groupedPlayers.map((group, groupIndex) => (
+            <div key={group.position}>
+              {/* Position Header */}
+              <div className='flex items-center mb-2'>
+                <div className='flex-grow h-px bg-gray-300'></div>
+                <span className='px-3 text-xs font-medium text-gray-500 bg-gray-50'>
+                  {getPositionName(group.position)}
+                </span>
+                <div className='flex-grow h-px bg-gray-300'></div>
+              </div>
 
-          {sortedTbdPlayers.map((player) => (
-            <PlayerItem
-              key={player.id}
-              player={player}
-              isTbd={true}
-              showReplaceButton={true}
-              isTeamA={isTeamA}
-            />
+              {/* Players in this position */}
+              <div className='space-y-1.5'>
+                {group.players.map((player) => (
+                  <PlayerItem
+                    key={player.id}
+                    player={player}
+                    showReplaceButton={player.playerType === 'TBD'}
+                    isTbd={
+                      player.playerType === 'TBD' ||
+                      tbdPlayers.some((tbd) => tbd.id === player.id)
+                    }
+                    isTeamA={isTeamA}
+                  />
+                ))}
+              </div>
+            </div>
           ))}
+        </div>
+      </div>
+    );
+  };
+
+  // Función para obtener el símbolo de rol
+  const getRoleSymbol = (
+    playerRoles?: PlayerRole[],
+    assignedRole?: string
+  ): string => {
+    const role = getPrimaryRole(playerRoles) || assignedRole;
+
+    if (!role) return 'JUG';
+
+    switch (role) {
+      case PLAYER_ROLES.GOALKEEPER:
+        return 'POR';
+      case PLAYER_ROLES.DEFENDER:
+        return 'DEF';
+      case PLAYER_ROLES.MIDFIELDER:
+        return 'MED';
+      case PLAYER_ROLES.FORWARD:
+        return 'DEL';
+      case PLAYER_ROLES.WILDCARD:
+        return 'COM';
+      default:
+        return 'JUG';
+    }
+  };
+
+  // Función para formatear jugadores en vista compacta
+  const formatPlayersCompact = (players: (Player | TbdPlayer)[]): string => {
+    return players
+      .map((player) => {
+        const roleSymbol = getRoleSymbol(
+          player.playerRoles,
+          player.assignedRole
+        );
+        const displayName =
+          player.playerType === 'TBD'
+            ? `TBD-${player.name}`
+            : player.name || 'Sin nombre';
+        return `(${roleSymbol}) ${displayName}`;
+      })
+      .join(' | ');
+  };
+
+  // Componente para vista compacta
+  const CompactView = () => {
+    const allPlayersA = [...playersA, ...teamATbdPlayers];
+    const allPlayersB = [...playersB, ...teamBTbdPlayers];
+    const sortedPlayersA = sortPlayersByRole(allPlayersA);
+    const sortedPlayersB = sortPlayersByRole(allPlayersB);
+
+    return (
+      <div className='bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mx-auto max-w-4xl'>
+        {/* Header con promedios */}
+        <div className='flex justify-between items-center mb-6'>
+          <div className='text-center'>
+            <h3 className='text-xl font-bold text-primary-900 mb-1'>
+              {teamAName}
+            </h3>
+            <div className='text-sm text-gray-600'>
+              {effectiveTeamAAvgAge && `${effectiveTeamAAvgAge} 🎂`}
+              {effectiveTeamAAvgAge && effectiveTeamAAvgRating && ' • '}
+              {effectiveTeamAAvgRating && `${effectiveTeamAAvgRating} ⭐`}
+            </div>
+          </div>
+
+          <div className='w-px h-16 bg-gray-300'></div>
+
+          <div className='text-center'>
+            <h3 className='text-xl font-bold text-lime-900 mb-1'>
+              {teamBName}
+            </h3>
+            <div className='text-sm text-gray-600'>
+              {effectiveTeamBAvgAge && `${effectiveTeamBAvgAge} 🎂`}
+              {effectiveTeamBAvgAge && effectiveTeamBAvgRating && ' • '}
+              {effectiveTeamBAvgRating && `${effectiveTeamBAvgRating} ⭐`}
+            </div>
+          </div>
+        </div>
+
+        {/* Lista de jugadores */}
+        <div className='flex justify-center'>
+          <div className='flex items-start gap-8 max-w-full'>
+            {/* Equipo A */}
+            <div className='flex-1 text-right'>
+              <div className='text-lg leading-relaxed font-medium text-gray-800 break-words'>
+                {formatPlayersCompact(sortedPlayersA)}
+              </div>
+            </div>
+
+            {/* Línea divisoria vertical */}
+            <div className='w-px bg-primary-300 self-stretch min-h-[100px] flex-shrink-0'></div>
+
+            {/* Equipo B */}
+            <div className='flex-1 text-left'>
+              <div className='text-lg leading-relaxed font-medium text-gray-800 break-words'>
+                {formatPlayersCompact(sortedPlayersB)}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -563,38 +742,15 @@ const TeamsList: React.FC<TeamsListProps> = ({
   return (
     <div
       id={`teams-list-container-${sortCount}`}
-      className='w-full'
+      className='w-full bg-transparent'
       data-sort-count={sortCount}
     >
-      {/* Desktop Layout with better spacing */}
-      <div className='hidden md:flex gap-6 justify-center px-4'>
-        <TeamCard
-          players={playersA}
-          tbdPlayers={teamATbdPlayers}
-          teamName={teamAName || 'Equipo A'}
-          isTeamA={true}
-          avgAge={effectiveTeamAAvgAge}
-          avgRating={effectiveTeamAAvgRating}
-        />
-        <TeamCard
-          players={playersB}
-          tbdPlayers={teamBTbdPlayers}
-          teamName={teamBName || 'Equipo B'}
-          isTeamA={false}
-          avgAge={effectiveTeamBAvgAge}
-          avgRating={effectiveTeamBAvgRating}
-        />
-      </div>
-
-      {/* Mobile Slider Layout with better spacing */}
-      <div className='md:hidden'>
-        {/* Slider Container */}
-        <div
-          ref={sliderRef}
-          className='flex overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-4 px-4'
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
-          <div className='snap-center min-w-[300px] flex-shrink-0'>
+      {isCompactView ? (
+        <CompactView />
+      ) : (
+        <>
+          {/* Desktop Layout with better spacing */}
+          <div className='hidden md:flex gap-6 justify-center px-4'>
             <TeamCard
               players={playersA}
               tbdPlayers={teamATbdPlayers}
@@ -603,8 +759,6 @@ const TeamsList: React.FC<TeamsListProps> = ({
               avgAge={effectiveTeamAAvgAge}
               avgRating={effectiveTeamAAvgRating}
             />
-          </div>
-          <div className='snap-center min-w-[300px] flex-shrink-0'>
             <TeamCard
               players={playersB}
               tbdPlayers={teamBTbdPlayers}
@@ -614,49 +768,80 @@ const TeamsList: React.FC<TeamsListProps> = ({
               avgRating={effectiveTeamBAvgRating}
             />
           </div>
-        </div>
 
-        {/* Navigation Controls */}
-        <div className='flex justify-center items-center gap-3 mt-4'>
-          <button
-            onClick={prevSlide}
-            className={`p-2 rounded-lg transition-colors ${
-              currentSlide === 0
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-            disabled={currentSlide === 0}
-          >
-            <ChevronLeftIcon className='h-4 w-4' />
-          </button>
+          {/* Mobile Slider Layout with better spacing */}
+          <div className='md:hidden'>
+            {/* Slider Container */}
+            <div
+              ref={sliderRef}
+              className='flex overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-4 px-4'
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              <div className='snap-center min-w-[300px] flex-shrink-0'>
+                <TeamCard
+                  players={playersA}
+                  tbdPlayers={teamATbdPlayers}
+                  teamName={teamAName || 'Equipo A'}
+                  isTeamA={true}
+                  avgAge={effectiveTeamAAvgAge}
+                  avgRating={effectiveTeamAAvgRating}
+                />
+              </div>
+              <div className='snap-center min-w-[300px] flex-shrink-0'>
+                <TeamCard
+                  players={playersB}
+                  tbdPlayers={teamBTbdPlayers}
+                  teamName={teamBName || 'Equipo B'}
+                  isTeamA={false}
+                  avgAge={effectiveTeamBAvgAge}
+                  avgRating={effectiveTeamBAvgRating}
+                />
+              </div>
+            </div>
 
-          {/* Dots indicator */}
-          <div className='flex gap-1.5'>
-            <div
-              className={`w-2 h-2 rounded-full transition-all ${
-                currentSlide === 0 ? 'bg-gray-800' : 'bg-gray-300'
-              }`}
-            />
-            <div
-              className={`w-2 h-2 rounded-full transition-all ${
-                currentSlide === 1 ? 'bg-gray-800' : 'bg-gray-300'
-              }`}
-            />
+            {/* Navigation Controls */}
+            <div className='flex justify-center items-center gap-3 mt-4'>
+              <button
+                onClick={prevSlide}
+                className={`p-2 rounded-lg transition-colors ${
+                  currentSlide === 0
+                    ? 'bg-primary-100 text-primary-400 cursor-not-allowed'
+                    : 'bg-primary-100 text-primary-600 hover:bg-primary-200'
+                }`}
+                disabled={currentSlide === 0}
+              >
+                <ChevronLeftIcon className='h-4 w-4' />
+              </button>
+
+              {/* Dots indicator */}
+              <div className='flex gap-1.5'>
+                <div
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    currentSlide === 0 ? 'bg-primary-800' : 'bg-primary-300'
+                  }`}
+                />
+                <div
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    currentSlide === 1 ? 'bg-primary-800' : 'bg-primary-300'
+                  }`}
+                />
+              </div>
+
+              <button
+                onClick={nextSlide}
+                className={`p-2 rounded-lg transition-colors ${
+                  currentSlide === 1
+                    ? 'bg-primary-100 text-primary-400 cursor-not-allowed'
+                    : 'bg-primary-100 text-primary-600 hover:bg-primary-200'
+                }`}
+                disabled={currentSlide === 1}
+              >
+                <ChevronRightIcon className='h-4 w-4' />
+              </button>
+            </div>
           </div>
-
-          <button
-            onClick={nextSlide}
-            className={`p-2 rounded-lg transition-colors ${
-              currentSlide === 1
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-            disabled={currentSlide === 1}
-          >
-            <ChevronRightIcon className='h-4 w-4' />
-          </button>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 };

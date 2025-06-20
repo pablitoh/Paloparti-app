@@ -70,7 +70,7 @@
 /* Estilos para mejorar screenshots */
 div[id^='teams-list-container'] {
   font-size: 16px;
-  background: white;
+  background: transparent;
   position: relative;
   width: 100%;
   max-width: 100%;
