@@ -1050,7 +1050,7 @@ export default function NextMatchTab({
       {matchDetails ? (
         <>
           {/* Cabecera con información del partido */}
-          <div className='bg-white rounded-2xl overflow-hidden shadow-green-lg border border-primary-100'>
+          <div className='overflow-hidden'>
             <div className='bg-gradient-green px-4 py-3 sm:py-4'>
               <div className='space-y-2'>
                 <h3 className='text-xl sm:text-2xl font-bold text-white flex items-center'>
@@ -1429,7 +1429,7 @@ export default function NextMatchTab({
           ) : null}
         </>
       ) : (
-        <div className='bg-white rounded-2xl p-8 text-center shadow-green-lg border border-primary-100'>
+        <div className='p-8 text-center'>
           <div className='mb-6'>
             <div className='w-20 h-20 bg-gradient-green-light rounded-full flex items-center justify-center mx-auto mb-4'>
               <svg
