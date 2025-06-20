@@ -668,6 +668,32 @@ const TeamsList: React.FC<TeamsListProps> = ({
     return nameParts[nameParts.length - 1];
   };
 
+  // Función para formatear nombre (iniciales + apellido si es muy largo)
+  const formatPlayerName = (fullName: string): string => {
+    if (!fullName) return 'Sin nombre';
+
+    const nameParts = fullName.trim().split(' ');
+
+    // Si solo tiene un nombre, devolverlo tal como está
+    if (nameParts.length === 1) {
+      return nameParts[0];
+    }
+
+    // Si el nombre completo es corto (menos de 12 caracteres), usar apellido solo
+    if (fullName.length <= 12) {
+      return getLastName(fullName);
+    }
+
+    // Si es muy largo, usar iniciales + apellido
+    const lastName = nameParts[nameParts.length - 1];
+    const firstNames = nameParts.slice(0, -1);
+    const initials = firstNames
+      .map((name) => name.charAt(0).toUpperCase())
+      .join('.');
+
+    return `${initials}. ${lastName}`;
+  };
+
   // Componente para vista compacta
   const CompactView = () => {
     const allPlayersA = [...playersA, ...teamATbdPlayers];
@@ -716,11 +742,11 @@ const TeamsList: React.FC<TeamsListProps> = ({
               ? `(${getRoleSymbol(
                   playerA.playerRoles,
                   playerA.assignedRole
-                )}) ${getLastName(playerA.name || '')}`
+                )}) ${formatPlayerName(playerA.name || '')}`
               : '—';
 
             const textB = playerB
-              ? `${getLastName(playerB.name || '')} (${getRoleSymbol(
+              ? `${formatPlayerName(playerB.name || '')} (${getRoleSymbol(
                   playerB.playerRoles,
                   playerB.assignedRole
                 )})`
