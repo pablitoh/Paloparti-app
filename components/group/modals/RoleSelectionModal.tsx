@@ -129,13 +129,9 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
 
         <div className='p-6'>
           <div className='mb-4'>
-            <p className='text-sm text-primary-600 mb-4'>
-              Selecciona{' '}
-              <span className='font-medium'>
-                {POSITION_CONFIG.MIN_POSITIONS}
-              </span>{' '}
-              posiciones por orden de prioridad. El número indica la preferencia
-              (1° = primera opción).
+            <p className='text-xs text-primary-600 mb-4'>
+              Selecciona {POSITION_CONFIG.MIN_POSITIONS} posiciones por orden de
+              prioridad
             </p>
 
             {/* Selector de roles con nueva estética */}

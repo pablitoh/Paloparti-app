@@ -224,14 +224,9 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
 
       {/* Selector de roles con prioridades */}
       <div className='mt-2 mb-4'>
-        <p className='text-sm font-medium text-gray-700 mb-1.5'>
-          Posición (selecciona {POSITION_CONFIG.MIN_POSITIONS} por orden de
-          prioridad)
-          {isConfirmed && (
-            <span className='ml-2 text-xs text-gray-500'>
-              (bloqueado - cancela asistencia para cambiar)
-            </span>
-          )}
+        <p className='text-xs text-gray-600 mb-1.5'>
+          Selecciona {POSITION_CONFIG.MIN_POSITIONS} posiciones por orden de
+          prioridad
         </p>
         <div className='grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5'>
           {Object.entries(PLAYER_ROLES).map(
@@ -266,24 +261,6 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
               )
           )}
         </div>
-        {isConfirmed && (
-          <div className='mt-2 text-xs text-blue-600'>
-            Roles confirmados:{' '}
-            {selectedRoles
-              .sort((a, b) => a.priority - b.priority)
-              .map((r) => `${r.priority}° ${r.role}`)
-              .join(', ') || 'Comodín'}
-          </div>
-        )}
-        {!isConfirmed && selectedRoles.length > 0 && (
-          <div className='mt-2 text-xs text-gray-600'>
-            Seleccionados:{' '}
-            {selectedRoles
-              .sort((a, b) => a.priority - b.priority)
-              .map((r) => `${r.priority}° ${r.role}`)
-              .join(', ')}
-          </div>
-        )}
       </div>
 
       {/* Botón de asistencia */}
