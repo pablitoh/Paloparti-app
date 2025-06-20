@@ -40,6 +40,7 @@ import type { MatchInterface } from '../../types/match';
 import ManualTeamFormationModal from '../../components/group/modals/ManualTeamFormationModal';
 import SwapPlayersModal from '../../components/group/modals/SwapPlayersModal';
 import Link from 'next/link';
+import { PlayerRole } from '../../lib/teambuilder/constants';
 
 // Add AuthUser interface
 interface AuthUser {
@@ -61,7 +62,7 @@ interface LazyNextMatchTabProps extends LazyTabProps {
   currentUserIsAdmin: boolean;
   isUserInGroup: boolean;
   handleAttendance: (status: ParticipantStatus) => Promise<void>;
-  handleRandomTeams: (confirmedPlayers?: any[]) => Promise<void>;
+  handleRandomizeTeams: (confirmedPlayers?: any[]) => Promise<void>;
   handleDeleteMatch: (matchId: string) => Promise<void>;
   setShowReplaceTbdModal: (id: string) => void;
   setShowSwapPlayersModal: (value: boolean) => void;
@@ -86,10 +87,10 @@ interface LazyMembersTabProps extends LazyTabProps {
   basicData: any;
   user: AuthUser | null;
   currentUserIsAdmin: boolean;
-  handleAdminAttendanceUpdate: (
+  handleAdminAttendance: (
     userId: string,
     status: ParticipantStatus,
-    playerRoles?: string[]
+    playerRoles?: PlayerRole[]
   ) => Promise<void>;
   handleLeaveGroup: () => Promise<void>;
 }
@@ -160,7 +161,7 @@ const LazyNextMatchTab = ({
   currentUserIsAdmin,
   isUserInGroup,
   handleAttendance,
-  handleRandomTeams,
+  handleRandomizeTeams,
   handleDeleteMatch,
   setShowReplaceTbdModal,
   setShowSwapPlayersModal,
@@ -215,7 +216,7 @@ const LazyNextMatchTab = ({
       }
 
       // Pass the current next match data to make sure we have the confirmed players
-      await handleRandomTeams(apiData?.nextMatchDetails?.confirmedPlayers);
+      await handleRandomizeTeams(apiData?.nextMatchDetails?.confirmedPlayers);
       // Don't refetch here as the mutation already handles it
       // This prevents double calls to the API
     } catch (error) {
@@ -341,7 +342,7 @@ const LazyMembersTab = ({
   basicData,
   user,
   currentUserIsAdmin,
-  handleAdminAttendanceUpdate,
+  handleAdminAttendance,
   handleLeaveGroup,
 }: LazyMembersTabProps) => {
   const { data: nextMatchData, isLoading: isNextMatchLoading } =
@@ -386,12 +387,17 @@ const LazyMembersTab = ({
         handleConfirmAttendance={async (
           memberId: string,
           userId: string,
-          playerRoles?: string[]
+          playerRoles?: PlayerRole[]
         ) => {
-          await handleAdminAttendanceUpdate(userId, 'CONFIRMED', playerRoles);
+          await handleAdminAttendance(
+            'CONFIRMED',
+            userId,
+            undefined,
+            playerRoles
+          );
         }}
         handleDeclineAttendance={async (memberId: string, userId: string) => {
-          await handleAdminAttendanceUpdate(userId, 'DECLINED');
+          await handleAdminAttendance('DECLINED', userId);
         }}
         handleLeaveGroup={handleLeaveGroup}
       />
@@ -628,10 +634,10 @@ const GroupContent = ({
   // Hook de acciones del grupo
   const {
     handleAttendance,
-    handleAdminAttendanceUpdate,
+    handleAdminAttendance,
     handleMembershipRequest,
     handleLeaveGroup,
-    handleRandomTeams,
+    handleRandomizeTeams,
     handleDeleteMatch,
     handleReplaceTbdPlayer,
     handleResetAttendance,
@@ -834,7 +840,7 @@ const GroupContent = ({
             currentUserIsAdmin={currentUserIsAdmin}
             isUserInGroup={isUserInGroup}
             handleAttendance={handleAttendance}
-            handleRandomTeams={handleRandomTeams}
+            handleRandomizeTeams={handleRandomizeTeams}
             handleDeleteMatch={handleDeleteMatch}
             setShowReplaceTbdModal={setShowReplaceTbdModal}
             setShowSwapPlayersModal={setShowSwapPlayersModal}
@@ -863,7 +869,7 @@ const GroupContent = ({
             basicData={groupBasicData}
             user={user}
             currentUserIsAdmin={currentUserIsAdmin}
-            handleAdminAttendanceUpdate={handleAdminAttendanceUpdate}
+            handleAdminAttendance={handleAdminAttendance}
             handleLeaveGroup={handleLeaveGroup}
           />
         );
@@ -893,10 +899,10 @@ const GroupContent = ({
     currentUserIsAdmin,
     isUserInGroup,
     handleAttendance,
-    handleRandomTeams,
+    handleRandomizeTeams,
     handleDeleteMatch,
     handleMembershipRequest,
-    handleAdminAttendanceUpdate,
+    handleAdminAttendance,
     handleLeaveGroup,
     allowFillIn,
     setAllowFillIn,

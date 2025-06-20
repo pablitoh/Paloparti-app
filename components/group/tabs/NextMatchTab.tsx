@@ -26,6 +26,7 @@ import {
 } from '../../../services/toastService';
 import type { ParticipantStatus } from '../../../types/group';
 import { normalizeTbdPlayers } from '../../../utils/tbdPlayersUtils';
+import { PlayerRole } from '../../../lib/teambuilder/constants';
 
 // Import our new components
 import TeamsList from './TeamsList';
@@ -52,7 +53,7 @@ interface Player {
   name: string | null;
   avatar: string | null;
   playerType?: string;
-  playerRoles?: string[]; // Roles del jugador
+  playerRoles?: PlayerRole[]; // Roles del jugador
   age?: number | null;
   isTeamA?: boolean;
 }
@@ -127,32 +128,25 @@ interface NextMatchTabProps {
   ) => void;
   handleGroupAttendance?: (
     status: ParticipantStatus,
-    playerRoles?: string[]
+    playerRoles?: PlayerRole[]
   ) => Promise<void>;
   handleSortTeams?: () => Promise<void>;
   handleAddResults?: () => void;
   handleDeleteMatch?: (id: string) => void;
   userAttendanceStatus?: ParticipantStatus;
-  userRoles?: string[];
+  userRoles?: PlayerRole[];
   allowFillIn: boolean;
   setAllowFillIn: (value: boolean) => void;
   setShowManualTeamFormationModal: (value: boolean) => void;
 }
 
 // Función para obtener el rol principal de un jugador (el de mayor prioridad)
-const getPrimaryRole = (playerRoles?: string[]): string | undefined => {
+const getPrimaryRole = (playerRoles?: PlayerRole[]): string | undefined => {
   if (!playerRoles || playerRoles.length === 0) return undefined;
 
-  // Encontrar el rol con la prioridad más alta (número más bajo tiene mayor prioridad)
-  return playerRoles.reduce((primaryRole, currentRole) => {
-    const primaryPriority =
-      PLAYER_ROLE_PRIORITY[primaryRole as keyof typeof PLAYER_ROLE_PRIORITY] ??
-      999;
-    const currentPriority =
-      PLAYER_ROLE_PRIORITY[currentRole as keyof typeof PLAYER_ROLE_PRIORITY] ??
-      999;
-    return currentPriority < primaryPriority ? currentRole : primaryRole;
-  }, playerRoles[0]);
+  // Ordenar por prioridad (1 = mayor prioridad)
+  const sortedRoles = [...playerRoles].sort((a, b) => a.priority - b.priority);
+  return sortedRoles[0]?.role;
 };
 
 // Función para ordenar jugadores por rol
@@ -438,7 +432,7 @@ export default function NextMatchTab({
   // Handle attendance for the current user
   const handleAttendance = async (
     status: ParticipantStatus,
-    playerRoles?: string[]
+    playerRoles?: PlayerRole[]
   ) => {
     if (!user?.id) {
       console.error('No user ID available for attendance update');

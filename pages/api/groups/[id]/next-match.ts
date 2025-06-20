@@ -5,6 +5,10 @@ import { prisma } from '../../../../lib/prisma';
 import { Match, MatchPlayer, User } from '@prisma/client';
 import { calculateAge } from '../../../../lib/utils';
 import { PLAYER_ROLES } from '../../../../components/group/AttendanceConfirmation';
+import {
+  normalizePlayerRoles,
+  PlayerRole,
+} from '../../../../lib/teambuilder/constants';
 
 // Valores de prioridad para roles (menor número = mayor prioridad)
 const ROLE_PRIORITY = {
@@ -198,7 +202,9 @@ export default async function handler(
       )
       .map((attendance: (typeof match.attendance)[0]) => {
         // Intentar extraer los roles del jugador desde tbdPlayers
-        let playerRoles: string[] = [PLAYER_ROLES.WILDCARD]; // Valor por defecto
+        let playerRoles: PlayerRole[] = [
+          { role: PLAYER_ROLES.WILDCARD, priority: 1 },
+        ]; // Valor por defecto
         if (match.tbdPlayers) {
           try {
             // Intentar extraer roles de tbdPlayers según el formato almacenado
@@ -209,7 +215,8 @@ export default async function handler(
 
             // Si tenemos la estructura playerRoles que guarda los roles por userId
             if (tbdObj.playerRoles && tbdObj.playerRoles[attendance.userId]) {
-              playerRoles = tbdObj.playerRoles[attendance.userId];
+              const rawRoles = tbdObj.playerRoles[attendance.userId];
+              playerRoles = normalizePlayerRoles(rawRoles);
               console.log(
                 `Roles encontrados para ${attendance.userId}:`,
                 playerRoles
@@ -240,7 +247,7 @@ export default async function handler(
     );
 
     // Extraer los roles del usuario actual si existe
-    let userRoles: string[] = [];
+    let userRoles: PlayerRole[] = [];
     if (userAttendance && match.tbdPlayers) {
       try {
         const tbdObj =
@@ -249,9 +256,11 @@ export default async function handler(
             : match.tbdPlayers;
 
         if (tbdObj.playerRoles && tbdObj.playerRoles[session.user.id]) {
-          userRoles = tbdObj.playerRoles[session.user.id];
+          const rawRoles = tbdObj.playerRoles[session.user.id];
+          userRoles = normalizePlayerRoles(rawRoles);
           console.log(
-            `Roles del usuario actual recuperados: ${userRoles.join(', ')}`
+            `Roles del usuario actual recuperados:`,
+            userRoles.map((r) => `${r.priority}° ${r.role}`).join(', ')
           );
         }
       } catch (error) {
@@ -265,7 +274,9 @@ export default async function handler(
       .filter((player: any) => player.isTeamA)
       .map((player: any) => {
         // Obtener roles del jugador si existen
-        let playerRoles: string[] = [PLAYER_ROLES.WILDCARD]; // Valor por defecto
+        let playerRoles: PlayerRole[] = [
+          { role: PLAYER_ROLES.WILDCARD, priority: 1 },
+        ]; // Valor por defecto
         let assignedRole: string | undefined;
 
         if (match.tbdPlayers) {
@@ -276,7 +287,8 @@ export default async function handler(
                 : match.tbdPlayers;
 
             if (tbdObj.playerRoles && tbdObj.playerRoles[player.userId]) {
-              playerRoles = tbdObj.playerRoles[player.userId];
+              const rawRoles = tbdObj.playerRoles[player.userId];
+              playerRoles = normalizePlayerRoles(rawRoles);
             }
 
             // Obtener el rol asignado para la formación
@@ -304,7 +316,9 @@ export default async function handler(
       .filter((player: any) => !player.isTeamA)
       .map((player: any) => {
         // Obtener roles del jugador si existen
-        let playerRoles: string[] = [PLAYER_ROLES.WILDCARD]; // Valor por defecto
+        let playerRoles: PlayerRole[] = [
+          { role: PLAYER_ROLES.WILDCARD, priority: 1 },
+        ]; // Valor por defecto
         let assignedRole: string | undefined;
 
         if (match.tbdPlayers) {
@@ -315,7 +329,8 @@ export default async function handler(
                 : match.tbdPlayers;
 
             if (tbdObj.playerRoles && tbdObj.playerRoles[player.userId]) {
-              playerRoles = tbdObj.playerRoles[player.userId];
+              const rawRoles = tbdObj.playerRoles[player.userId];
+              playerRoles = normalizePlayerRoles(rawRoles);
             }
 
             // Obtener el rol asignado para la formación

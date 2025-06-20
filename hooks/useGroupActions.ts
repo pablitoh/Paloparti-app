@@ -3,6 +3,7 @@ import { showSuccessToast, showErrorToast } from '../services/toastService';
 import type { ParticipantStatus } from '../types/group';
 import { useQueryClient } from '@tanstack/react-query';
 import { PLAYER_ROLES } from '../components/group/AttendanceConfirmation';
+import { PlayerRole, normalizePlayerRoles } from '../lib/teambuilder/constants';
 import {
   useUserAttendanceMutation,
   useAdminAttendanceMutation,
@@ -27,12 +28,12 @@ export const useGroupActions = ({
   nextMatchId,
   onSuccess,
   group,
-  allowFillIn = false,
+  allowFillIn = true,
 }: UseGroupActionsProps) => {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  // Mutaciones
+  // Hook mutations
   const userAttendanceMutation = useUserAttendanceMutation();
   const adminAttendanceMutation = useAdminAttendanceMutation();
   const membershipRequestMutation = useMembershipRequestMutation();
@@ -149,55 +150,40 @@ export const useGroupActions = ({
     }
   };
 
+  // Handler for user attendance
   const handleAttendance = async (
     status: ParticipantStatus,
-    playerRoles?: string[]
-  ): Promise<void> => {
-    if (!groupId) {
-      console.error('ID de grupo inválido');
-      showErrorToast('ID de grupo inválido');
-      return;
-    }
-
+    playerRoles?: string[] | PlayerRole[]
+  ) => {
     try {
-      // Intentar leer los roles desde localStorage (funcionalidad principal)
-      let effectiveRoles: string[] = [];
+      console.log('======= FRONTEND HOOK =======');
+      console.log('ATTENDANCE STATUS:', status);
+      console.log('PLAYER ROLES (raw):', playerRoles);
+      console.log('PLAYER ROLES TYPE:', typeof playerRoles);
+      console.log('PLAYER ROLES IS ARRAY:', Array.isArray(playerRoles));
 
+      // Normalizar roles al nuevo formato
+      let effectiveRoles: PlayerRole[] = [];
       if (status === 'CONFIRMED') {
-        try {
-          // Primero verificar si se proporcionaron roles como parámetro
-          if (Array.isArray(playerRoles) && playerRoles.length > 0) {
-            console.log('Usando roles de parámetros:', playerRoles);
-            effectiveRoles = [...playerRoles];
-          } else {
-            // Si no hay parámetros, intentar leer de localStorage
-            const storedRoles = localStorage.getItem(
-              'paloparti_selected_roles'
-            );
-            if (storedRoles) {
-              console.log('Roles encontrados en localStorage:', storedRoles);
-              try {
-                const parsedRoles = JSON.parse(storedRoles);
-                if (Array.isArray(parsedRoles) && parsedRoles.length > 0) {
-                  effectiveRoles = parsedRoles;
-                } else {
-                  // Valor predeterminado si parsedRoles no es un array válido
-                  effectiveRoles = [PLAYER_ROLES.WILDCARD];
-                }
-              } catch (e) {
-                console.error('Error parsing stored roles:', e);
-                effectiveRoles = [PLAYER_ROLES.WILDCARD];
-              }
-            } else {
-              // Valor predeterminado
-              console.log('Usando valor predeterminado: Comodín');
-              effectiveRoles = [PLAYER_ROLES.WILDCARD];
+        if (playerRoles && playerRoles.length > 0) {
+          // Normalizar roles (convierte formato antiguo si es necesario)
+          effectiveRoles = normalizePlayerRoles(playerRoles);
+          console.log('NORMALIZED ROLES:', effectiveRoles);
+        } else {
+          // Si no se proporcionan roles, usar recuperar del localStorage
+          const savedRoles = localStorage.getItem('paloparti_selected_roles');
+          if (savedRoles) {
+            try {
+              const parsedRoles = JSON.parse(savedRoles);
+              effectiveRoles = normalizePlayerRoles(parsedRoles);
+              console.log('ROLES FROM LOCALSTORAGE:', effectiveRoles);
+            } catch (e) {
+              console.error('Error parsing localStorage roles:', e);
+              effectiveRoles = [{ role: PLAYER_ROLES.WILDCARD, priority: 1 }];
             }
+          } else {
+            effectiveRoles = [{ role: PLAYER_ROLES.WILDCARD, priority: 1 }];
           }
-        } catch (e) {
-          console.error('Error procesando roles:', e);
-          // Fallback a valor predeterminado en caso de error
-          effectiveRoles = [PLAYER_ROLES.WILDCARD];
         }
 
         // Validar que haya al menos un rol seleccionado
@@ -260,415 +246,205 @@ export const useGroupActions = ({
       let data;
       try {
         data = await response.json();
-        console.log('Respuesta del servidor:', data);
-      } catch (e) {
-        console.error('Error parsing response:', e);
-        throw new Error('Error processing server response');
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        throw new Error('Error en la respuesta del servidor');
       }
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to update attendance');
+        console.error('Server response error:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData: data,
+        });
+        throw new Error(data?.error || data?.message || 'Error del servidor');
       }
 
-      // Limpiar localStorage después de completar
-      if (status === 'CONFIRMED') {
-        localStorage.removeItem('paloparti_selected_roles');
-      }
+      console.log('Respuesta exitosa del servidor:', data);
 
-      // Forzar invalidación completa de la caché para asegurar actualización de UI
+      // Invalidar caché para forzar actualización
       await queryClient.invalidateQueries({
         queryKey: ['group', 'nextMatch', groupId],
-        exact: true,
-        refetchType: 'active',
       });
 
-      // Si la caché está vacía, forzar una recarga de la página
-      const cachedData = queryClient.getQueryData([
-        'group',
-        'nextMatch',
-        groupId,
-      ]);
-      if (!cachedData) {
-        console.log('No hay datos en caché, forzando recarga de datos');
-        await queryClient.refetchQueries({
-          queryKey: ['group', 'nextMatch', groupId],
-          exact: true,
-        });
-      }
+      // Show success message
+      const statusMessage = status === 'CONFIRMED' ? 'confirmada' : 'cancelada';
+      showSuccessToast(`Asistencia ${statusMessage} exitosamente`);
 
-      showSuccessToast(
-        status === 'CONFIRMED'
-          ? 'Asistencia confirmada'
-          : status === 'DECLINED'
-          ? 'Asistencia rechazada'
-          : 'Estado de asistencia actualizado'
-      );
-
+      // Call onSuccess callback if provided
       if (onSuccess) {
         onSuccess();
       }
-
-      return data;
-    } catch (error: any) {
-      console.error('Error updating attendance:', error);
-      showErrorToast(error.message || 'Error al actualizar asistencia');
-      throw error;
-    }
-  };
-
-  const handleAdminAttendanceUpdate = async (
-    userId: string,
-    status: ParticipantStatus,
-    playerRoles?: string[]
-  ) => {
-    if (!groupId) {
-      showErrorToast('ID de grupo inválido');
-      return;
-    }
-
-    try {
-      // First, ensure we have the latest match ID by fetching it if necessary
-      let currentMatchId = nextMatchId;
-      if (!currentMatchId) {
-        try {
-          // Get the latest match ID from the API
-          const matchResponse = await fetch(
-            `/api/groups/${groupId}/next-match`
-          );
-          if (matchResponse.ok) {
-            const matchData = await matchResponse.json();
-            if (matchData?.nextMatchDetails?.id) {
-              currentMatchId = matchData.nextMatchDetails.id;
-            } else {
-              throw new Error('No hay un partido activo para este grupo');
-            }
-          } else {
-            throw new Error('Error al obtener información del partido');
-          }
-        } catch (error) {
-          console.error('Error fetching match data:', error);
-          showErrorToast('No hay un partido programado para este grupo');
-          return;
-        }
-      }
-
-      // Usar roles proporcionados o asignar Comodín por defecto
-      const rolesParaEnviar =
-        status === 'CONFIRMED'
-          ? playerRoles && playerRoles.length > 0
-            ? playerRoles
-            : [PLAYER_ROLES.WILDCARD]
-          : [];
-
-      const response = await fetch(`/api/attendances`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          matchId: currentMatchId,
-          status,
-          groupId,
-          playerRoles: rolesParaEnviar,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update attendance');
-      }
-
-      const data = await response.json();
-
-      // Solo invalidamos la consulta del próximo partido ya que es lo único que cambia
-      await invalidateRelevantQueries('nextMatch');
-
-      // Show appropriate message
-      const successMessage =
-        status === 'CONFIRMED'
-          ? 'Asistencia confirmada'
-          : status === 'DECLINED'
-          ? 'Asistencia rechazada'
-          : 'Estado de asistencia actualizado';
-
-      showSuccessToast(successMessage);
-
-      if (onSuccess) {
-        onSuccess();
-      }
-
-      return data;
     } catch (error) {
-      console.error('Error updating attendance:', error);
-      showErrorToast('Error al actualizar asistencia');
+      console.error('Error in handleAttendance:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Error desconocido';
+      showErrorToast(`Error al actualizar asistencia: ${errorMessage}`);
       throw error;
     }
   };
 
-  const handleMembershipRequest = async (
+  // Handler for admin attendance (confirming other users)
+  const handleAdminAttendance = async (
+    status: ParticipantStatus,
     userId: string,
-    action: 'APPROVE' | 'REJECT'
+    targetUserId?: string,
+    playerRoles?: string[] | PlayerRole[]
   ) => {
-    if (!groupId) {
-      showErrorToast('ID de grupo inválido');
-      return;
-    }
-
     try {
+      // Normalizar roles si se proporcionan
+      let effectiveRoles: PlayerRole[] = [];
+      if (status === 'CONFIRMED' && playerRoles && playerRoles.length > 0) {
+        effectiveRoles = normalizePlayerRoles(playerRoles);
+      }
+
+      await adminAttendanceMutation.mutateAsync({
+        groupId,
+        matchId: nextMatchId || '',
+        userId,
+        status,
+      });
+
+      const statusMessage = status === 'CONFIRMED' ? 'confirmada' : 'cancelada';
+      showSuccessToast(`Asistencia ${statusMessage} exitosamente`);
+
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (error) {
+      console.error('Error in handleAdminAttendance:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Error desconocido';
+      showErrorToast(`Error al actualizar asistencia: ${errorMessage}`);
+      throw error;
+    }
+  };
+
+  // Handler for membership requests
+  const handleMembershipRequest = async (
+    action: 'accept' | 'reject',
+    memberId: string
+  ) => {
+    try {
+      // Convertir formato para que coincida con la interfaz
+      const actionFormat = action === 'accept' ? 'APPROVE' : 'REJECT';
+
       await membershipRequestMutation.mutateAsync({
         groupId,
-        userId,
-        action,
+        userId: memberId,
+        action: actionFormat,
       });
 
-      // Only invalidate members data
-      await invalidateRelevantQueries('members');
-
-      const message =
-        action === 'APPROVE'
-          ? 'Solicitud aprobada correctamente'
-          : 'Solicitud rechazada correctamente';
-
-      showSuccessToast(message);
+      showSuccessToast(
+        action === 'accept'
+          ? 'Solicitud aceptada exitosamente'
+          : 'Solicitud rechazada exitosamente'
+      );
 
       if (onSuccess) {
         onSuccess();
       }
-    } catch (error: any) {
-      console.error('Error executing action:', error);
-      showErrorToast(error.message || 'Ocurrió un error inesperado');
+    } catch (error) {
+      console.error('Error in handleMembershipRequest:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Error desconocido';
+      showErrorToast(`Error al procesar solicitud: ${errorMessage}`);
+      throw error;
     }
   };
 
+  // Handler for leaving group
   const handleLeaveGroup = async () => {
-    if (!groupId) {
-      showErrorToast('ID de grupo inválido');
-      return;
-    }
-
-    await executeAction(async () => {
+    try {
       await leaveGroupMutation.mutateAsync(groupId);
+      showSuccessToast('Has salido del grupo exitosamente');
       router.push('/groups');
-    }, 'Has abandonado el grupo correctamente');
+    } catch (error) {
+      console.error('Error in handleLeaveGroup:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Error desconocido';
+      showErrorToast(`Error al salir del grupo: ${errorMessage}`);
+      throw error;
+    }
   };
 
-  const handleRandomTeams = async (providedConfirmedPlayers?: any[]) => {
-    if (!nextMatchId || !groupId) {
-      showErrorToast(
-        'No hay próximo partido configurado o ID de grupo inválido'
-      );
-      return;
-    }
-
+  // Handler for randomizing teams
+  const handleRandomizeTeams = async (
+    options: {
+      balanceByAge?: boolean;
+      balanceByRole?: boolean;
+      balanceByRating?: boolean;
+    } = {}
+  ) => {
     try {
-      // Use provided confirmed players if available, otherwise fall back to group data
-      const confirmedPlayers =
-        providedConfirmedPlayers ||
-        group?.nextMatchDetails?.confirmedPlayers ||
-        [];
+      if (!nextMatchId) {
+        throw new Error('No hay un partido programado');
+      }
 
-      // Verificar que los jugadores estén efectivamente confirmados
-      console.log(
-        'Jugadores confirmados antes del filtro:',
-        confirmedPlayers.length
-      );
-
-      // Crear el formato de jugadores que espera la API, incluyendo los roles de jugador
-      const players = confirmedPlayers.map((player: any) => {
-        // Verificar si el jugador tiene roles definidos
-        const playerRoles = player.playerRoles || [PLAYER_ROLES.WILDCARD];
-        console.log(`Roles del jugador ${player.id}:`, playerRoles);
-
-        return {
-          userId: player.id,
-          name: player.name,
-          playerRoles: playerRoles, // Incluir los roles del jugador
-        };
+      await randomizeTeamsMutation.mutateAsync({
+        matchId: nextMatchId,
+        groupId,
+        allowTbdPlayers: allowFillIn,
+        ...options,
       });
 
-      console.log('Jugadores enviados para sorteo:', players.length);
-
-      if (players.length < 2) {
-        showErrorToast(
-          'Se necesitan al menos 2 jugadores confirmados para sortear equipos'
-        );
-        return;
-      }
-
-      // Crear jugadores TBD si es necesario
-      const requiredPlayers = group?.requiredPlayers || 10;
-      const missingPlayers = Math.max(0, requiredPlayers - players.length);
-
-      // Formato correcto para tbdPlayers que evita el error de prisma
-      const tbdPlayersData = {
-        teamA: [] as any[],
-        teamB: [] as any[],
-      };
-
-      if (allowFillIn && missingPlayers > 0) {
-        // Decidir cuántos jugadores TBD van a cada equipo
-        const halfMissing = Math.ceil(missingPlayers / 2);
-
-        for (let i = 0; i < halfMissing; i++) {
-          tbdPlayersData.teamA.push({
-            id: `tbd-${Date.now()}-a-${i}`,
-            name: `TBD A${i + 1}`,
-            avatar: null,
-            isTeamA: true,
-            playerType: 'TBD',
-          });
-        }
-
-        for (let i = 0; i < missingPlayers - halfMissing; i++) {
-          tbdPlayersData.teamB.push({
-            id: `tbd-${Date.now()}-b-${i}`,
-            name: `TBD B${i + 1}`,
-            avatar: null,
-            isTeamA: false,
-            playerType: 'TBD',
-          });
-        }
-      }
-
-      // Leer el valor balanceByAge del contexto global si está disponible
-      const balanceByAge =
-        typeof window !== 'undefined' &&
-        (window as any).__balanceByAge !== undefined
-          ? (window as any).__balanceByAge
-          : true; // Por defecto true si no está definido
-
-      // Leer el valor balanceByRole del contexto global si está disponible
-      const balanceByRole =
-        typeof window !== 'undefined' &&
-        (window as any).__balanceByRole !== undefined
-          ? (window as any).__balanceByRole
-          : true; // Por defecto true si no está definido
-
-      // Leer el valor balanceByRating del contexto global si está disponible
-      const balanceByRating =
-        typeof window !== 'undefined' &&
-        (window as any).__balanceByRating !== undefined
-          ? (window as any).__balanceByRating
-          : false; // Por defecto false si no está definido
-
-      // Check if we should use a completely random algorithm (when no criteria selected)
-      const useRandomAlgorithm =
-        !balanceByAge && !balanceByRole && !balanceByRating;
-
-      console.log('Sending team formation request with:', {
-        players,
-        tbdPlayers: tbdPlayersData,
-        balanceByAge,
-        balanceByRole,
-        balanceByRating,
-        useRandomAlgorithm,
-      });
-
-      const response = await fetch(`/api/matches/create-match`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          groupId,
-          matchId: nextMatchId || null,
-          mode: 'auto',
-          isResort: nextMatchId ? true : false,
-          players,
-          tbdPlayers: tbdPlayersData,
-          balanceByAge,
-          balanceByRole,
-          balanceByRating,
-          useRandomAlgorithm,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Error al formar equipos');
-      }
-
-      const result = await response.json();
-      console.log('Create match API response:', result);
-
-      // Here's the issue - we should only invalidate if needed
-      // Check if the result has proper team data
-      if (!result.teamA || !result.teamB) {
-        // Only invalidate if we didn't get complete data back
-        await queryClient.invalidateQueries({
-          queryKey: ['group', 'nextMatch', groupId],
-          exact: true,
-        });
-      } else {
-        // Otherwise, update the cache directly without triggering a refetch
-        queryClient.setQueryData(
-          ['group', 'nextMatch', groupId],
-          (oldData: any) => {
-            if (!oldData) return oldData;
-            return {
-              ...oldData,
-              nextMatchDetails: {
-                ...oldData.nextMatchDetails,
-                playersA: result.teamA,
-                playersB: result.teamB,
-                tbdPlayers: result.tbdPlayers,
-              },
-            };
-          }
-        );
-      }
-
-      showSuccessToast('Equipos formados correctamente');
+      showSuccessToast('Equipos formados exitosamente');
 
       if (onSuccess) {
         onSuccess();
       }
-
-      return result;
-    } catch (error: any) {
-      console.error('Error executing action:', error);
-      showErrorToast(error.message || 'Ocurrió un error inesperado');
-      return null;
+    } catch (error) {
+      console.error('Error in handleRandomizeTeams:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Error desconocido';
+      showErrorToast(`Error al formar equipos: ${errorMessage}`);
+      throw error;
     }
   };
 
-  const handleDeleteMatch = async (matchId: string) => {
-    if (!groupId) {
-      showErrorToast('ID de grupo inválido');
-      return;
-    }
+  // Handler for deleting match
+  const handleDeleteMatch = async () => {
+    try {
+      if (!nextMatchId) {
+        throw new Error('No hay un partido para eliminar');
+      }
 
-    await executeAction(async () => {
       await deleteMatchMutation.mutateAsync({
-        matchId,
+        matchId: nextMatchId,
         groupId,
       });
-    }, 'Partido eliminado correctamente');
+
+      showSuccessToast('Partido eliminado exitosamente');
+
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (error) {
+      console.error('Error in handleDeleteMatch:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Error desconocido';
+      showErrorToast(`Error al eliminar partido: ${errorMessage}`);
+      throw error;
+    }
   };
 
+  // Handler for replacing TBD player
   const handleReplaceTbdPlayer = async (
     tbdPlayerId: string,
-    userId: string,
-    isTeamA: boolean
+    replacementUserId: string
   ) => {
-    if (!nextMatchId || !groupId) {
-      showErrorToast(
-        'No hay próximo partido configurado o ID de grupo inválido'
-      );
-      return;
-    }
-
     try {
+      if (!nextMatchId) {
+        throw new Error('No hay un partido activo');
+      }
+
       await replaceTbdPlayerMutation.mutateAsync({
-        tbdPlayerId,
-        userId,
         matchId: nextMatchId,
-        isTeamA,
+        tbdPlayerId,
+        userId: replacementUserId,
+        isTeamA: true, // Este valor deberá ser determinado por la lógica del negocio
         groupId,
       });
-
-      // Invalidar tanto nextMatch como members para actualizar ambas pestañas
-      await invalidateRelevantQueries('all');
 
       showSuccessToast('Jugador reemplazado exitosamente');
 
@@ -676,35 +452,58 @@ export const useGroupActions = ({
         onSuccess();
       }
     } catch (error) {
-      console.error('Error replacing TBD player:', error);
-      showErrorToast('Error al reemplazar jugador TBD');
+      console.error('Error in handleReplaceTbdPlayer:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Error desconocido';
+      showErrorToast(`Error al reemplazar jugador: ${errorMessage}`);
+      throw error;
     }
   };
 
+  // Handler for resetting attendance
   const handleResetAttendance = async () => {
-    if (!nextMatchId || !groupId) {
-      showErrorToast(
-        'No hay próximo partido configurado o ID de grupo inválido'
-      );
-      return;
-    }
+    try {
+      if (!nextMatchId) {
+        throw new Error('No hay un partido activo');
+      }
 
-    await executeAction(async () => {
       await resetAttendanceMutation.mutateAsync({
         matchId: nextMatchId,
         groupId,
       });
-    });
+
+      showSuccessToast('Asistencia reiniciada exitosamente');
+
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (error) {
+      console.error('Error in handleResetAttendance:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Error desconocido';
+      showErrorToast(`Error al reiniciar asistencia: ${errorMessage}`);
+      throw error;
+    }
   };
 
   return {
     handleAttendance,
-    handleAdminAttendanceUpdate,
+    handleAdminAttendance,
     handleMembershipRequest,
     handleLeaveGroup,
-    handleRandomTeams,
+    handleRandomizeTeams,
     handleDeleteMatch,
     handleReplaceTbdPlayer,
     handleResetAttendance,
+    isLoading: {
+      attendance: userAttendanceMutation.isPending,
+      adminAttendance: adminAttendanceMutation.isPending,
+      membershipRequest: membershipRequestMutation.isPending,
+      leaveGroup: leaveGroupMutation.isPending,
+      randomizeTeams: randomizeTeamsMutation.isPending,
+      deleteMatch: deleteMatchMutation.isPending,
+      replaceTbdPlayer: replaceTbdPlayerMutation.isPending,
+      resetAttendance: resetAttendanceMutation.isPending,
+    },
   };
 };

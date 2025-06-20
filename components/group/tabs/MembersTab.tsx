@@ -12,7 +12,7 @@ import {
   ChevronUpIcon,
   UserPlusIcon,
 } from '@heroicons/react/24/outline';
-import RoleSelectionModal from '../modals/RoleSelectionModal';
+import RoleSelectionModal, { PlayerRole } from '../modals/RoleSelectionModal';
 import LeaveGroupModal from '../modals/LeaveGroupModal';
 import AddGhostPlayerModal from '../modals/AddGhostPlayerModal';
 import StarRating from '../../StarRating';
@@ -35,7 +35,7 @@ interface MembersTabProps {
   handleConfirmAttendance: (
     memberId: string,
     userId: string,
-    playerRoles?: string[]
+    playerRoles?: PlayerRole[]
   ) => Promise<void>;
   handleDeclineAttendance: (memberId: string, userId: string) => Promise<void>;
   handleLeaveGroup?: () => Promise<void>;
@@ -147,7 +147,7 @@ export default function MembersTab({
   };
 
   // Función para manejar la confirmación después de seleccionar roles
-  const handleConfirmWithRoles = async (roles: string[]) => {
+  const handleConfirmWithRoles = async (roles: PlayerRole[]) => {
     if (!selectedMember) return;
 
     setProcessingButton({ id: selectedMember.id, action: 'confirm' });
@@ -163,6 +163,34 @@ export default function MembersTab({
         [selectedMember.userId]: true,
       }));
       setLocalConfirmedCount((prev) => prev + 1);
+
+      // Registrar la acción en los logs con las prioridades
+      if (user && group.id) {
+        const rolesText =
+          roles.length > 0
+            ? roles
+                .sort((a, b) => a.priority - b.priority)
+                .map((r) => `${r.priority}° ${r.role}`)
+                .join(', ')
+            : 'Comodín';
+
+        await createLogEntry({
+          groupId: group.id,
+          action: LogAction.ADMIN_CONFIRMED_ATTENDANCE,
+          performedBy: user.id,
+          performedByName: user.name || user.email || 'Admin',
+          targetUserId: selectedMember.userId,
+          targetUserName: selectedMember.name || 'Miembro',
+          details: {
+            playerRoles: roles,
+            rolesText: rolesText,
+            message: `confirmó la asistencia de **${
+              selectedMember.name || 'Miembro'
+            }** con posiciones: ${rolesText}`,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
     } finally {
       setProcessingButton(null);
       setSelectedMember(null);

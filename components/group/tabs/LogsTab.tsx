@@ -33,6 +33,7 @@ const actionToGroup: Record<string, string> = {
 
   [LogAction.USER_ATTENDANCE_UPDATED]: 'attendance',
   [LogAction.ADMIN_ATTENDANCE_UPDATED]: 'attendance',
+  [LogAction.ADMIN_CONFIRMED_ATTENDANCE]: 'attendance',
   [LogAction.ATTENDANCE_RESET]: 'attendance',
 
   [LogAction.USER_JOINED]: 'members',
@@ -68,22 +69,53 @@ const actionMessages: Record<string, (details: any) => string> = {
   [LogAction.MATCH_EDITED]: () => 'editó la información del partido',
   [LogAction.USER_JOINED]: () => 'se unió al grupo',
   [LogAction.USER_LEFT]: () => 'abandonó el grupo',
-  [LogAction.USER_ATTENDANCE_UPDATED]: (details) =>
-    `actualizó su asistencia a "${
+  [LogAction.USER_ATTENDANCE_UPDATED]: (details) => {
+    const statusText =
       details.status === 'CONFIRMED'
         ? 'Confirmado'
         : details.status === 'DECLINED'
         ? 'No asistirá'
-        : 'Pendiente'
-    }"`,
-  [LogAction.ADMIN_ATTENDANCE_UPDATED]: (details) =>
-    `actualizó la asistencia de **${details.userName || 'un jugador'}** a "${
+        : 'Pendiente';
+
+    const positionsText =
+      details.status === 'CONFIRMED' &&
+      details.playerRoles &&
+      details.playerRoles.length > 0
+        ? ` (Posiciones: ${details.playerRoles.join(', ')})`
+        : '';
+
+    return `actualizó su asistencia a "${statusText}"${positionsText}`;
+  },
+  [LogAction.ADMIN_ATTENDANCE_UPDATED]: (details) => {
+    const statusText =
       details.status === 'CONFIRMED'
         ? 'Confirmado'
         : details.status === 'DECLINED'
         ? 'No asistirá'
-        : 'Pendiente'
-    }"`,
+        : 'Pendiente';
+
+    const positionsText =
+      details.status === 'CONFIRMED' &&
+      details.playerRoles &&
+      details.playerRoles.length > 0
+        ? ` (Posiciones: ${details.playerRoles.join(', ')})`
+        : '';
+
+    return `actualizó la asistencia de **${
+      details.userName || 'un jugador'
+    }** a "${statusText}"${positionsText}`;
+  },
+  [LogAction.ADMIN_CONFIRMED_ATTENDANCE]: (details) => {
+    // Usar el mensaje predefinido si está disponible, sino construir uno
+    if (details.message) {
+      return details.message;
+    }
+
+    const rolesText = details.rolesText || 'Comodín';
+    return `confirmó la asistencia de **${
+      details.targetUserName || 'un jugador'
+    }** con posiciones: ${rolesText}`;
+  },
   [LogAction.USER_ROLE_CHANGED]: (details) =>
     `cambió el rol de **${details.targetUser?.name || 'un usuario'}** a ${
       details.newRole === 'ADMIN' ? 'Administrador' : 'Miembro'
