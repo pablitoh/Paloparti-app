@@ -2323,27 +2323,42 @@ export default async function handler(
     }
 
     // Comprobar si tenemos suficientes jugadores confirmados
-    if (mode === 'auto' && players.length < 2) {
-      // Obtenemos los miembros del grupo solo si no se proporcionaron jugadores
-      const confirmedMembers = await prisma.matchPlayer.findMany({
-        where: {
-          matchId,
-          match: {
-            groupId,
+    if (mode === 'auto') {
+      let confirmedPlayersCount = 0;
+
+      if (players && players.length > 0) {
+        // Si se proporcionaron jugadores en la request, usar esa cantidad
+        confirmedPlayersCount = players.length;
+      } else if (isResort && matchId) {
+        // Si es un resorteo, obtener jugadores confirmados de asistencia
+        const confirmedAttendance = await prisma.matchAttendance.findMany({
+          where: {
+            matchId,
+            status: 'CONFIRMED',
           },
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              birthdate: true,
+        });
+        confirmedPlayersCount = confirmedAttendance.length;
+      } else {
+        // Fallback: obtener jugadores desde matchPlayer
+        const confirmedMembers = await prisma.matchPlayer.findMany({
+          where: {
+            matchId,
+            match: {
+              groupId,
             },
           },
-        },
+        });
+        confirmedPlayersCount = confirmedMembers.length;
+      }
+
+      console.log('Verificando jugadores confirmados:', {
+        confirmedPlayersCount,
+        hasPlayers: players && players.length > 0,
+        isResort,
+        matchId,
       });
 
-      if (confirmedMembers.length < 2) {
+      if (confirmedPlayersCount < 2) {
         return res.status(400).json({
           message:
             'Se necesitan al menos 2 jugadores confirmados para formar equipos',
