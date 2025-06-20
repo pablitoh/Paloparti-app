@@ -143,7 +143,7 @@ const Header = () => {
                 >
                   <div className='w-8 h-8 transition-transform group-hover:scale-110'>
                     <img
-                      src={`/logo.png?v=${Date.now()}`}
+                      src='/logo.png'
                       alt='Paloparti Logo'
                       className='w-full h-full object-contain'
                     />

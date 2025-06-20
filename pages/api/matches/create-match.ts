@@ -2695,6 +2695,13 @@ export default async function handler(
       if (actuallyFirstTime) {
         allowTbdPlayers = true;
         console.log('🎯 Forzando allowTbdPlayers = true para primera vez');
+      } else {
+        // CORREGIDO: También forzar TBD players en re-sorteos si allowTbdPlayers es true desde el frontend
+        // Esto asegura que los jugadores TBD se generen consistentemente
+        if (allowTbdPlayersParam === true) {
+          allowTbdPlayers = true;
+          console.log('🎯 Manteniendo allowTbdPlayers = true para re-sorteo');
+        }
       }
 
       // Obtener información de los equipos actuales ANTES de recalcularlos
@@ -4280,6 +4287,9 @@ export default async function handler(
     const addTbdPlayers = (team: any[], isTeamA: boolean) => {
       // Si no se permite añadir TBD players, retornar array vacío
       if (allowTbdPlayers === false) {
+        console.log(
+          `🚫 TBD players deshabilitados para equipo ${isTeamA ? 'A' : 'B'}`
+        );
         return [];
       }
 
@@ -4294,6 +4304,11 @@ export default async function handler(
           : [];
 
         if (tbdForTeam.length > 0) {
+          console.log(
+            `✅ Usando TBD players predefinidos para equipo ${
+              isTeamA ? 'A' : 'B'
+            }: ${tbdForTeam.length}`
+          );
           return tbdForTeam;
         }
       }
@@ -4301,6 +4316,11 @@ export default async function handler(
       // CORREGIDO: Verificar si ESTE equipo específico necesita TBD players
       // independientemente del total global de jugadores
       if (team.length >= requiredPlayersPerTeam) {
+        console.log(
+          `✅ Equipo ${isTeamA ? 'A' : 'B'} ya tiene suficientes jugadores (${
+            team.length
+          }/${requiredPlayersPerTeam})`
+        );
         return []; // No need for TBD players on this team
       }
 
@@ -4334,6 +4354,11 @@ export default async function handler(
         });
       }
 
+      console.log(
+        `✅ Generados ${generatedTbdPlayers.length} jugadores TBD para equipo ${
+          isTeamA ? 'A' : 'B'
+        }`
+      );
       return generatedTbdPlayers;
     };
 
