@@ -380,52 +380,35 @@ const TeamsList: React.FC<TeamsListProps> = ({
 
             {/* Star Rating below avatar */}
             {!isTbd && player.starRating !== undefined && (
-              <div className='absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-primary-50 px-1.5 py-0.5 rounded-full border border-primary-200 text-xs font-medium text-primary-700 whitespace-nowrap'>
+              <div className='absolute -bottom-1 left-1/2 transform -translate-x-1/2 bg-gray-100 px-1 py-0.5 rounded text-xs font-medium text-gray-600 whitespace-nowrap'>
                 {player.starRating} ⭐
               </div>
             )}
 
             {/* Dropdown Menu */}
             {dropdownOpen && currentUserIsAdmin && onSwapPlayer && !isTbd && (
-              <div className='absolute top-12 left-0 w-52 bg-white rounded-2xl shadow-green-lg border border-primary-100 py-2 z-[99999] backdrop-blur-sm'>
-                {/* Header del dropdown */}
-                <div className='px-4 py-2 border-b border-primary-100 bg-gradient-to-r from-primary-50 to-lime-50 rounded-t-2xl'>
-                  <div className='text-xs font-semibold text-primary-700 uppercase tracking-wide'>
-                    Acciones del jugador
-                  </div>
-                </div>
-
-                {/* Opción de intercambiar */}
+              <div className='absolute top-12 left-0 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[99999]'>
                 <button
                   onClick={() => {
                     onSwapPlayer(player.id, isTeamA);
                     setDropdownOpen(false);
                   }}
-                  className='flex items-center w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-lime-50 hover:to-primary-50 hover:text-lime-700 transition-all duration-200 rounded-b-2xl group'
+                  className='flex items-center w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors'
                 >
-                  <div className='flex items-center justify-center w-8 h-8 mr-3 rounded-full bg-lime-100 text-lime-600 group-hover:bg-lime-200 transition-colors'>
-                    <svg
-                      className='w-4 h-4'
-                      fill='none'
-                      stroke='currentColor'
-                      viewBox='0 0 24 24'
-                    >
-                      <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        strokeWidth='2'
-                        d='M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4'
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className='font-medium text-gray-900 group-hover:text-lime-800'>
-                      Intercambiar de equipo
-                    </div>
-                    <div className='text-xs text-gray-500 group-hover:text-lime-600'>
-                      Mover al {isTeamA ? 'Equipo B' : 'Equipo A'}
-                    </div>
-                  </div>
+                  <svg
+                    className='w-4 h-4 mr-2 text-gray-500'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth='2'
+                      d='M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4'
+                    />
+                  </svg>
+                  Intercambiar de equipo
                 </button>
               </div>
             )}
@@ -498,24 +481,15 @@ const TeamsList: React.FC<TeamsListProps> = ({
           </div>
         </div>
 
-        {/* Admin buttons with better styling */}
+        {/* Admin button */}
         {currentUserIsAdmin && showReplaceButton && onReplaceTbd && (
-          <div className='flex gap-2 admin-buttons'>
-            <button
-              onClick={() => onReplaceTbd(player.id)}
-              className={`
-                p-2 rounded-xl shadow-sm border transition-all duration-200 transform hover:scale-105
-                ${
-                  isTeamA
-                    ? 'bg-primary-50 text-primary-600 border-primary-200 hover:bg-primary-100 hover:border-primary-300'
-                    : 'bg-coral-50 text-coral-600 border-coral-200 hover:bg-coral-100 hover:border-coral-300'
-                }
-              `}
-              title='Reemplazar jugador'
-            >
-              <UserPlusIcon className='h-4 w-4' />
-            </button>
-          </div>
+          <button
+            onClick={() => onReplaceTbd(player.id)}
+            className='p-2 rounded-lg bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 hover:border-gray-300 transition-colors'
+            title='Reemplazar jugador'
+          >
+            <UserPlusIcon className='h-4 w-4' />
+          </button>
         )}
       </div>
     );
@@ -534,93 +508,52 @@ const TeamsList: React.FC<TeamsListProps> = ({
     const sortedTbdPlayers = sortPlayersByRole(tbdPlayers);
 
     return (
-      <div
-        className={`
-        bg-white rounded-2xl shadow-green-lg border 
-        ${
-          isTeamA
-            ? 'border-primary-200 hover:border-primary-300'
-            : 'border-coral-200 hover:border-coral-300'
-        }
-        p-6 min-w-0 flex-shrink-0 w-full md:w-auto
-        transform transition-all duration-300 hover:scale-[1.02] hover:shadow-green-xl
-        ${isTeamA ? 'hover:bg-primary-25' : 'hover:bg-coral-25'}
-      `}
-      >
-        {/* Team Header with gradient */}
-        <div className='text-center mb-6'>
-          <div
-            className={`
-            inline-flex items-center justify-center w-full py-3 px-4 rounded-xl mb-3
-            ${
-              isTeamA
-                ? 'bg-gradient-to-r from-primary-500 to-lime-500 text-white'
-                : 'bg-gradient-to-r from-coral-500 to-orange-500 text-white'
-            }
-            shadow-lg transform transition-all duration-300 hover:scale-105
-          `}
+      <div className='bg-white rounded-xl shadow-sm border border-gray-200 p-5 min-w-0 flex-shrink-0 w-full md:w-auto transition-all duration-200 hover:shadow-md hover:border-gray-300'>
+        {/* Team Header - Minimalist design */}
+        <div className='text-center mb-4'>
+          <h3
+            className={`text-xl font-semibold mb-2 ${
+              isTeamA ? 'text-primary-700' : 'text-coral-600'
+            }`}
           >
-            <h3 className='text-lg font-bold'>{teamName}</h3>
-          </div>
+            {teamName}
+          </h3>
 
-          {/* Team stats with better design */}
-          <div className='flex justify-center items-center gap-3 text-sm'>
-            {avgAge !== undefined && (
-              <div
-                className={`
-                flex items-center gap-1 px-3 py-1.5 rounded-full transition-all duration-200
-                ${
-                  isTeamA
-                    ? 'bg-primary-50 border border-primary-200 hover:bg-primary-100'
-                    : 'bg-coral-50 border border-coral-200 hover:bg-coral-100'
-                }
-              `}
-              >
-                <span className='text-gray-600'>👥</span>
-                <span className='text-gray-700 font-medium'>{avgAge} años</span>
-              </div>
-            )}
+          {/* Age in parentheses below team name */}
+          {avgAge !== undefined && (
+            <p className='text-sm text-gray-500 mb-3'>({avgAge})</p>
+          )}
 
-            {avgRating !== undefined && (
-              <div className='flex items-center gap-1 bg-lime-50 px-3 py-1.5 rounded-full border border-lime-200 hover:bg-lime-100 transition-all duration-200'>
-                <span className='text-lime-700 font-bold'>{avgRating}</span>
-                <span className='text-lime-600'>⭐</span>
-              </div>
-            )}
-          </div>
+          {/* Rating badge - subtle */}
+          {avgRating !== undefined && (
+            <div className='inline-flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-md border border-gray-200'>
+              <span className='text-gray-700 text-sm font-medium'>
+                {avgRating}
+              </span>
+              <span className='text-gray-500 text-xs'>⭐</span>
+            </div>
+          )}
         </div>
 
-        {/* Players List with better spacing */}
-        <div className='space-y-2'>
-          {sortedPlayers.map((player, index) => (
-            <div
+        {/* Players List */}
+        <div className='space-y-1.5'>
+          {sortedPlayers.map((player) => (
+            <PlayerItem
               key={player.id}
-              className='transform transition-all duration-200 hover:translate-x-1'
-              style={{ animationDelay: `${index * 50}ms` }}
-            >
-              <PlayerItem
-                player={player}
-                showReplaceButton={player.playerType === 'TBD'}
-                isTeamA={isTeamA}
-              />
-            </div>
+              player={player}
+              showReplaceButton={player.playerType === 'TBD'}
+              isTeamA={isTeamA}
+            />
           ))}
 
-          {sortedTbdPlayers.map((player, index) => (
-            <div
+          {sortedTbdPlayers.map((player) => (
+            <PlayerItem
               key={player.id}
-              className='transform transition-all duration-200 hover:translate-x-1'
-              style={{
-                animationDelay: `${(sortedPlayers.length + index) * 50}ms`,
-              }}
-            >
-              <PlayerItem
-                player={player}
-                isTbd={true}
-                showReplaceButton={true}
-                isTeamA={isTeamA}
-              />
-            </div>
+              player={player}
+              isTbd={true}
+              showReplaceButton={true}
+              isTeamA={isTeamA}
+            />
           ))}
         </div>
       </div>
@@ -684,49 +617,44 @@ const TeamsList: React.FC<TeamsListProps> = ({
         </div>
 
         {/* Navigation Controls */}
-        <div className='flex justify-center items-center gap-4 mt-4'>
+        <div className='flex justify-center items-center gap-3 mt-4'>
           <button
             onClick={prevSlide}
-            className={`p-2 rounded-full transition-all ${
+            className={`p-2 rounded-lg transition-colors ${
               currentSlide === 0
                 ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-primary-50 text-primary-600 hover:bg-primary-100'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
             disabled={currentSlide === 0}
           >
-            <ChevronLeftIcon className='h-5 w-5' />
+            <ChevronLeftIcon className='h-4 w-4' />
           </button>
 
           {/* Dots indicator */}
-          <div className='flex gap-2'>
+          <div className='flex gap-1.5'>
             <div
               className={`w-2 h-2 rounded-full transition-all ${
-                currentSlide === 0 ? 'bg-primary-500' : 'bg-gray-300'
+                currentSlide === 0 ? 'bg-gray-800' : 'bg-gray-300'
               }`}
             />
             <div
               className={`w-2 h-2 rounded-full transition-all ${
-                currentSlide === 1 ? 'bg-coral-500' : 'bg-gray-300'
+                currentSlide === 1 ? 'bg-gray-800' : 'bg-gray-300'
               }`}
             />
           </div>
 
           <button
             onClick={nextSlide}
-            className={`p-2 rounded-full transition-all ${
+            className={`p-2 rounded-lg transition-colors ${
               currentSlide === 1
                 ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-coral-50 text-coral-500 hover:bg-coral-100'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
             disabled={currentSlide === 1}
           >
-            <ChevronRightIcon className='h-5 w-5' />
+            <ChevronRightIcon className='h-4 w-4' />
           </button>
-        </div>
-
-        {/* Swipe hint */}
-        <div className='text-center mt-2'>
-          <p className='text-xs text-gray-500'>Desliza para comparar equipos</p>
         </div>
       </div>
     </div>

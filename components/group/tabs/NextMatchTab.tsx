@@ -1272,23 +1272,24 @@ export default function NextMatchTab({
                   {/* Admin actions - responsive */}
                   {currentUserIsAdmin && (
                     <div className='flex items-center gap-2'>
-                      {/* Add Results Button - responsive */}
-                      <Button
-                        variant='primary'
+                      {/* Add Results Button - minimal design */}
+                      <button
                         onClick={handleAddResults}
-                        className={`flex items-center justify-center ${
-                          !teamsHavePlayers
-                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                            : ''
-                        } text-sm sm:text-sm px-3 py-2 sm:px-4 sm:py-2`}
-                        size='sm'
                         disabled={!teamsHavePlayers}
+                        className={`
+                          flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                          ${
+                            !teamsHavePlayers
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : 'bg-gray-900 text-white hover:bg-gray-800'
+                          }
+                        `}
                       >
                         <svg
                           xmlns='http://www.w3.org/2000/svg'
                           viewBox='0 0 24 24'
                           fill='currentColor'
-                          className='w-4 h-4 mr-2 flex-shrink-0'
+                          className='w-4 h-4 flex-shrink-0'
                         >
                           <path
                             fillRule='evenodd'
@@ -1296,10 +1297,11 @@ export default function NextMatchTab({
                             clipRule='evenodd'
                           />
                         </svg>
-                        <span className='whitespace-nowrap'>
+                        <span className='hidden sm:inline'>
                           Agregar resultado
                         </span>
-                      </Button>
+                        <span className='sm:hidden'>Resultado</span>
+                      </button>
 
                       {/* Actions Dropdown */}
                       <div className='relative' data-actions-dropdown>
@@ -1307,11 +1309,11 @@ export default function NextMatchTab({
                           onClick={() =>
                             setShowActionsDropdown(!showActionsDropdown)
                           }
-                          className='p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-full transition-colors'
+                          className='p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors'
                           title='Más opciones'
                         >
                           <svg
-                            className='w-5 h-5'
+                            className='w-4 h-4'
                             fill='currentColor'
                             viewBox='0 0 24 24'
                           >
@@ -1321,16 +1323,7 @@ export default function NextMatchTab({
 
                         {/* Dropdown Menu */}
                         {showActionsDropdown && (
-                          <div className='absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-green-lg border border-primary-100 py-2 z-[99999] backdrop-blur-sm'>
-                            <div className='px-4 py-2 border-b border-gray-100 bg-gradient-to-r from-primary-50 to-lime-50'>
-                              <div className='text-sm font-medium text-gray-900'>
-                                Opciones
-                              </div>
-                              <div className='text-xs text-gray-500'>
-                                Acciones del partido
-                              </div>
-                            </div>
-
+                          <div className='absolute right-0 mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[99999]'>
                             {/* Share option */}
                             <button
                               onClick={() => {
@@ -1343,10 +1336,10 @@ export default function NextMatchTab({
                                 }
                                 setShowActionsDropdown(false);
                               }}
-                              className='w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors flex items-center'
+                              className='w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center'
                             >
                               <svg
-                                className='w-4 h-4 mr-3'
+                                className='w-4 h-4 mr-2 text-gray-500'
                                 fill='none'
                                 stroke='currentColor'
                                 viewBox='0 0 24 24'
@@ -1367,10 +1360,10 @@ export default function NextMatchTab({
                                 setShowDeleteModal(true);
                                 setShowActionsDropdown(false);
                               }}
-                              className='w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors flex items-center'
+                              className='w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center'
                               disabled={deleteLoading}
                             >
-                              <TrashIcon className='h-4 w-4 mr-3' />
+                              <TrashIcon className='h-4 w-4 mr-2' />
                               Eliminar partido
                             </button>
                           </div>
