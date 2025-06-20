@@ -6,6 +6,7 @@ import { clearAuthState, getSafeCallbackUrl } from '../lib/authUtils';
 import { GetServerSideProps } from 'next';
 import { getSession, signIn } from 'next-auth/react';
 import { subYears, format, differenceInYears } from 'date-fns';
+import DatePickerField from '../components/DatePickerField';
 
 /**
  * Página de registro simplificada
@@ -66,19 +67,21 @@ export default function Register({ callbackUrl }: RegisterProps) {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
-  // Limpia estado de autenticación al cargar
+  // Limpia estado de autenticación al cargar (solo una vez)
   useEffect(() => {
     clearAuthState();
   }, []);
 
+  // Manejar redirección solo cuando cambie el estado de usuario
   useEffect(() => {
-    // Si el usuario ya está autenticado, redirigir según callbackUrl
-    if (user && !authLoading) {
+    if (user && !authLoading && !redirecting) {
+      setRedirecting(true);
       const redirectUrl = getSafeCallbackUrl(callbackUrl as string, '/groups');
       router.push(redirectUrl);
     }
-  }, [user, authLoading, router, callbackUrl]);
+  }, [user, authLoading, callbackUrl]); // Removido router para evitar loops
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -166,24 +169,28 @@ export default function Register({ callbackUrl }: RegisterProps) {
     );
   }
 
-  // Si ya está autenticado, no mostrar el formulario
-  if (user) {
-    return null;
+  // Si ya está autenticado o redirigiendo, no mostrar el formulario
+  if (user || redirecting) {
+    return (
+      <div className='min-h-screen bg-gradient-green flex justify-center items-center'>
+        <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white'></div>
+      </div>
+    );
   }
 
   return (
-    <div className='min-h-screen bg-gradient-green flex items-center justify-center px-4 py-8'>
+    <div className='min-h-screen bg-gradient-green flex items-center justify-center px-4 py-6'>
       <div className='w-full max-w-sm'>
         {/* Logo/Shield */}
         <div className='text-center mb-6'>
-          <div className='mx-auto w-28 h-28 mb-4'>
+          <div className='mx-auto w-24 h-24 mb-3'>
             <img
               src='/logo.png'
               alt='Paloparti Logo'
               className='w-full h-full object-contain drop-shadow-lg'
             />
           </div>
-          <h1 className='text-3xl font-bold text-white mb-1 tracking-wide'>
+          <h1 className='text-2xl font-bold text-white mb-1 tracking-wide'>
             PALOPARTI
           </h1>
           <p className='text-white/80 text-sm'>¡Únete a nosotros!</p>
@@ -197,7 +204,7 @@ export default function Register({ callbackUrl }: RegisterProps) {
         )}
 
         {/* Formulario */}
-        <form onSubmit={handleSubmit} className='space-y-3'>
+        <form onSubmit={handleSubmit} className='space-y-3 mb-4'>
           <input
             type='text'
             name='name'
@@ -238,15 +245,16 @@ export default function Register({ callbackUrl }: RegisterProps) {
             required
           />
 
+          {/* Campo de fecha nativo optimizado para móvil */}
           <input
             type='date'
             name='birthdate'
-            placeholder='Fecha de nacimiento'
-            className='w-full px-4 py-3 bg-white/90 backdrop-blur-sm rounded-xl text-gray-800 placeholder-gray-500 border-0 focus:outline-none focus:ring-4 focus:ring-white/50 focus:bg-white transition-all duration-200'
+            className='w-full px-4 py-3 bg-white/90 backdrop-blur-sm rounded-xl text-gray-700 border-0 focus:outline-none focus:ring-4 focus:ring-white/50 focus:bg-white transition-all duration-200 text-sm'
             value={formData.birthdate}
             onChange={handleChange}
             max={maxDate}
             required
+            aria-label='Fecha de nacimiento'
           />
 
           <button
@@ -258,22 +266,8 @@ export default function Register({ callbackUrl }: RegisterProps) {
           </button>
         </form>
 
-        {/* Separador */}
-        <div className='flex items-center justify-center my-4'>
-          <div className='w-6 h-6 bg-white/20 rounded-full flex items-center justify-center'>
-            <div className='w-1.5 h-1.5 bg-white/60 rounded-full'></div>
-          </div>
-        </div>
-
-        {/* Ya tienes cuenta */}
-        <Link href='/auth/signin'>
-          <button className='w-full bg-transparent border-2 border-white/30 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 hover:bg-white/10 hover:border-white/50 mb-4'>
-            Ya tengo cuenta
-          </button>
-        </Link>
-
-        {/* Botón de Google habilitado */}
-        <div className='space-y-2'>
+        {/* Botón de Google */}
+        <div className='mb-3'>
           <button
             onClick={handleGoogleSignIn}
             className='w-full bg-white/90 backdrop-blur-sm text-gray-800 font-semibold py-3 px-6 rounded-xl transition-all duration-200 hover:bg-white flex items-center justify-center space-x-3'
@@ -296,8 +290,17 @@ export default function Register({ callbackUrl }: RegisterProps) {
                 d='M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z'
               />
             </svg>
-            <span>Registrarse con Google</span>
+            <span>Iniciar sesión con Google</span>
           </button>
+        </div>
+
+        {/* Ya tienes cuenta - Texto más pequeño */}
+        <div className='text-center'>
+          <Link href='/auth/signin'>
+            <span className='text-white/80 text-sm hover:text-white transition-colors cursor-pointer underline'>
+              ¿Ya tienes cuenta? Inicia sesión aquí
+            </span>
+          </Link>
         </div>
       </div>
     </div>
