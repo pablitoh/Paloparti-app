@@ -40,16 +40,6 @@ export default async function handler(
 
     const { userId, groupId, matchId, status, playerRoles } = req.body;
 
-    console.log('🔍 ATTENDANCES API Called:', {
-      method: req.method,
-      userId,
-      targetUserId: userId || session.user.id,
-      matchId,
-      status,
-      playerRoles: playerRoles ? `${playerRoles.length} roles` : 'no roles',
-      timestamp: new Date().toISOString(),
-    });
-
     // Validate required fields
     if (!matchId || !status) {
       return res.status(400).json({
@@ -75,11 +65,9 @@ export default async function handler(
       if (playerRoles && playerRoles.length > 0) {
         // Normalizar roles (maneja tanto string[] como PlayerRole[])
         validatedRoles = normalizePlayerRoles(playerRoles);
-        console.log('✅ Using provided roles:', validatedRoles);
       } else {
         // Si no se proporcionan roles, usar valor por defecto
         validatedRoles = [{ role: PLAYER_ROLES.WILDCARD, priority: 1 }];
-        console.log('⚠️ Using default WILDCARD role - no roles provided');
       }
     }
 
