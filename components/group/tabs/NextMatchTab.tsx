@@ -1248,7 +1248,7 @@ export default function NextMatchTab({
           (matchDetails?.sortCount && matchDetails.sortCount > 0) ? (
             <div className='space-y-4'>
               {/* Header with actions */}
-              <div className='bg-white rounded-2xl shadow-green-lg border border-primary-100 p-4 md:p-6'>
+              <div className='p-4 md:p-6'>
                 <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4'>
                   <div>
                     <h3 className='text-lg font-semibold leading-6 text-gray-900 flex items-center'>
@@ -1281,7 +1281,7 @@ export default function NextMatchTab({
                           ${
                             !teamsHavePlayers
                               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                              : 'bg-gray-900 text-white hover:bg-gray-800'
+                              : 'bg-primary-600 text-white hover:bg-primary-700'
                           }
                         `}
                       >

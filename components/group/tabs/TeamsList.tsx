@@ -387,7 +387,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
 
             {/* Dropdown Menu */}
             {dropdownOpen && currentUserIsAdmin && onSwapPlayer && !isTbd && (
-              <div className='absolute top-12 left-0 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[99999]'>
+              <div className='absolute top-12 left-0 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[100000]'>
                 <button
                   onClick={() => {
                     onSwapPlayer(player.id, isTeamA);
@@ -508,7 +508,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
     const sortedTbdPlayers = sortPlayersByRole(tbdPlayers);
 
     return (
-      <div className='bg-white rounded-xl shadow-sm border border-gray-200 p-5 min-w-0 flex-shrink-0 w-full md:w-auto transition-all duration-200 hover:shadow-md hover:border-gray-300'>
+      <div className='bg-primary-25 rounded-xl shadow-sm border border-primary-300 p-5 min-w-0 flex-shrink-0 w-full md:w-auto transition-all duration-200 hover:shadow-md hover:border-primary-400'>
         {/* Team Header - Minimalist design */}
         <div className='text-center mb-4'>
           <h3
@@ -563,11 +563,11 @@ const TeamsList: React.FC<TeamsListProps> = ({
   return (
     <div
       id={`teams-list-container-${sortCount}`}
-      className='w-full px-4'
+      className='w-full'
       data-sort-count={sortCount}
     >
       {/* Desktop Layout with better spacing */}
-      <div className='hidden md:flex gap-6 justify-center max-w-6xl mx-auto'>
+      <div className='hidden md:flex gap-6 justify-center px-4'>
         <TeamCard
           players={playersA}
           tbdPlayers={teamATbdPlayers}
@@ -591,7 +591,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
         {/* Slider Container */}
         <div
           ref={sliderRef}
-          className='flex overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-6 px-2'
+          className='flex overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-4 px-4'
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           <div className='snap-center min-w-[300px] flex-shrink-0'>
