@@ -513,11 +513,12 @@ const assignPlayersToPosition = (
   return assigned;
 };
 
-// Nueva función inteligente para balancear equipos por rol (primario + secundario + comodín + aleatorio)
+// Nueva función inteligente para balancear equipos por rol MANTENIENDO BALANCE DE JUGADORES
 const createIntelligentRoleBalancedTeams = (
   members: Member[]
 ): [Member[], Member[]] => {
   console.log('🧠 Iniciando asignación inteligente de roles...');
+  console.log(`👥 Total jugadores: ${members.length}`);
 
   const availableByRole = getAvailablePlayersByRole(members);
   const assignedPlayers = new Set<string>();
@@ -525,75 +526,148 @@ const createIntelligentRoleBalancedTeams = (
   let teamA: Member[] = [];
   let teamB: Member[] = [];
 
-  // Configuración de roles por equipo (ajustable según necesidades)
-  const roleConfig = {
-    [PLAYER_ROLES.GOALKEEPER]: { maxPerTeam: 1, priority: 1 }, // Crítico
-    [PLAYER_ROLES.DEFENDER]: { maxPerTeam: 3, priority: 2 }, // Importante
-    [PLAYER_ROLES.MIDFIELDER]: { maxPerTeam: 3, priority: 3 }, // Importante
-    [PLAYER_ROLES.FORWARD]: { maxPerTeam: 3, priority: 4 }, // Normal
-  };
+  // PASO 1: Asignar arqueros (crítico - 1 por equipo)
+  console.log('🥅 PASO 1: Asignando arqueros...');
 
-  // Asignar roles por prioridad
-  const roleOrder = Object.entries(roleConfig)
-    .sort(([, a], [, b]) => a.priority - b.priority)
-    .map(([role]) => role);
+  const goalkeepersA = assignPlayersToPosition(
+    PLAYER_ROLES.GOALKEEPER,
+    1,
+    availableByRole,
+    assignedPlayers,
+    members
+  );
+  teamA.push(...goalkeepersA);
 
-  console.log('📋 Orden de asignación de roles:', roleOrder);
+  const goalkeepersB = assignPlayersToPosition(
+    PLAYER_ROLES.GOALKEEPER,
+    1,
+    availableByRole,
+    assignedPlayers,
+    members
+  );
+  teamB.push(...goalkeepersB);
 
-  for (const role of roleOrder) {
-    const maxPerTeam = roleConfig[role].maxPerTeam;
+  console.log(
+    `🥅 Arqueros asignados: Team A (${goalkeepersA.length}), Team B (${goalkeepersB.length})`
+  );
 
-    // Asignar para equipo A
-    const assignedToA = assignPlayersToPosition(
-      role,
-      maxPerTeam,
-      availableByRole,
-      assignedPlayers,
-      members
-    );
-    teamA.push(...assignedToA);
-
-    // Asignar para equipo B (mismo número que equipo A para balance)
-    const assignedToB = assignPlayersToPosition(
-      role,
-      maxPerTeam,
-      availableByRole,
-      assignedPlayers,
-      members
-    );
-    teamB.push(...assignedToB);
-  }
-
-  // Asignar jugadores restantes de manera balanceada
+  // PASO 2: Crear pool de jugadores restantes ordenados por preferencia
   const remainingPlayers = members.filter((p) => !assignedPlayers.has(p.id));
-  console.log(`🔄 Jugadores restantes: ${remainingPlayers.length}`);
+  console.log(
+    `🎯 PASO 2: Distribuyendo ${remainingPlayers.length} jugadores restantes...`
+  );
 
-  remainingPlayers.forEach((player, index) => {
-    // Alternar entre equipos para balance
-    const targetTeam = index % 2 === 0 ? teamA : teamB;
+  // Ordenar jugadores por preferencias para maximizar satisfacción
+  const prioritizedPlayers = remainingPlayers.sort((a, b) => {
+    const roleA = getPrimaryRole(a.playerRoles);
+    const roleB = getPrimaryRole(b.playerRoles);
 
-    // Asignar rol flexible basado en lo que el equipo necesita
-    const availableRoles = [
-      PLAYER_ROLES.MIDFIELDER, // Priorizar mediocampo
-      PLAYER_ROLES.DEFENDER, // Luego defensa
-      PLAYER_ROLES.FORWARD, // Finalmente ataque
-    ];
+    // Priorizar jugadores con roles específicos sobre comodines
+    if (roleA === PLAYER_ROLES.WILDCARD && roleB !== PLAYER_ROLES.WILDCARD)
+      return 1;
+    if (roleB === PLAYER_ROLES.WILDCARD && roleA !== PLAYER_ROLES.WILDCARD)
+      return -1;
 
-    const assignedRole = assignFlexibleRole(targetTeam, availableRoles);
+    // Mantener orden original para roles similares
+    return 0;
+  });
+
+  // PASO 3: Distribuir alternadamente manteniendo balance de equipos
+  prioritizedPlayers.forEach((player, index) => {
+    // Alternar basándose en el balance actual de equipos
+    const shouldGoToA = teamA.length <= teamB.length;
+    const targetTeam = shouldGoToA ? teamA : teamB;
+    const teamName = shouldGoToA ? 'A' : 'B';
+
+    // Asignar rol inteligente basado en preferencias y necesidades del equipo
+    const assignedRole = determineSmartRole(player, targetTeam);
     targetTeam.push({ ...player, assignedRole });
 
     console.log(
-      `🔄 Jugador restante asignado: ${player.name} -> ${assignedRole} (Team ${
-        index % 2 === 0 ? 'A' : 'B'
-      })`
+      `👤 ${
+        player.name
+      } -> Team ${teamName} como ${assignedRole} (preferencia: ${getPrimaryRole(
+        player.playerRoles
+      )})`
     );
   });
 
   console.log(
-    `✅ Asignación completada: Team A (${teamA.length}), Team B (${teamB.length})`
+    `✅ Distribución final: Team A (${teamA.length}), Team B (${teamB.length})`
   );
 
+  // PASO 4: Verificar balance final
+  const diff = Math.abs(teamA.length - teamB.length);
+  if (diff > 1) {
+    console.log(`⚠️ Desbalance detectado (${diff}), corrigiendo...`);
+    // Mover jugadores para equilibrar
+    if (teamA.length > teamB.length) {
+      const playersToMove = Math.floor(diff / 2);
+      for (let i = 0; i < playersToMove; i++) {
+        const playerToMove = teamA.pop();
+        if (playerToMove) teamB.push(playerToMove);
+      }
+    } else {
+      const playersToMove = Math.floor(diff / 2);
+      for (let i = 0; i < playersToMove; i++) {
+        const playerToMove = teamB.pop();
+        if (playerToMove) teamA.push(playerToMove);
+      }
+    }
+    console.log(
+      `✅ Balance corregido: Team A (${teamA.length}), Team B (${teamB.length})`
+    );
+  }
+
   return [teamA, teamB];
+};
+
+// Función para determinar el rol más inteligente para un jugador en un equipo específico
+const determineSmartRole = (player: Member, team: Member[]): string => {
+  const primaryRole = getPrimaryRole(player.playerRoles);
+
+  // Si el jugador tiene un rol primario específico, usarlo
+  if (primaryRole && primaryRole !== PLAYER_ROLES.WILDCARD) {
+    return primaryRole;
+  }
+
+  // Si es comodín o no tiene rol, asignar basado en necesidades del equipo
+  const teamRoles = team.map((p) => p.assignedRole).filter(Boolean);
+  const roleCounts = {
+    [PLAYER_ROLES.GOALKEEPER]: teamRoles.filter(
+      (r) => r === PLAYER_ROLES.GOALKEEPER
+    ).length,
+    [PLAYER_ROLES.DEFENDER]: teamRoles.filter(
+      (r) => r === PLAYER_ROLES.DEFENDER
+    ).length,
+    [PLAYER_ROLES.MIDFIELDER]: teamRoles.filter(
+      (r) => r === PLAYER_ROLES.MIDFIELDER
+    ).length,
+    [PLAYER_ROLES.FORWARD]: teamRoles.filter((r) => r === PLAYER_ROLES.FORWARD)
+      .length,
+  };
+
+  // Buscar el rol con menor representación (excluyendo arquero que ya está asignado)
+  const availableRoles = [
+    PLAYER_ROLES.DEFENDER,
+    PLAYER_ROLES.MIDFIELDER,
+    PLAYER_ROLES.FORWARD,
+  ];
+
+  // Ordenar por menor cantidad en el equipo
+  availableRoles.sort((a, b) => roleCounts[a] - roleCounts[b]);
+
+  // Si el jugador tiene este rol como secundario, preferirlo
+  if (player.playerRoles) {
+    for (const role of availableRoles) {
+      if (playerHasRole(player, role)) {
+        return role;
+      }
+    }
+  }
+
+  // Si no tiene preferencia, asignar el rol menos representado
+  return availableRoles[0];
 };
 
 // Función para balancear equipos por rol y edad simultáneamente (ORIGINAL - mantener para compatibilidad)

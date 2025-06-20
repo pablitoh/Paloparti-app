@@ -210,6 +210,25 @@ export default function NextMatchTab({
   // Estado para el modal de eliminar partido
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+  // Estado para el dropdown de acciones
+  const [showActionsDropdown, setShowActionsDropdown] = useState(false);
+
+  // Cerrar dropdown cuando se hace clic afuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (showActionsDropdown && !target?.closest('[data-actions-dropdown]')) {
+        setShowActionsDropdown(false);
+      }
+    };
+
+    if (showActionsDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () =>
+        document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showActionsDropdown]);
+
   // Local state to track attendance status
   const [localUserAttendanceStatus, setLocalUserAttendanceStatus] = useState<
     ParticipantStatus | undefined
@@ -1244,66 +1263,131 @@ export default function NextMatchTab({
                         d='M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z'
                       />
                     </svg>
-                    Equipos Formados
+                    Equipos
                   </h3>
-                  <p className='mt-1 max-w-2xl text-sm text-primary-600'>
-                    Equipos para el próximo partido
-                  </p>
                 </div>
 
-                {/* Share and Admin actions for the teams section */}
+                {/* Add Results button and Admin actions dropdown */}
                 <div className='flex items-center gap-2'>
-                  <ShareTeamsButton
-                    elementId='teams-list-container'
-                    groupName={group.name || 'Grupo'}
-                    teamAName={group.teamAName || 'Equipo A'}
-                    teamBName={group.teamBName || 'Equipo B'}
-                    className='text-sm'
-                    sortCount={matchDetails?.sortCount || 0}
-                  />
                   {currentUserIsAdmin && (
-                    <div className='flex space-x-2'>
+                    <>
+                      {/* Add Results Button */}
                       <Button
                         variant='primary'
                         onClick={handleAddResults}
-                        className={`flex items-center text-xs ${
+                        className={`flex items-center text-sm ${
                           !teamsHavePlayers
                             ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                             : ''
                         }`}
                         size='sm'
                         disabled={!teamsHavePlayers}
-                        title='Terminar partido'
                       >
                         <svg
                           xmlns='http://www.w3.org/2000/svg'
                           viewBox='0 0 24 24'
                           fill='currentColor'
-                          className='w-4 h-4 sm:mr-2'
+                          className='w-4 h-4 mr-2'
                         >
                           <path
                             fillRule='evenodd'
-                            d='M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z'
+                            d='M12 3.75a.75.75 0 01.75.75v6.75h6.75a.75.75 0 010 1.5h-6.75v6.75a.75.75 0 01-1.5 0v-6.75H4.5a.75.75 0 010-1.5h6.75V4.5a.75.75 0 01.75-.75z'
                             clipRule='evenodd'
                           />
                         </svg>
-                        <span className='hidden sm:inline'>
-                          Terminar partido
-                        </span>
+                        Agregar resultado
                       </Button>
 
-                      <Button
-                        variant='danger'
-                        onClick={() => setShowDeleteModal(true)}
-                        className='p-1.5 rounded-full'
-                        size='sm'
-                        title='Eliminar partido'
-                        disabled={deleteLoading}
-                      >
-                        <TrashIcon className='h-5 w-5' />
-                      </Button>
-                    </div>
+                      {/* Actions Dropdown */}
+                      <div className='relative' data-actions-dropdown>
+                        <button
+                          onClick={() =>
+                            setShowActionsDropdown(!showActionsDropdown)
+                          }
+                          className='p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-full transition-colors'
+                          title='Más opciones'
+                        >
+                          <svg
+                            className='w-5 h-5'
+                            fill='currentColor'
+                            viewBox='0 0 24 24'
+                          >
+                            <path d='M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z' />
+                          </svg>
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {showActionsDropdown && (
+                          <div className='absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-green-lg border border-primary-100 py-2 z-[99999] backdrop-blur-sm'>
+                            <div className='px-4 py-2 border-b border-gray-100 bg-gradient-to-r from-primary-50 to-lime-50'>
+                              <div className='text-sm font-medium text-gray-900'>
+                                Opciones
+                              </div>
+                              <div className='text-xs text-gray-500'>
+                                Acciones del partido
+                              </div>
+                            </div>
+
+                            {/* Share option */}
+                            <button
+                              onClick={() => {
+                                // Trigger ShareTeamsButton click
+                                const shareButton = document.querySelector(
+                                  '[data-share-teams-button]'
+                                ) as HTMLButtonElement;
+                                if (shareButton) {
+                                  shareButton.click();
+                                }
+                                setShowActionsDropdown(false);
+                              }}
+                              className='w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors flex items-center'
+                            >
+                              <svg
+                                className='w-4 h-4 mr-3'
+                                fill='none'
+                                stroke='currentColor'
+                                viewBox='0 0 24 24'
+                              >
+                                <path
+                                  strokeLinecap='round'
+                                  strokeLinejoin='round'
+                                  strokeWidth='2'
+                                  d='M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z'
+                                />
+                              </svg>
+                              Compartir equipos
+                            </button>
+
+                            {/* Delete option */}
+                            <button
+                              onClick={() => {
+                                setShowDeleteModal(true);
+                                setShowActionsDropdown(false);
+                              }}
+                              className='w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors flex items-center'
+                              disabled={deleteLoading}
+                            >
+                              <TrashIcon className='h-4 w-4 mr-3' />
+                              Eliminar partido
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
+
+                  {/* Hidden ShareTeamsButton for programmatic access */}
+                  <div className='hidden'>
+                    <ShareTeamsButton
+                      elementId='teams-list-container'
+                      groupName={group.name || 'Grupo'}
+                      teamAName={group.teamAName || 'Equipo A'}
+                      teamBName={group.teamBName || 'Equipo B'}
+                      className='text-sm'
+                      sortCount={matchDetails?.sortCount || 0}
+                      data-share-teams-button
+                    />
+                  </div>
                 </div>
               </div>
 

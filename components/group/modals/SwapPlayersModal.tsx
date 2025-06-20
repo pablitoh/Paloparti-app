@@ -260,7 +260,7 @@ const SwapPlayersModal = ({
                   )}
                 </div>
                 {isSelected && (
-                  <div className='w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center'>
+                  <div className='w-5 h-5 rounded-full bg-primary-500 flex items-center justify-center'>
                     <span className='text-white text-xs font-bold'>
                       {selectedPlayer1?.id === player.id ? '1' : '2'}
                     </span>
@@ -277,8 +277,8 @@ const SwapPlayersModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
-      <div className='bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto'>
+    <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[99999]'>
+      <div className='bg-white rounded-2xl p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto shadow-green-lg border border-primary-100'>
         <div className='mb-6'>
           <div className='flex justify-between items-start'>
             <div>
@@ -305,7 +305,7 @@ const SwapPlayersModal = ({
 
         {/* Selection Summary */}
         {(selectedPlayer1 || selectedPlayer2) && (
-          <div className='mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200'>
+          <div className='mb-6 p-4 bg-gradient-to-r from-primary-50 to-lime-50 rounded-xl border border-primary-200'>
             <div className='flex items-center justify-center space-x-4'>
               <div className='text-center'>
                 <div className='text-xs text-gray-500 mb-1'>Jugador 1</div>
@@ -336,7 +336,7 @@ const SwapPlayersModal = ({
                 )}
               </div>
 
-              <ArrowsRightLeftIcon className='h-6 w-6 text-blue-500' />
+              <ArrowsRightLeftIcon className='h-6 w-6 text-primary-500' />
 
               <div className='text-center'>
                 <div className='text-xs text-gray-500 mb-1'>Jugador 2</div>
@@ -372,14 +372,14 @@ const SwapPlayersModal = ({
 
         {/* Teams */}
         <div className='grid grid-cols-1 md:grid-cols-2 gap-6 mb-6'>
-          <div className='border border-blue-200 rounded-lg p-4'>
+          <div className='border border-primary-200 rounded-xl p-4 bg-primary-50/30'>
             {renderPlayerList(
               allPlayers.teamA,
               group?.teamAName || 'Equipo A',
               true
             )}
           </div>
-          <div className='border border-red-200 rounded-lg p-4'>
+          <div className='border border-coral-200 rounded-xl p-4 bg-coral-50/30'>
             {renderPlayerList(
               allPlayers.teamB,
               group?.teamBName || 'Equipo B',
