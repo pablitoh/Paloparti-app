@@ -375,7 +375,228 @@ const getPrimaryRole = (
   return sortedRoles[0].role;
 };
 
-// Función para balancear equipos por rol y edad simultáneamente
+// Función para verificar si un jugador tiene un rol específico (primario o secundario)
+const playerHasRole = (player: Member, targetRole: string): boolean => {
+  if (!player.playerRoles) return false;
+
+  return player.playerRoles.some((role) => {
+    if (typeof role === 'string') {
+      return role === targetRole;
+    } else if (role && typeof role === 'object' && 'role' in role) {
+      return role.role === targetRole;
+    }
+    return false;
+  });
+};
+
+// Función para obtener jugadores disponibles por rol (primario + secundario + comodín)
+const getAvailablePlayersByRole = (players: Member[]) => {
+  const availableByRole: Record<
+    string,
+    { primary: Member[]; secondary: Member[]; wildcard: Member[] }
+  > = {
+    [PLAYER_ROLES.GOALKEEPER]: { primary: [], secondary: [], wildcard: [] },
+    [PLAYER_ROLES.DEFENDER]: { primary: [], secondary: [], wildcard: [] },
+    [PLAYER_ROLES.MIDFIELDER]: { primary: [], secondary: [], wildcard: [] },
+    [PLAYER_ROLES.FORWARD]: { primary: [], secondary: [], wildcard: [] },
+  };
+
+  players.forEach((player) => {
+    const primaryRole = getPrimaryRole(player.playerRoles);
+
+    // Clasificar por rol primario
+    if (primaryRole && availableByRole[primaryRole]) {
+      availableByRole[primaryRole].primary.push(player);
+    } else if (primaryRole === PLAYER_ROLES.WILDCARD) {
+      // Los comodines se pueden usar para cualquier posición
+      Object.keys(availableByRole).forEach((role) => {
+        availableByRole[role].wildcard.push(player);
+      });
+    }
+
+    // Buscar en roles secundarios (prioridad > 1)
+    if (player.playerRoles) {
+      const normalizedRoles = normalizePlayerRoles(player.playerRoles);
+      normalizedRoles.forEach((roleObj) => {
+        // Si no es el rol primario y tiene menor prioridad
+        if (
+          roleObj.role !== primaryRole &&
+          roleObj.priority > 1 &&
+          availableByRole[roleObj.role]
+        ) {
+          availableByRole[roleObj.role].secondary.push(player);
+        }
+      });
+    }
+  });
+
+  return availableByRole;
+};
+
+// Función inteligente para asignar jugadores a una posición específica
+const assignPlayersToPosition = (
+  targetRole: string,
+  maxPlayers: number,
+  availableByRole: Record<
+    string,
+    { primary: Member[]; secondary: Member[]; wildcard: Member[] }
+  >,
+  assignedPlayers: Set<string>,
+  allPlayers: Member[] // Para fallback aleatorio
+): Member[] => {
+  const assigned: Member[] = [];
+  const roleData = availableByRole[targetRole];
+
+  console.log(`🎯 Asignando ${targetRole} (máximo ${maxPlayers}):`);
+  console.log(`  - Primarios disponibles: ${roleData.primary.length}`);
+  console.log(`  - Secundarios disponibles: ${roleData.secondary.length}`);
+  console.log(`  - Comodines disponibles: ${roleData.wildcard.length}`);
+
+  // 1. Asignar jugadores con rol primario PRIMERO
+  for (const player of roleData.primary) {
+    if (assigned.length >= maxPlayers) break;
+    if (assignedPlayers.has(player.id)) continue;
+
+    assigned.push({ ...player, assignedRole: targetRole });
+    assignedPlayers.add(player.id);
+    console.log(`  ✅ Asignado PRIMARIO: ${player.name} -> ${targetRole}`);
+  }
+
+  // 2. Si necesitamos más, usar jugadores con rol secundario
+  if (assigned.length < maxPlayers) {
+    for (const player of roleData.secondary) {
+      if (assigned.length >= maxPlayers) break;
+      if (assignedPlayers.has(player.id)) continue;
+
+      assigned.push({ ...player, assignedRole: targetRole });
+      assignedPlayers.add(player.id);
+      console.log(`  ✅ Asignado SECUNDARIO: ${player.name} -> ${targetRole}`);
+    }
+  }
+
+  // 3. Si aún necesitamos más, usar comodines
+  if (assigned.length < maxPlayers) {
+    for (const player of roleData.wildcard) {
+      if (assigned.length >= maxPlayers) break;
+      if (assignedPlayers.has(player.id)) continue;
+
+      assigned.push({ ...player, assignedRole: targetRole });
+      assignedPlayers.add(player.id);
+      console.log(`  ✅ Asignado COMODÍN: ${player.name} -> ${targetRole}`);
+    }
+  }
+
+  // 4. ÚLTIMO RECURSO: Asignar jugadores al azar si es crítico (solo para arqueros)
+  if (assigned.length < maxPlayers && targetRole === PLAYER_ROLES.GOALKEEPER) {
+    console.log(
+      `  ⚠️ ÚLTIMO RECURSO: Buscando jugador aleatorio para ${targetRole}`
+    );
+
+    const availablePlayers = allPlayers.filter(
+      (p) => !assignedPlayers.has(p.id)
+    );
+    if (availablePlayers.length > 0) {
+      // Seleccionar aleatoriamente
+      const randomPlayer =
+        availablePlayers[Math.floor(Math.random() * availablePlayers.length)];
+      assigned.push({ ...randomPlayer, assignedRole: targetRole });
+      assignedPlayers.add(randomPlayer.id);
+      console.log(
+        `  🎲 Asignado ALEATORIO: ${randomPlayer.name} -> ${targetRole}`
+      );
+    }
+  }
+
+  console.log(
+    `  📊 Total asignados para ${targetRole}: ${assigned.length}/${maxPlayers}`
+  );
+  return assigned;
+};
+
+// Nueva función inteligente para balancear equipos por rol (primario + secundario + comodín + aleatorio)
+const createIntelligentRoleBalancedTeams = (
+  members: Member[]
+): [Member[], Member[]] => {
+  console.log('🧠 Iniciando asignación inteligente de roles...');
+
+  const availableByRole = getAvailablePlayersByRole(members);
+  const assignedPlayers = new Set<string>();
+
+  let teamA: Member[] = [];
+  let teamB: Member[] = [];
+
+  // Configuración de roles por equipo (ajustable según necesidades)
+  const roleConfig = {
+    [PLAYER_ROLES.GOALKEEPER]: { maxPerTeam: 1, priority: 1 }, // Crítico
+    [PLAYER_ROLES.DEFENDER]: { maxPerTeam: 3, priority: 2 }, // Importante
+    [PLAYER_ROLES.MIDFIELDER]: { maxPerTeam: 3, priority: 3 }, // Importante
+    [PLAYER_ROLES.FORWARD]: { maxPerTeam: 3, priority: 4 }, // Normal
+  };
+
+  // Asignar roles por prioridad
+  const roleOrder = Object.entries(roleConfig)
+    .sort(([, a], [, b]) => a.priority - b.priority)
+    .map(([role]) => role);
+
+  console.log('📋 Orden de asignación de roles:', roleOrder);
+
+  for (const role of roleOrder) {
+    const maxPerTeam = roleConfig[role].maxPerTeam;
+
+    // Asignar para equipo A
+    const assignedToA = assignPlayersToPosition(
+      role,
+      maxPerTeam,
+      availableByRole,
+      assignedPlayers,
+      members
+    );
+    teamA.push(...assignedToA);
+
+    // Asignar para equipo B (mismo número que equipo A para balance)
+    const assignedToB = assignPlayersToPosition(
+      role,
+      maxPerTeam,
+      availableByRole,
+      assignedPlayers,
+      members
+    );
+    teamB.push(...assignedToB);
+  }
+
+  // Asignar jugadores restantes de manera balanceada
+  const remainingPlayers = members.filter((p) => !assignedPlayers.has(p.id));
+  console.log(`🔄 Jugadores restantes: ${remainingPlayers.length}`);
+
+  remainingPlayers.forEach((player, index) => {
+    // Alternar entre equipos para balance
+    const targetTeam = index % 2 === 0 ? teamA : teamB;
+
+    // Asignar rol flexible basado en lo que el equipo necesita
+    const availableRoles = [
+      PLAYER_ROLES.MIDFIELDER, // Priorizar mediocampo
+      PLAYER_ROLES.DEFENDER, // Luego defensa
+      PLAYER_ROLES.FORWARD, // Finalmente ataque
+    ];
+
+    const assignedRole = assignFlexibleRole(targetTeam, availableRoles);
+    targetTeam.push({ ...player, assignedRole });
+
+    console.log(
+      `🔄 Jugador restante asignado: ${player.name} -> ${assignedRole} (Team ${
+        index % 2 === 0 ? 'A' : 'B'
+      })`
+    );
+  });
+
+  console.log(
+    `✅ Asignación completada: Team A (${teamA.length}), Team B (${teamB.length})`
+  );
+
+  return [teamA, teamB];
+};
+
+// Función para balancear equipos por rol y edad simultáneamente (ORIGINAL - mantener para compatibilidad)
 const createRoleAndAgeBalancedTeams = (
   members: Member[]
 ): [Member[], Member[]] => {
@@ -3639,14 +3860,16 @@ export default async function handler(
           // Balanceo por rating y edad (podríamos también usar el combinado aquí)
           [autoTeamA, autoTeamB] = createCombinedBalancedTeams(mappedMembers);
         } else if (balanceByRole && balanceByAge) {
-          // Balanceo por rol y edad
-          [autoTeamA, autoTeamB] = createRoleAndAgeBalancedTeams(mappedMembers);
+          // Balanceo inteligente por rol (primario + secundario + comodín + aleatorio)
+          [autoTeamA, autoTeamB] =
+            createIntelligentRoleBalancedTeams(mappedMembers);
         } else if (balanceByRating) {
           // Solo balanceo por rating
           [autoTeamA, autoTeamB] = createRatingBalancedTeams(mappedMembers);
         } else if (balanceByRole) {
-          // Solo balanceo por rol
-          [autoTeamA, autoTeamB] = createRoleBalancedTeams(mappedMembers);
+          // Solo balanceo inteligente por rol
+          [autoTeamA, autoTeamB] =
+            createIntelligentRoleBalancedTeams(mappedMembers);
         } else if (balanceByAge) {
           // Solo balanceo por edad
           [autoTeamA, autoTeamB] = createBalancedTeams(mappedMembers);
