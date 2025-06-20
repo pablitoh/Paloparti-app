@@ -245,17 +245,18 @@ export default function Register({ callbackUrl }: RegisterProps) {
             required
           />
 
-          {/* Campo de fecha con placeholder personalizado único */}
+          {/* Campo de fecha con dimensiones exactas igual a otros campos */}
           <div className='relative'>
             <input
               type='date'
               name='birthdate'
-              className='w-full px-4 py-3 bg-white/90 backdrop-blur-sm rounded-xl text-gray-800 border-0 focus:outline-none focus:ring-4 focus:ring-white/50 focus:bg-white transition-all duration-200
+              className='w-full px-4 py-3 bg-white/90 backdrop-blur-sm rounded-xl text-gray-800 border-0 focus:outline-none focus:ring-4 focus:ring-white/50 focus:bg-white transition-all duration-200 h-12
               [&::-webkit-datetime-edit-text]:opacity-0
               [&::-webkit-datetime-edit-month-field]:opacity-0  
               [&::-webkit-datetime-edit-day-field]:opacity-0
               [&::-webkit-datetime-edit-year-field]:opacity-0
-              [&::-webkit-datetime-edit]:opacity-0'
+              [&::-webkit-datetime-edit]:opacity-0
+              [&::-webkit-calendar-picker-indicator]:opacity-0'
               value={formData.birthdate}
               onChange={handleChange}
               max={maxDate}
@@ -263,6 +264,10 @@ export default function Register({ callbackUrl }: RegisterProps) {
               style={{
                 fontSize: '16px',
                 colorScheme: 'light',
+                height: '48px', // Altura fija igual a otros campos
+                minHeight: '48px',
+                maxHeight: '48px',
+                boxSizing: 'border-box',
               }}
             />
             {/* Placeholder personalizado que se oculta cuando hay fecha */}
@@ -281,6 +286,22 @@ export default function Register({ callbackUrl }: RegisterProps) {
                 </span>
               </div>
             )}
+            {/* Icono de calendario clickeable */}
+            <div className='absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none'>
+              <svg
+                className='w-5 h-5 text-gray-400'
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'
+                />
+              </svg>
+            </div>
           </div>
 
           <button
