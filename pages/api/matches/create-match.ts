@@ -2704,6 +2704,16 @@ export default async function handler(
         }
       }
 
+      // NUEVO: Log detallado del estado de allowTbdPlayers después de configuración
+      console.log('🔍 Estado final de allowTbdPlayers:', {
+        allowTbdPlayersParam,
+        allowTbdPlayers,
+        actuallyFirstTime,
+        sortCount: existingMatch?.sortCount,
+        isResort,
+        matchId,
+      });
+
       // Obtener información de los equipos actuales ANTES de recalcularlos
       const previousMatchPlayers = await prisma.matchPlayer.findMany({
         where: { matchId },
@@ -2883,6 +2893,8 @@ export default async function handler(
     const teamAName = group.teamAName ? `${group.teamAName}` : `Equipo A`;
     const teamBName = group.teamBName ? `${group.teamBName}` : `Equipo B`;
     const requiredPlayersPerTeam = Math.ceil(group.requiredPlayers / 2) || 5;
+
+    // Remover log temporal - mover a lugar correcto
 
     // Usar valores existentes si es un re-sorteo, o los proporcionados/default si es uno nuevo
     const matchDate =
