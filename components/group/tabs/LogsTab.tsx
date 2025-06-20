@@ -111,9 +111,20 @@ const actionMessages: Record<string, (details: any) => string> = {
       return details.message;
     }
 
-    const rolesText = details.rolesText || 'Comodín';
+    // Si no hay playerRoles en el log, significa que no se proporcionaron roles específicos
+    if (!details.playerRoles || details.playerRoles.length === 0) {
+      return `confirmó la asistencia de **${
+        details.userName || 'un jugador'
+      }**`;
+    }
+
+    // Si hay roles, convertirlos a texto legible
+    const rolesText = details.playerRoles
+      .map((role: any) => (typeof role === 'string' ? role : role.role))
+      .join(', ');
+
     return `confirmó la asistencia de **${
-      details.targetUserName || 'un jugador'
+      details.userName || 'un jugador'
     }** con posiciones: ${rolesText}`;
   },
   [LogAction.USER_ROLE_CHANGED]: (details) =>

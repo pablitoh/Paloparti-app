@@ -61,13 +61,22 @@ export default async function handler(
 
     // Validar y procesar playerRoles
     let validatedRoles: PlayerRole[] = [];
+    let rolesWereProvided = false; // Flag para saber si se proporcionaron roles
+
     if (status === 'CONFIRMED') {
       if (playerRoles && playerRoles.length > 0) {
         // Normalizar roles (maneja tanto string[] como PlayerRole[])
         validatedRoles = normalizePlayerRoles(playerRoles);
+        rolesWereProvided = true;
+        console.log('🟢 Roles proporcionados:', validatedRoles);
       } else {
         // Si no se proporcionan roles, usar valor por defecto
         validatedRoles = [{ role: PLAYER_ROLES.WILDCARD, priority: 1 }];
+        rolesWereProvided = false;
+        console.log(
+          '🔴 No se proporcionaron roles, usando default:',
+          validatedRoles
+        );
       }
     }
 
@@ -208,7 +217,8 @@ export default async function handler(
             userId: targetUserId,
             userName: targetUser?.name,
             status,
-            playerRoles: validatedRoles,
+            // Solo incluir playerRoles en el log si se proporcionaron roles específicos
+            ...(rolesWereProvided && { playerRoles: validatedRoles }),
           }
         );
       }
