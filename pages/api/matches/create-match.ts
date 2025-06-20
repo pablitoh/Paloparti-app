@@ -4297,6 +4297,16 @@ export default async function handler(
 
     // Añadir jugadores TBD si es necesario
     const addTbdPlayers = (team: any[], isTeamA: boolean) => {
+      console.log(
+        `🔧 addTbdPlayers llamado para equipo ${isTeamA ? 'A' : 'B'}:`,
+        {
+          teamLength: team.length,
+          allowTbdPlayers,
+          requiredPlayersPerTeam,
+          groupRequiredPlayers: group.requiredPlayers,
+        }
+      );
+
       // Si no se permite añadir TBD players, retornar array vacío
       if (allowTbdPlayers === false) {
         console.log(
