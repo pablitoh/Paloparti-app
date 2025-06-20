@@ -2331,9 +2331,12 @@ export default async function handler(
       isResort = false, // Indica si es un re-sorteo de un partido existente
       players = [], // Lista de jugadores proporcionada para el sorteo
       tbdPlayersInput = { teamA: [], teamB: [] }, // Jugadores TBD predefinidos
-      allowTbdPlayers = true, // Por defecto permitir TBD players si no se especifica
+      allowTbdPlayers: allowTbdPlayersParam = true, // Por defecto permitir TBD players si no se especifica
       useRandomAlgorithm = false, // Parámetro para usar algoritmo completamente aleatorio
     } = req.body;
+
+    // Crear variable mutable para allowTbdPlayers
+    let allowTbdPlayers = allowTbdPlayersParam;
 
     // Validar campos requeridos
     if (!groupId) {
@@ -2378,6 +2381,25 @@ export default async function handler(
         return res.status(400).json({
           message: 'Solo se pueden reorganizar partidos pendientes',
         });
+      }
+
+      // DETECTAR SI ES REALMENTE LA PRIMERA VEZ basándose en sortCount
+      const actuallyFirstTime =
+        !existingMatch.sortCount || existingMatch.sortCount === 0;
+      if (actuallyFirstTime) {
+        console.log(
+          '🎯 PRIMERA VEZ sorteando equipos (sortCount = 0), generando TBD players'
+        );
+      } else {
+        console.log(
+          `🎯 RE-SORTEO de equipos (sortCount = ${existingMatch.sortCount})`
+        );
+      }
+
+      // Sobrescribir allowTbdPlayers para primera vez - siempre generar TBD la primera vez
+      if (actuallyFirstTime) {
+        allowTbdPlayers = true;
+        console.log('🎯 Forzando allowTbdPlayers = true para primera vez');
       }
 
       // Obtener información de los equipos actuales ANTES de recalcularlos

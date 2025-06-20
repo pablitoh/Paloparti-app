@@ -531,7 +531,7 @@ export const useRandomizeTeamsMutation = () => {
           groupId: params.groupId,
           matchId: params.matchId,
           mode: 'auto',
-          isResort: true,
+          isResort: true, // Este endpoint siempre es para re-sorteos, el primer sorteo debe crear un partido
           forceNewShuffle: true, // Añadir parámetro para forzar un nuevo sorteo aleatorio
           balanceByAge:
             params.balanceByAge !== undefined ? params.balanceByAge : false, // Pasar el parámetro con valor por defecto false
