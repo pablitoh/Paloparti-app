@@ -154,7 +154,7 @@ const getPlayerRoles = (player: Player | TbdPlayer): string[] => {
       return (player.playerRoles as PlayerRole[]).map((pr) => pr.role);
     }
     // Si es string[] (formato antiguo), devolverlo directamente
-    return player.playerRoles as string[];
+    return player.playerRoles as unknown as string[];
   }
 
   // Si no tiene roles, devolver array vacío
@@ -272,16 +272,48 @@ const TeamsList: React.FC<TeamsListProps> = ({
     // Obtener roles del jugador y determinar el rol principal
     const playerRoles = getPlayerRoles(player);
 
-    // Priorizar el rol asignado si existe
-    const displayRole = player.assignedRole || getPrimaryRole(playerRoles);
+    // Función para obtener roles ordenados por prioridad del usuario
+    const getUserSelectedRoles = (): string[] => {
+      if (player.playerRoles && Array.isArray(player.playerRoles)) {
+        // Si es PlayerRole[], ordenar por prioridad
+        if (
+          player.playerRoles.length > 0 &&
+          typeof player.playerRoles[0] === 'object' &&
+          'role' in player.playerRoles[0]
+        ) {
+          const sortedRoles = [...(player.playerRoles as PlayerRole[])].sort(
+            (a, b) => a.priority - b.priority
+          );
+          return sortedRoles.map((pr) => pr.role);
+        }
+        // Si es string[] (formato antiguo), devolverlo directamente
+        return player.playerRoles as unknown as string[];
+      }
+      return [];
+    };
 
-    // Mostrar el ícono del rol asignado primero, seguido por los demás roles seleccionados
-    const allRoles = displayRole
-      ? [displayRole, ...playerRoles.filter((role) => role !== displayRole)]
-      : playerRoles;
+    const userSelectedRoles = getUserSelectedRoles();
 
-    // Eliminar duplicados
-    const uniqueRoles = [...new Set(allRoles)];
+    // Priorizar el rol asignado si existe, seguido por las elecciones del usuario
+    let displayRoles: string[] = [];
+
+    if (player.assignedRole) {
+      // Mostrar el rol asignado primero (con fondo amarillo)
+      displayRoles.push(player.assignedRole);
+      // Agregar las elecciones del usuario que no sean el rol asignado
+      const otherUserRoles = userSelectedRoles.filter(
+        (role) => role !== player.assignedRole
+      );
+      displayRoles.push(...otherUserRoles);
+    } else {
+      // Si no hay rol asignado, mostrar las elecciones del usuario
+      displayRoles = userSelectedRoles;
+    }
+
+    // Eliminar duplicados manteniendo el orden
+    const uniqueRoles = displayRoles.filter(
+      (role, index) => displayRoles.indexOf(role) === index
+    );
 
     // Obtener íconos para los roles
     const roleIcons = uniqueRoles.map((role) => ROLE_ICONS[role]?.icon);
