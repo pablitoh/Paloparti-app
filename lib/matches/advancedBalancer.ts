@@ -65,10 +65,18 @@ export const createRatingBalancedTeams = (
         Object.values(PLAYER_ROLES)
       );
 
+    // CORREGIDO: Solo marcar como forzado si NO tiene este rol entre sus preferencias
+    const hasThisRole =
+      player.playerRoles?.some((role) =>
+        typeof role === 'string'
+          ? role === assignedRole
+          : role.role === assignedRole
+      ) || false;
+
     const playerWithRole = {
       ...player,
       assignedRole,
-      positionForced: !getPrimaryRole(player.playerRoles),
+      positionForced: !hasThisRole,
     };
 
     // Asignar al equipo con menor rating promedio, o alternar si están equilibrados
@@ -139,10 +147,18 @@ export const createRandomTeams = (members: Member[]): [Member[], Member[]] => {
     const assignedRole =
       getPrimaryRole(player.playerRoles) || PLAYER_ROLES.WILDCARD;
 
+    // CORREGIDO: Solo marcar como forzado si NO tiene este rol entre sus preferencias
+    const hasThisRole =
+      player.playerRoles?.some((role) =>
+        typeof role === 'string'
+          ? role === assignedRole
+          : role.role === assignedRole
+      ) || false;
+
     const playerWithRole = {
       ...player,
       assignedRole,
-      positionForced: !getPrimaryRole(player.playerRoles),
+      positionForced: !hasThisRole,
     };
 
     if (index % 2 === 0) {

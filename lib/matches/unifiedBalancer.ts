@@ -21,24 +21,51 @@ const FORMATIONS = {
 };
 
 // Utilidades para trabajar con roles de jugadores
-const getPrimaryRole = (playerRoles?: PlayerRole[]): string | undefined => {
+const getPrimaryRole = (
+  playerRoles?: PlayerRole[] | string[]
+): string | undefined => {
   if (!playerRoles || playerRoles.length === 0) return undefined;
-  const sortedRoles = [...playerRoles].sort((a, b) => a.priority - b.priority);
+
+  // Si es un array de strings, devolver el primero
+  if (typeof playerRoles[0] === 'string') {
+    return playerRoles[0] as string;
+  }
+
+  // Si es un array de objetos PlayerRole, devolver el de mayor prioridad (menor número)
+  const roleObjects = playerRoles as PlayerRole[];
+  const sortedRoles = [...roleObjects].sort((a, b) => a.priority - b.priority);
   return sortedRoles[0]?.role;
 };
 
-const getSecondaryRole = (playerRoles?: PlayerRole[]): string | undefined => {
+const getSecondaryRole = (
+  playerRoles?: PlayerRole[] | string[]
+): string | undefined => {
   if (!playerRoles || playerRoles.length < 2) return undefined;
-  const sortedRoles = [...playerRoles].sort((a, b) => a.priority - b.priority);
+
+  // Si es un array de strings, devolver el segundo
+  if (typeof playerRoles[0] === 'string') {
+    return playerRoles[1] as string;
+  }
+
+  // Si es un array de objetos PlayerRole, devolver el segundo de mayor prioridad
+  const roleObjects = playerRoles as PlayerRole[];
+  const sortedRoles = [...roleObjects].sort((a, b) => a.priority - b.priority);
   return sortedRoles[1]?.role;
 };
 
 const hasRole = (
-  playerRoles: PlayerRole[] | undefined,
+  playerRoles: PlayerRole[] | string[] | undefined,
   role: string
 ): boolean => {
-  if (!playerRoles) return false;
-  return playerRoles.some((r) => r.role === role);
+  if (!playerRoles || playerRoles.length === 0) return false;
+
+  // Si es un array de strings
+  if (typeof playerRoles[0] === 'string') {
+    return (playerRoles as string[]).includes(role);
+  }
+
+  // Si es un array de objetos PlayerRole
+  return (playerRoles as PlayerRole[]).some((r) => r.role === role);
 };
 
 type PositionCount = Record<string, number>;
@@ -308,7 +335,10 @@ class UnifiedTeamBalancer {
         break; // Ya llenamos ambos equipos para esta posición
       }
 
-      const isForced = candidate.priority >= 3;
+      // CORREGIDO: Lógica más inteligente para determinar si es forzado
+      // Solo marcar como forzado si el jugador NO TIENE este rol entre sus preferencias
+      const hasThisRole = hasRole(candidate.player.playerRoles, position);
+      const isForced = !hasThisRole;
 
       this.assignPlayerToTeam(
         candidate.player,
@@ -471,7 +501,11 @@ class UnifiedTeamBalancer {
       if (this.assignedPlayerIds.has(candidate.player.id)) continue;
 
       const isTeamA = i % 2 === 0;
-      const isForced = candidate.priority > 2;
+      // CORREGIDO: Solo marcar como forzado si NO tiene arquero entre sus roles
+      const isForced = !hasRole(
+        candidate.player.playerRoles,
+        PLAYER_ROLES.GOALKEEPER
+      );
 
       this.assignPlayerToTeam(
         candidate.player,
@@ -525,11 +559,19 @@ class UnifiedTeamBalancer {
     if (availablePlayers.length > 0) {
       // Tomar el primero disponible
       const player = availablePlayers[0];
-      this.assignPlayerToTeam(player, PLAYER_ROLES.GOALKEEPER, isTeamA, true);
+      // CORREGIDO: Solo marcar como forzado si NO tiene arquero entre sus roles
+      const isForced = !hasRole(player.playerRoles, PLAYER_ROLES.GOALKEEPER);
+
+      this.assignPlayerToTeam(
+        player,
+        PLAYER_ROLES.GOALKEEPER,
+        isTeamA,
+        isForced
+      );
       console.log(
         `   ✅ ${player.name} → Equipo ${
           isTeamA ? 'A' : 'B'
-        } (ARQUERO DE EMERGENCIA)`
+        } (ARQUERO DE EMERGENCIA${isForced ? ' - FORZADO' : ''})`
       );
     } else {
       console.log(
@@ -650,7 +692,9 @@ class UnifiedTeamBalancer {
     }
 
     if (bestCandidate) {
-      const isForced = bestCandidate.priority > 2;
+      // CORREGIDO: Solo marcar como forzado si NO tiene este rol entre sus preferencias
+      const isForced = !hasRole(bestCandidate.player.playerRoles, position);
+
       this.assignPlayerToTeam(
         bestCandidate.player,
         position,
@@ -691,15 +735,15 @@ class UnifiedTeamBalancer {
       const isTeamA = this.shouldAssignToTeamA();
       const bestPosition = this.determineBestPositionForPlayer(player, isTeamA);
 
-      this.assignPlayerToTeam(
-        player,
-        bestPosition,
-        isTeamA,
-        !hasRole(player.playerRoles, bestPosition)
-      );
+      // CORREGIDO: Solo marcar como forzado si NO tiene este rol entre sus preferencias
+      const isForced = !hasRole(player.playerRoles, bestPosition);
+
+      this.assignPlayerToTeam(player, bestPosition, isTeamA, isForced);
 
       console.log(
-        `   ✅ ${player.name} → ${bestPosition} (Equipo ${isTeamA ? 'A' : 'B'})`
+        `   ✅ ${player.name} → ${bestPosition} (Equipo ${isTeamA ? 'A' : 'B'}${
+          isForced ? ' - FORZADO' : ''
+        })`
       );
     });
   }
@@ -902,6 +946,7 @@ class UnifiedTeamBalancer {
 
     // Convertir el jugador a arquero
     targetPlayer.assignedRole = PLAYER_ROLES.GOALKEEPER;
+    // CORREGIDO: Solo marcar como forzado si NO tiene arquero entre sus roles
     targetPlayer.positionForced = !hasRole(
       targetPlayer.playerRoles,
       PLAYER_ROLES.GOALKEEPER

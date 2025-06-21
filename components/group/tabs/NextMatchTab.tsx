@@ -596,8 +596,18 @@ export default function NextMatchTab({
         (window as any).__allowTbdPlayers = allowFillIn;
         // Pasar el estado de modo aleatorio
         (window as any).__isRandomMode = isRandomMode;
+
+        console.log('🐛 DEBUG - Variables globales seteadas:', {
+          __balanceByAge: (window as any).__balanceByAge,
+          __balanceByRole: (window as any).__balanceByRole,
+          __balanceByRating: (window as any).__balanceByRating,
+          __allowTbdPlayers: (window as any).__allowTbdPlayers,
+          __isRandomMode: (window as any).__isRandomMode,
+        });
+
         await handleSortTeams();
         // The parent component handles invalidation/refetch
+        return; // CORREGIDO: Importante agregar return para evitar ejecutar el else
       } else {
         // Mostrar un estado de carga para mejorar la experiencia de usuario
         showLoadingToast('Sorteando equipos...');
@@ -665,14 +675,32 @@ export default function NextMatchTab({
           return newKey;
         });
 
-        // Forzar una actualización completa después de un breve delay
+        // Forzar invalidaciones múltiples para asegurar la actualización
+        console.log(
+          '🔄 Forzando invalidaciones para asegurar actualización UI'
+        );
+
+        // Invalidar inmediatamente
+        queryClient.invalidateQueries({
+          queryKey: ['group', 'nextMatch', id],
+          exact: true,
+          refetchType: 'all',
+        });
+
+        // Invalidar básicos del grupo también
+        queryClient.invalidateQueries({
+          queryKey: ['group', 'basic', id],
+          refetchType: 'active',
+        });
+
+        // Invalidación adicional con delay para casos edge
         setTimeout(() => {
-          console.log('🔄 Forzando invalidación adicional después de 100ms');
+          console.log('🔄 Invalidación adicional después de 200ms');
           queryClient.invalidateQueries({
             queryKey: ['group', 'nextMatch', id],
-            exact: true,
+            refetchType: 'all',
           });
-        }, 100);
+        }, 200);
 
         // Notificar al usuario que los equipos han sido sorteados
         showSuccessToast('Equipos sorteados exitosamente');
@@ -1424,6 +1452,18 @@ _Generado con Paloparti_ 🚀`;
               </div>
 
               {/* TeamsList component */}
+              {(() => {
+                // Debug logging antes de renderizar TeamsList
+                console.log('🎯 NextMatchTab - Renderizando TeamsList con:', {
+                  teamsListKey,
+                  processedPlayersACount: processedPlayersA.length,
+                  processedPlayersBCount: processedPlayersB.length,
+                  sortCount: matchDetails?.sortCount,
+                  matchDetailsId: matchDetails?.id,
+                  timestamp: new Date().toISOString(),
+                });
+                return null;
+              })()}
               <TeamsList
                 key={teamsListKey}
                 // @ts-ignore - Ignoramos los errores de tipo debido a conflictos entre definiciones

@@ -382,14 +382,89 @@ export const useGroupActions = ({
         throw new Error('No hay un partido programado');
       }
 
-      // Debug log to track allowFillIn value
-      console.log('🔍 handleRandomizeTeams - allowFillIn value:', allowFillIn);
+      // CORREGIDO: Leer variables globales si no se proporcionan opciones directas
+      const globalBalanceByAge = (window as any).__balanceByAge;
+      const globalBalanceByRole = (window as any).__balanceByRole;
+      const globalBalanceByRating = (window as any).__balanceByRating;
+      const globalUseRandomAlgorithm = (window as any).__isRandomMode;
+      const globalAllowTbdPlayers = (window as any).__allowTbdPlayers;
+
+      const finalOptions = {
+        balanceByAge:
+          globalBalanceByAge !== undefined
+            ? globalBalanceByAge
+            : options.balanceByAge ?? false,
+        balanceByRole:
+          globalBalanceByRole !== undefined
+            ? globalBalanceByRole
+            : options.balanceByRole ?? true,
+        balanceByRating:
+          globalBalanceByRating !== undefined
+            ? globalBalanceByRating
+            : options.balanceByRating ?? false,
+      };
+
+      const useRandomAlgorithm =
+        globalUseRandomAlgorithm !== undefined
+          ? globalUseRandomAlgorithm
+          : false;
+      const allowTbdPlayersFromGlobal =
+        globalAllowTbdPlayers !== undefined
+          ? globalAllowTbdPlayers
+          : allowFillIn;
+
+      // Debug log to track all values
+      console.log('🔍 handleRandomizeTeams - valores finales:', {
+        // Variables globales raw
+        globalBalanceByAge,
+        globalBalanceByRole,
+        globalBalanceByRating,
+        globalUseRandomAlgorithm,
+        globalAllowTbdPlayers,
+        // Opciones directas
+        options,
+        // Valores finales calculados
+        finalOptions,
+        useRandomAlgorithm,
+        allowTbdPlayersFromGlobal,
+        allowFillIn,
+      });
 
       await randomizeTeamsMutation.mutateAsync({
         matchId: nextMatchId,
         groupId,
-        allowTbdPlayers: allowFillIn,
-        ...options,
+        allowTbdPlayers: allowTbdPlayersFromGlobal,
+        useRandomAlgorithm,
+        ...finalOptions,
+      });
+
+      // Limpiar variables globales después del uso
+      if ((window as any).__balanceByAge !== undefined)
+        delete (window as any).__balanceByAge;
+      if ((window as any).__balanceByRole !== undefined)
+        delete (window as any).__balanceByRole;
+      if ((window as any).__balanceByRating !== undefined)
+        delete (window as any).__balanceByRating;
+      if ((window as any).__isRandomMode !== undefined)
+        delete (window as any).__isRandomMode;
+      if ((window as any).__allowTbdPlayers !== undefined)
+        delete (window as any).__allowTbdPlayers;
+
+      // Asegurar que las queries se actualicen
+      console.log('🔄 useGroupActions - Forzando refetch de datos');
+
+      // Invalidar múltiples queries para asegurar actualización
+      const queriesToInvalidate = [
+        ['group', 'nextMatch', groupId],
+        ['group', 'basic', groupId],
+        ['group', 'details', groupId],
+      ];
+
+      queriesToInvalidate.forEach((queryKey) => {
+        queryClient.invalidateQueries({
+          queryKey,
+          refetchType: 'all',
+        });
       });
 
       showSuccessToast('Equipos formados exitosamente');

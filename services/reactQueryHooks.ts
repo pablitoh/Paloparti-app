@@ -558,18 +558,45 @@ export const useRandomizeTeamsMutation = () => {
       return response.json();
     },
     onSuccess: (data, variables) => {
-      // Simplificar: solo invalidar para forzar refetch completo
-      const queryKey = ['group', 'nextMatch', variables.groupId];
+      console.log('🔄 Sorteo exitoso, actualizando caché...');
 
-      console.log('🔄 Invalidando caché después de sorteo exitoso');
+      // 1. Actualizar datos en el caché directamente
+      queryClient.setQueryData(
+        ['group', 'nextMatch', variables.groupId],
+        (oldData: any) => {
+          if (!oldData) return oldData;
 
-      // Invalidar las queries para forzar un refetch completo
+          return {
+            ...oldData,
+            nextMatchDetails: data.match
+              ? {
+                  ...oldData.nextMatchDetails,
+                  ...data.match,
+                  playersA: data.teamA || [],
+                  playersB: data.teamB || [],
+                  tbdPlayers: data.tbdPlayers,
+                  teamAAvgAge: data.teamAAvgAge,
+                  teamBAvgAge: data.teamBAvgAge,
+                  sortCount: data.match.sortCount,
+                }
+              : oldData.nextMatchDetails,
+          };
+        }
+      );
+
+      // 2. Invalidar para forzar refetch
       queryClient.invalidateQueries({
-        queryKey: queryKey,
+        queryKey: ['group', 'nextMatch', variables.groupId],
         exact: true,
+        refetchType: 'all',
       });
 
-      showSuccessToast('Equipos formados aleatoriamente');
+      // 3. También invalidar queries relacionadas
+      queryClient.invalidateQueries({
+        queryKey: ['group', 'basic', variables.groupId],
+      });
+
+      showSuccessToast('Equipos formados exitosamente');
     },
     onError: (error: Error) => {
       showErrorToast(error.message || 'Error al formar equipos');

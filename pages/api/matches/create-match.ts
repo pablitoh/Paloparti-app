@@ -280,11 +280,27 @@ export default async function handler(
       const userId = attendance.user.id;
       const userPlayerRoles = playerRolesFromMatch[userId] || [];
 
+      // Calcular edad dinámicamente si hay fecha de nacimiento
+      let calculatedAge = null;
+      if (attendance.user.birthdate) {
+        const birthDate = new Date(attendance.user.birthdate);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (
+          monthDiff < 0 ||
+          (monthDiff === 0 && today.getDate() < birthDate.getDate())
+        ) {
+          age--;
+        }
+        calculatedAge = age;
+      }
+
       return {
         id: userId,
         name: attendance.user.name,
         birthdate: attendance.user.birthdate,
-        age: null, // Se calculará dinámicamente
+        age: calculatedAge, // Edad calculada dinámicamente
         role: getPrimaryRole(userPlayerRoles) || 'No especificado',
         playerRoles: userPlayerRoles,
         starRating: ratingsMap.get(userId) || 3, // Default rating si no se encuentra

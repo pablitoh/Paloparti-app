@@ -803,6 +803,17 @@ const TeamsList: React.FC<TeamsListProps> = ({
     playersACount: playersA.length,
     playersBCount: playersB.length,
     teamsListKey: sortCount,
+    playersAData: playersA.map((p) => ({
+      id: p.id,
+      name: p.name,
+      assignedRole: p.assignedRole,
+    })),
+    playersBData: playersB.map((p) => ({
+      id: p.id,
+      name: p.name,
+      assignedRole: p.assignedRole,
+    })),
+    timestamp: new Date().toISOString(),
   });
 
   return (
