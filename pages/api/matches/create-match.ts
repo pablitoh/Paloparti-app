@@ -4347,8 +4347,22 @@ export default async function handler(
         }
       }
 
-      // CORREGIDO: Verificar si ESTE equipo específico necesita TBD players
-      // independientemente del total global de jugadores
+      // CORRECCIÓN CRÍTICA: Verificar si hay suficientes jugadores TOTALES antes de agregar TBD
+      // Si hay 22 jugadores confirmados, NO deben agregarse TBD players
+      const totalConfirmedPlayers = finalTeamA.length + finalTeamB.length;
+
+      console.log(
+        `🔍 Verificación TBD: Total confirmados=${totalConfirmedPlayers}, Requeridos=${group.requiredPlayers}`
+      );
+
+      if (totalConfirmedPlayers >= group.requiredPlayers) {
+        console.log(
+          `✅ Hay suficientes jugadores confirmados (${totalConfirmedPlayers}/${group.requiredPlayers}) - NO se agregan TBD`
+        );
+        return []; // No agregar TBD si ya hay suficientes jugadores confirmados
+      }
+
+      // SOLO agregar TBD si realmente faltan jugadores globalmente
       if (team.length >= requiredPlayersPerTeam) {
         console.log(
           `✅ Equipo ${isTeamA ? 'A' : 'B'} ya tiene suficientes jugadores (${
