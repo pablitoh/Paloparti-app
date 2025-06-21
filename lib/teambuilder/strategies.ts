@@ -3,6 +3,7 @@ import {
   PLAYER_ROLES,
   ROLE_PRIORITY,
   FORMATION,
+  MINIMUM_FORMATIONS,
   getPrimaryRole,
   POSITION_ASSIGNMENT_PATTERN,
 } from './constants';
@@ -246,89 +247,21 @@ export class RoleBalanceStrategy implements BalanceStrategy {
       return;
     }
 
-    // Para equipos normales, proceder con el patrón estándar
-    // Obtener la siguiente posición según el patrón
-    const getNextPosition = (): string => {
-      const position =
-        POSITION_ASSIGNMENT_PATTERN[
-          patternIndex % POSITION_ASSIGNMENT_PATTERN.length
-        ];
-      patternIndex++;
-      return position;
-    };
+    // Para equipos normales, garantizar formaciones mínimas 4-3-3 o 4-4-2
+    this.guaranteeMinimumFormation(
+      playersByRole,
+      playersWithoutRole,
+      teamA,
+      teamB
+    );
 
-    // Función para contar posiciones ya asignadas
-    const countPositions = (team: Member[], role: string): number => {
-      return team.filter((p) => p.assignedRole === role).length;
-    };
-
-    // Límites por posición según la formación
-    const positionLimits = {
-      [PLAYER_ROLES.GOALKEEPER]: FORMATION.GOALKEEPER,
-      [PLAYER_ROLES.DEFENDER]: FORMATION.DEFENDERS,
-      [PLAYER_ROLES.MIDFIELDER]: FORMATION.MIDFIELDERS,
-      [PLAYER_ROLES.FORWARD]: FORMATION.FORWARDS,
-    };
-
-    // Función para obtener un jugador para una posición específica
-    const getPlayerForPosition = (position: string): Member | undefined => {
-      // Primero buscar jugadores con este rol principal
-      if (playersByRole[position] && playersByRole[position].length > 0) {
-        return playersByRole[position].shift();
-      }
-
-      // Si no hay, usar comodines
-      if (
-        playersByRole[PLAYER_ROLES.WILDCARD] &&
-        playersByRole[PLAYER_ROLES.WILDCARD].length > 0
-      ) {
-        return playersByRole[PLAYER_ROLES.WILDCARD].shift();
-      }
-
-      // Si no hay comodines, usar jugadores sin rol
-      if (playersWithoutRole.length > 0) {
-        return playersWithoutRole.shift();
-      }
-
-      // Si no hay jugadores sin rol, usar cualquier jugador disponible
-      for (const role in playersByRole) {
-        if (playersByRole[role].length > 0) {
-          return playersByRole[role].shift();
-        }
-      }
-
-      return undefined;
-    };
-
-    // Asignar jugadores a posiciones alternando equipos y siguiendo el patrón
-    while (
-      Object.values(playersByRole).some((group) => group.length > 0) ||
-      playersWithoutRole.length > 0
-    ) {
-      const nextPosition = getNextPosition();
-
-      // Verificar si el equipo ya alcanzó el límite para esta posición
-      if (
-        countPositions(currentTeam, nextPosition) >=
-        positionLimits[nextPosition]
-      ) {
-        // Si ya tiene suficientes jugadores en esta posición, probar con la siguiente
-        continue;
-      }
-
-      // Obtener jugador para la posición
-      const player = getPlayerForPosition(nextPosition);
-
-      // Si encontramos un jugador, asignarlo
-      if (player) {
-        currentTeam.push({ ...player, assignedRole: nextPosition });
-        // Alternar al otro equipo
-        currentTeam = currentTeam === teamA ? teamB : teamA;
-      } else {
-        // Si no hay más jugadores disponibles, salir del bucle
-        break;
-      }
-    }
+    // Distribuir jugadores restantes de manera equilibrada
+    this.distributeRemainingPlayers(
+      playersByRole,
+      playersWithoutRole,
+      teamA,
+      teamB
+    );
   }
 
   // Método específico para garantizar posiciones clave en equipos pequeños
@@ -626,6 +559,233 @@ export class RoleBalanceStrategy implements BalanceStrategy {
         finalCounts[PLAYER_ROLES.MIDFIELDER]
       }, FWD=${finalCounts[PLAYER_ROLES.FORWARD]}`
     );
+  }
+
+  // Método para garantizar formaciones mínimas (4-3-3 o 4-4-2)
+  private guaranteeMinimumFormation(
+    playersByRole: Record<string, Member[]>,
+    playersWithoutRole: Member[],
+    teamA: Member[],
+    teamB: Member[]
+  ): void {
+    console.log('🎯 Garantizando formaciones mínimas 4-3-3 o 4-4-2...');
+
+    // Calcular jugadores totales disponibles
+    const totalPlayers =
+      Object.values(playersByRole).reduce(
+        (sum, players) => sum + players.length,
+        0
+      ) + playersWithoutRole.length;
+
+    // Cada equipo debe tener al menos 11 jugadores para garantizar formación completa
+    const playersPerTeam = Math.floor(totalPlayers / 2);
+
+    if (playersPerTeam < 11) {
+      console.log(
+        `⚠️ Solo hay ${playersPerTeam} jugadores por equipo, aplicando formación reducida`
+      );
+      this.guaranteeKeyPositions(
+        playersByRole,
+        playersWithoutRole,
+        teamA,
+        teamB
+      );
+      return;
+    }
+
+    // Función para asegurar formación mínima para un equipo
+    const ensureMinimumFormation = (
+      team: Member[],
+      formationType: '4-3-3' | '4-4-2'
+    ) => {
+      const formation = MINIMUM_FORMATIONS[formationType];
+      const needed = {
+        [PLAYER_ROLES.GOALKEEPER]: Math.max(
+          0,
+          formation.GOALKEEPER -
+            team.filter((p) => p.assignedRole === PLAYER_ROLES.GOALKEEPER)
+              .length
+        ),
+        [PLAYER_ROLES.DEFENDER]: Math.max(
+          0,
+          formation.DEFENDERS -
+            team.filter((p) => p.assignedRole === PLAYER_ROLES.DEFENDER).length
+        ),
+        [PLAYER_ROLES.MIDFIELDER]: Math.max(
+          0,
+          formation.MIDFIELDERS -
+            team.filter((p) => p.assignedRole === PLAYER_ROLES.MIDFIELDER)
+              .length
+        ),
+        [PLAYER_ROLES.FORWARD]: Math.max(
+          0,
+          formation.FORWARDS -
+            team.filter((p) => p.assignedRole === PLAYER_ROLES.FORWARD).length
+        ),
+      };
+
+      // Asignar jugadores necesarios por posición
+      Object.entries(needed).forEach(([position, count]) => {
+        for (let i = 0; i < count; i++) {
+          let player: Member | undefined;
+
+          // Buscar jugador en orden de prioridad
+          if (playersByRole[position]?.length > 0) {
+            player = playersByRole[position].shift();
+          } else if (playersByRole[PLAYER_ROLES.WILDCARD]?.length > 0) {
+            player = playersByRole[PLAYER_ROLES.WILDCARD].shift();
+          } else if (playersWithoutRole.length > 0) {
+            player = playersWithoutRole.shift();
+          } else {
+            // Buscar en otras posiciones
+            for (const role of Object.keys(playersByRole)) {
+              if (playersByRole[role].length > 0) {
+                player = playersByRole[role].shift();
+                break;
+              }
+            }
+          }
+
+          if (player) {
+            team.push({ ...player, assignedRole: position });
+            console.log(`✅ Asignado ${player.name} como ${position}`);
+          }
+        }
+      });
+    };
+
+    // Decidir qué formación usar (4-3-3 por defecto, 4-4-2 si hay más mediocampistas)
+    const totalMidfielders =
+      playersByRole[PLAYER_ROLES.MIDFIELDER]?.length || 0;
+    const totalForwards = playersByRole[PLAYER_ROLES.FORWARD]?.length || 0;
+
+    const useFormation442 = totalMidfielders > totalForwards;
+    const formation = useFormation442 ? '4-4-2' : '4-3-3';
+
+    console.log(`📋 Usando formación ${formation} para ambos equipos`);
+
+    // Garantizar formación mínima para ambos equipos
+    ensureMinimumFormation(teamA, formation);
+    ensureMinimumFormation(teamB, formation);
+
+    console.log(`✅ Formación ${formation} garantizada para ambos equipos`);
+  }
+
+  // Método para distribuir jugadores restantes después de garantizar formaciones mínimas
+  private distributeRemainingPlayers(
+    playersByRole: Record<string, Member[]>,
+    playersWithoutRole: Member[],
+    teamA: Member[],
+    teamB: Member[]
+  ): void {
+    // Combinar todos los jugadores restantes
+    const remainingPlayers: Member[] = [];
+
+    // Agregar jugadores restantes de cada posición
+    Object.values(playersByRole).forEach((players) => {
+      remainingPlayers.push(...players);
+    });
+    remainingPlayers.push(...playersWithoutRole);
+
+    if (remainingPlayers.length === 0) {
+      console.log('✅ No hay jugadores restantes para distribuir');
+      return;
+    }
+
+    console.log(
+      `🔄 Distribuyendo ${remainingPlayers.length} jugadores restantes`
+    );
+
+    // Alternar la asignación entre equipos para mantener equilibrio
+    let currentTeam = teamA.length <= teamB.length ? teamA : teamB;
+
+    remainingPlayers.forEach((player, index) => {
+      // Determinar el rol más apropiado basado en las necesidades del equipo
+      const bestRole = this.determineBestRoleForTeam(player, currentTeam);
+
+      // Asignar el jugador al equipo actual
+      currentTeam.push({ ...player, assignedRole: bestRole });
+
+      // Alternar al siguiente equipo
+      currentTeam = currentTeam === teamA ? teamB : teamA;
+    });
+
+    console.log(`✅ Jugadores restantes distribuidos`);
+  }
+
+  // Método auxiliar para determinar el mejor rol para un jugador en un equipo específico
+  private determineBestRoleForTeam(player: Member, team: Member[]): string {
+    // Obtener el rol preferido del jugador
+    const preferredRole = getPrimaryRole(player.playerRoles);
+
+    // Contar jugadores actuales por posición en el equipo
+    const positionCounts = {
+      [PLAYER_ROLES.GOALKEEPER]: team.filter(
+        (p) => p.assignedRole === PLAYER_ROLES.GOALKEEPER
+      ).length,
+      [PLAYER_ROLES.DEFENDER]: team.filter(
+        (p) => p.assignedRole === PLAYER_ROLES.DEFENDER
+      ).length,
+      [PLAYER_ROLES.MIDFIELDER]: team.filter(
+        (p) => p.assignedRole === PLAYER_ROLES.MIDFIELDER
+      ).length,
+      [PLAYER_ROLES.FORWARD]: team.filter(
+        (p) => p.assignedRole === PLAYER_ROLES.FORWARD
+      ).length,
+    };
+
+    // Si el rol preferido es válido y no hay demasiados jugadores en esa posición, usarlo
+    if (preferredRole && preferredRole !== PLAYER_ROLES.WILDCARD) {
+      const maxAllowed = this.getMaxAllowedForPosition(preferredRole);
+      if (positionCounts[preferredRole] < maxAllowed) {
+        return preferredRole;
+      }
+    }
+
+    // Si no, encontrar la posición que más necesita jugadores
+    const positionNeeds = [
+      {
+        role: PLAYER_ROLES.DEFENDER,
+        need:
+          this.getMaxAllowedForPosition(PLAYER_ROLES.DEFENDER) -
+          positionCounts[PLAYER_ROLES.DEFENDER],
+      },
+      {
+        role: PLAYER_ROLES.MIDFIELDER,
+        need:
+          this.getMaxAllowedForPosition(PLAYER_ROLES.MIDFIELDER) -
+          positionCounts[PLAYER_ROLES.MIDFIELDER],
+      },
+      {
+        role: PLAYER_ROLES.FORWARD,
+        need:
+          this.getMaxAllowedForPosition(PLAYER_ROLES.FORWARD) -
+          positionCounts[PLAYER_ROLES.FORWARD],
+      },
+    ]
+      .filter((p) => p.need > 0)
+      .sort((a, b) => b.need - a.need);
+
+    // Devolver la posición que más necesita jugadores, o mediocampo por defecto
+    return positionNeeds.length > 0
+      ? positionNeeds[0].role
+      : PLAYER_ROLES.MIDFIELDER;
+  }
+
+  // Método auxiliar para obtener el máximo permitido por posición (más flexible que formación estricta)
+  private getMaxAllowedForPosition(position: string): number {
+    switch (position) {
+      case PLAYER_ROLES.GOALKEEPER:
+        return 1; // Solo 1 arquero
+      case PLAYER_ROLES.DEFENDER:
+        return 6; // Flexible entre 4-6 defensores
+      case PLAYER_ROLES.MIDFIELDER:
+        return 6; // Flexible entre 3-6 mediocampistas
+      case PLAYER_ROLES.FORWARD:
+        return 4; // Flexible entre 2-4 delanteros
+      default:
+        return 2;
+    }
   }
 }
 

@@ -17,7 +17,25 @@ export const ROLE_PRIORITY = {
   [PLAYER_ROLES.WILDCARD]: 4,
 };
 
-// Constantes para la formación 4-3-3
+// Formaciones mínimas garantizadas
+export const MINIMUM_FORMATIONS = {
+  '4-3-3': {
+    GOALKEEPER: 1,
+    DEFENDERS: 4,
+    MIDFIELDERS: 3,
+    FORWARDS: 3,
+    TOTAL: 11,
+  },
+  '4-4-2': {
+    GOALKEEPER: 1,
+    DEFENDERS: 4,
+    MIDFIELDERS: 4,
+    FORWARDS: 2,
+    TOTAL: 11,
+  },
+};
+
+// Constantes para la formación por defecto (4-3-3)
 export const FORMATION = {
   GOALKEEPER: 1,
   DEFENDERS: 4,
