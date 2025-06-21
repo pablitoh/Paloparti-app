@@ -71,7 +71,7 @@ class UnifiedTeamBalancer {
 
   // Método principal para crear equipos balanceados
   createBalancedTeams(members: Member[]): [AssignedPlayer[], AssignedPlayer[]] {
-    console.log('\n🎯 ===== ALGORITMO UNIFICADO DE BALANCE DE EQUIPOS =====');
+    console.log('\n🎯 ===== ALGORITMO UNIFICADO MEJORADO =====');
     console.log(`📊 Total de jugadores: ${members.length}`);
     console.log(
       `⚙️ Opciones: edad=${this.options.balanceByAge}, rating=${this.options.balanceByRating}, posición=${this.options.balanceByRole}`
@@ -85,22 +85,10 @@ class UnifiedTeamBalancer {
     // Determinar formación basada en las posiciones disponibles
     this.determineFormation(members);
 
-    // Clasificar jugadores por posiciones
-    const playersByPosition = this.classifyPlayersByPosition(members);
+    // NUEVO: Algoritmo de asignación óptima global
+    this.performGlobalOptimalAssignment(members);
 
-    // Fase 1: Asignar arqueros (CRÍTICO - siempre primero)
-    this.assignGoalkeepers(playersByPosition);
-
-    // Fase 2: Garantizar al menos 1 de cada posición restante
-    this.guaranteeMinimumPositions(playersByPosition);
-
-    // Fase 3: Completar formaciones siguiendo 4-3-3 o 4-4-2
-    this.completeFormations(playersByPosition);
-
-    // Fase 4: Distribuir jugadores restantes balanceando por edad/habilidad
-    this.distributeRemainingPlayers(playersByPosition);
-
-    // Fase 5: Verificación final y ajustes
+    // Verificación final y ajustes
     this.finalizeTeams();
 
     console.log('\n✅ Equipos finales creados:');
@@ -149,6 +137,202 @@ class UnifiedTeamBalancer {
     console.log(
       `   Delanteros disponibles: ${positionCounts[PLAYER_ROLES.FORWARD]}`
     );
+  }
+
+  private performGlobalOptimalAssignment(members: Member[]): void {
+    console.log('\n🔍 NUEVO: Análisis global para asignación óptima...');
+
+    const targetFormation = FORMATIONS[this.formation];
+    const needed = {
+      [PLAYER_ROLES.GOALKEEPER]: 2, // 1 por equipo
+      [PLAYER_ROLES.DEFENDER]: targetFormation[PLAYER_ROLES.DEFENDER] * 2,
+      [PLAYER_ROLES.MIDFIELDER]: targetFormation[PLAYER_ROLES.MIDFIELDER] * 2,
+      [PLAYER_ROLES.FORWARD]: targetFormation[PLAYER_ROLES.FORWARD] * 2,
+    };
+
+    console.log('🎯 Posiciones requeridas:', needed);
+
+    // Crear pool de candidatos optimizado por posición
+    const candidatesByPosition = this.createOptimizedCandidatePool(members);
+
+    // Asignar posiciones en orden de criticidad: Arqueros > Defensores > Mediocampo > Delanteros
+    const positions = [
+      PLAYER_ROLES.GOALKEEPER,
+      PLAYER_ROLES.DEFENDER,
+      PLAYER_ROLES.MIDFIELDER,
+      PLAYER_ROLES.FORWARD,
+    ];
+
+    positions.forEach((position) => {
+      const requiredCount = needed[position];
+      console.log(`\n🎯 Asignando ${position} (${requiredCount} necesarios):`);
+
+      this.assignPositionWithOptimalPreferences(
+        candidatesByPosition[position],
+        position,
+        requiredCount
+      );
+    });
+
+    console.log('\n✅ Asignación global completada');
+  }
+
+  private createOptimizedCandidatePool(members: Member[]) {
+    const pool = {
+      [PLAYER_ROLES.GOALKEEPER]: [] as Array<{
+        player: Member;
+        priority: number;
+        balanceScore: number;
+      }>,
+      [PLAYER_ROLES.DEFENDER]: [] as Array<{
+        player: Member;
+        priority: number;
+        balanceScore: number;
+      }>,
+      [PLAYER_ROLES.MIDFIELDER]: [] as Array<{
+        player: Member;
+        priority: number;
+        balanceScore: number;
+      }>,
+      [PLAYER_ROLES.FORWARD]: [] as Array<{
+        player: Member;
+        priority: number;
+        balanceScore: number;
+      }>,
+    };
+
+    members.forEach((member) => {
+      const primaryRole = getPrimaryRole(member.playerRoles);
+      const secondaryRole = getSecondaryRole(member.playerRoles);
+      const balanceScore = this.calculatePlayerBalanceScore(member);
+
+      // Agregar a posición primaria con prioridad 1
+      if (primaryRole && pool[primaryRole]) {
+        pool[primaryRole].push({
+          player: member,
+          priority: 1,
+          balanceScore,
+        });
+      }
+
+      // Agregar a posición secundaria con prioridad 2
+      if (
+        secondaryRole &&
+        pool[secondaryRole] &&
+        secondaryRole !== primaryRole
+      ) {
+        pool[secondaryRole].push({
+          player: member,
+          priority: 2,
+          balanceScore,
+        });
+      }
+
+      // Si no tiene posiciones específicas o es comodín, agregar a todas con prioridad 3
+      if (!primaryRole || primaryRole === PLAYER_ROLES.WILDCARD) {
+        Object.keys(pool).forEach((position) => {
+          pool[position].push({
+            player: member,
+            priority: 3,
+            balanceScore,
+          });
+        });
+      }
+    });
+
+    // Ordenar cada pool por prioridad y luego por balance
+    Object.keys(pool).forEach((position) => {
+      pool[position].sort((a, b) => {
+        if (a.priority !== b.priority) return a.priority - b.priority;
+        return b.balanceScore - a.balanceScore; // Mayor balance primero
+      });
+
+      console.log(
+        `📊 ${position}: ${pool[position].length} candidatos (${
+          pool[position].filter((c) => c.priority === 1).length
+        } prim, ${pool[position].filter((c) => c.priority === 2).length} sec, ${
+          pool[position].filter((c) => c.priority === 3).length
+        } wild)`
+      );
+    });
+
+    return pool;
+  }
+
+  private calculatePlayerBalanceScore(player: Member): number {
+    let score = 0;
+
+    if (this.options.balanceByRating && player.starRating) {
+      score += player.starRating * 2;
+    }
+
+    if (this.options.balanceByAge && player.age) {
+      // Normalizar edad (18-45)
+      const normalizedAge = Math.max(
+        0,
+        Math.min(1, (player.age - 18) / (45 - 18))
+      );
+      score += normalizedAge * 1;
+    }
+
+    return score;
+  }
+
+  private assignPositionWithOptimalPreferences(
+    candidates: Array<{
+      player: Member;
+      priority: number;
+      balanceScore: number;
+    }>,
+    position: string,
+    needed: number
+  ): void {
+    let assigned = 0;
+    let teamACount = 0;
+    let teamBCount = 0;
+    const maxPerTeam = Math.ceil(needed / 2);
+
+    for (const candidate of candidates) {
+      if (assigned >= needed) break;
+      if (this.assignedPlayerIds.has(candidate.player.id)) continue;
+
+      // Decidir equipo basado en balance
+      let assignToTeamA: boolean;
+      if (teamACount < maxPerTeam && teamBCount < maxPerTeam) {
+        assignToTeamA = this.shouldAssignToTeamA();
+      } else if (teamACount < maxPerTeam) {
+        assignToTeamA = true;
+      } else if (teamBCount < maxPerTeam) {
+        assignToTeamA = false;
+      } else {
+        break; // Ya llenamos ambos equipos para esta posición
+      }
+
+      const isForced = candidate.priority >= 3;
+
+      this.assignPlayerToTeam(
+        candidate.player,
+        position,
+        assignToTeamA,
+        isForced
+      );
+
+      if (assignToTeamA) teamACount++;
+      else teamBCount++;
+      assigned++;
+
+      console.log(
+        `   ✅ ${candidate.player.name} → Equipo ${
+          assignToTeamA ? 'A' : 'B'
+        } (prioridad ${candidate.priority}${isForced ? ' - FORZADO' : ''})`
+      );
+    }
+
+    if (assigned < needed) {
+      console.log(
+        `   ⚠️ Solo se asignaron ${assigned}/${needed} jugadores para ${position}`
+      );
+    }
   }
 
   private classifyPlayersByPosition(members: Member[]) {
