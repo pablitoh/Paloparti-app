@@ -303,11 +303,23 @@ class UnifiedTeamBalancer {
       );
     }
 
-    // Si solo se asignó un arquero o ninguno, llenar los faltantes
-    if (this.getPositionCount(this.teamA)[PLAYER_ROLES.GOALKEEPER] === 0) {
+    // Verificar si cada equipo tiene al menos un arquero
+    const teamAGoalkeepers = this.getPositionCount(this.teamA)[
+      PLAYER_ROLES.GOALKEEPER
+    ];
+    const teamBGoalkeepers = this.getPositionCount(this.teamB)[
+      PLAYER_ROLES.GOALKEEPER
+    ];
+
+    console.log(
+      `🔍 Arqueros después de asignación inicial: A=${teamAGoalkeepers}, B=${teamBGoalkeepers}`
+    );
+
+    // Si un equipo no tiene arquero, asignar uno de emergencia
+    if (teamAGoalkeepers === 0) {
       this.assignEmergencyGoalkeeper(true, playersByPosition); // Equipo A
     }
-    if (this.getPositionCount(this.teamB)[PLAYER_ROLES.GOALKEEPER] === 0) {
+    if (teamBGoalkeepers === 0) {
       this.assignEmergencyGoalkeeper(false, playersByPosition); // Equipo B
     }
   }
@@ -331,7 +343,15 @@ class UnifiedTeamBalancer {
       const player = availablePlayers[0];
       this.assignPlayerToTeam(player, PLAYER_ROLES.GOALKEEPER, isTeamA, true);
       console.log(
-        `   ✅ ${player.name} → Equipo ${isTeamA ? 'A' : 'B'} (EMERGENCIA)`
+        `   ✅ ${player.name} → Equipo ${
+          isTeamA ? 'A' : 'B'
+        } (ARQUERO DE EMERGENCIA)`
+      );
+    } else {
+      console.log(
+        `   ❌ No hay jugadores disponibles para arquero de emergencia en equipo ${
+          isTeamA ? 'A' : 'B'
+        }`
       );
     }
   }
@@ -672,6 +692,44 @@ class UnifiedTeamBalancer {
       : 0;
   }
 
+  private convertPlayerToGoalkeeper(isTeamA: boolean): void {
+    const team = isTeamA ? this.teamA : this.teamB;
+
+    if (team.length === 0) {
+      console.log(
+        `❌ No hay jugadores en equipo ${
+          isTeamA ? 'A' : 'B'
+        } para convertir a arquero`
+      );
+      return;
+    }
+
+    // Buscar el jugador menos impactante para convertir
+    // Priorizar jugadores que ya tengan arquero como segunda opción
+    let targetPlayer = team.find((player) => {
+      const secondaryRole = getSecondaryRole(player.playerRoles);
+      return secondaryRole === PLAYER_ROLES.GOALKEEPER;
+    });
+
+    // Si no hay nadie con arquero secundario, tomar cualquiera
+    if (!targetPlayer) {
+      targetPlayer = team[0];
+    }
+
+    // Convertir el jugador a arquero
+    targetPlayer.assignedRole = PLAYER_ROLES.GOALKEEPER;
+    targetPlayer.positionForced = !hasRole(
+      targetPlayer.playerRoles,
+      PLAYER_ROLES.GOALKEEPER
+    );
+
+    console.log(
+      `   ✅ ${targetPlayer.name} convertido a arquero en equipo ${
+        isTeamA ? 'A' : 'B'
+      } ${targetPlayer.positionForced ? '(FORZADO)' : '(SECUNDARIO)'}`
+    );
+  }
+
   private finalizeTeams(): void {
     console.log('\n🔍 Fase 5: Verificación final...');
 
@@ -715,6 +773,17 @@ class UnifiedTeamBalancer {
         teamBCount[PLAYER_ROLES.FORWARD]
       }`
     );
+
+    // Verificación de emergencia para arqueros
+    if (teamACount[PLAYER_ROLES.GOALKEEPER] === 0) {
+      console.log('🚨 EMERGENCIA: Equipo A sin arquero - Convirtiendo jugador');
+      this.convertPlayerToGoalkeeper(true);
+    }
+
+    if (teamBCount[PLAYER_ROLES.GOALKEEPER] === 0) {
+      console.log('🚨 EMERGENCIA: Equipo B sin arquero - Convirtiendo jugador');
+      this.convertPlayerToGoalkeeper(false);
+    }
 
     // Mostrar estadísticas de balance
     if (this.options.balanceByRating) {

@@ -589,7 +589,7 @@ export const useRandomizeTeamsMutation = () => {
             tbdPlayers: data.tbdPlayers,
             teamAAvgAge: data.teamAAvgAge, // Añadir promedios de edad al caché
             teamBAvgAge: data.teamBAvgAge, // Añadir promedios de edad al caché
-            sortCount: 1, // Asegurar que el sortCount sea 1 después del sorteo
+            sortCount: (oldData.nextMatchDetails?.sortCount || 0) + 1, // Incrementar correctamente el sortCount
           },
         };
       });

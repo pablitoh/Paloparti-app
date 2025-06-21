@@ -62,11 +62,6 @@ export const assignPlayersToPosition = (
       });
       assignedPlayers.add(player.id);
 
-      // Debug específico para arqueros
-      if (targetRole === PLAYER_ROLES.GOALKEEPER) {
-        console.log(`🧤 ARQUERO ASIGNADO: ${player.name} (${categoryName})`);
-      }
-
       console.log(
         `     ✅ Asignado: ${player.name} (${categoryName}) -> ${targetRole}`
       );
@@ -149,26 +144,6 @@ export const createIntelligentRoleBalancedTeams = (
     console.log(
       `   ${role}: ${total} total (${players.primary.length} primarios, ${players.secondary.length} secundarios, ${players.wildcard.length} wildcard)`
     );
-
-    // Debug específico para arqueros
-    if (role === PLAYER_ROLES.GOALKEEPER) {
-      console.log('🧤 DEBUG ARQUEROS:');
-      players.primary.forEach((p) =>
-        console.log(
-          `   PRIMARIO: ${p.name} - roles: ${JSON.stringify(p.playerRoles)}`
-        )
-      );
-      players.secondary.forEach((p) =>
-        console.log(
-          `   SECUNDARIO: ${p.name} - roles: ${JSON.stringify(p.playerRoles)}`
-        )
-      );
-      players.wildcard.forEach((p) =>
-        console.log(
-          `   WILDCARD: ${p.name} - roles: ${JSON.stringify(p.playerRoles)}`
-        )
-      );
-    }
   });
 
   // Calcular formación ideal basada en el número de jugadores
@@ -186,12 +161,6 @@ export const createIntelligentRoleBalancedTeams = (
     [PLAYER_ROLES.MIDFIELDER]: Math.max(1, Math.floor(playersPerTeam * 0.4)), // ~40% mediocampistas
     [PLAYER_ROLES.FORWARD]: Math.max(1, Math.floor(playersPerTeam * 0.3)), // ~30% delanteros
   };
-
-  console.log(
-    `🧤 DEBUG: playersPerTeam = ${playersPerTeam}, arqueros = ${
-      roleDistribution[PLAYER_ROLES.GOALKEEPER]
-    }`
-  );
 
   // Ajustar distribución para que coincida con el total de jugadores por equipo
   const totalDistributed = Object.values(roleDistribution).reduce(
