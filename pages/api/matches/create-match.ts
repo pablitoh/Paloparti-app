@@ -18,6 +18,7 @@ type Member = {
   role: string;
   playerRoles?: PlayerRole[]; // Roles elegidos por el usuario con prioridades
   assignedRole?: string; // Rol asignado para la formación
+  positionForced?: boolean; // Indica si la posición fue forzada (no es preferida del jugador)
   starRating?: number; // Nivel de habilidad del jugador (0-5)
 };
 
@@ -3988,9 +3989,26 @@ export default async function handler(
           // Solo balanceo por edad
           [autoTeamA, autoTeamB] = createBalancedTeams(mappedMembers);
         } else {
+          console.log('🎯 EJECUTANDO: createRandomTeams (aleatorio)');
           // Equipos aleatorios sin balanceo
           [autoTeamA, autoTeamB] = createRandomTeams(mappedMembers);
         }
+
+        // DIAGNÓSTICO: Log de resultados después de formación
+        console.log('🔍 RESULTADO DE FORMACIÓN:', {
+          teamASize: autoTeamA.length,
+          teamBSize: autoTeamB.length,
+          teamASample: autoTeamA.slice(0, 3).map(p => ({ 
+            name: p.name, 
+            assignedRole: p.assignedRole,
+            positionForced: p.positionForced 
+          })),
+          teamBSample: autoTeamB.slice(0, 3).map(p => ({ 
+            name: p.name, 
+            assignedRole: p.assignedRole,
+            positionForced: p.positionForced 
+          })),
+        });
 
         // Garantizar que siempre haya un balance equitativo de jugadores reales
         // independientemente del algoritmo seleccionado
