@@ -5,10 +5,7 @@ import { prisma } from '../../../../lib/prisma';
 import { Match, MatchPlayer, User } from '@prisma/client';
 import { calculateAge } from '../../../../lib/utils';
 import { PLAYER_ROLES } from '../../../../components/group/AttendanceConfirmation';
-import {
-  normalizePlayerRoles,
-  PlayerRole,
-} from '../../../../lib/teambuilder/constants';
+import { normalizePlayerRoles, PlayerRole } from '../../../../lib/teambuilder';
 
 // Valores de prioridad para roles (menor número = mayor prioridad)
 const ROLE_PRIORITY = {

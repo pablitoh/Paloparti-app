@@ -3,7 +3,7 @@ import { showSuccessToast, showErrorToast } from '../services/toastService';
 import type { ParticipantStatus } from '../types/group';
 import { useQueryClient } from '@tanstack/react-query';
 import { PLAYER_ROLES } from '../components/group/AttendanceConfirmation';
-import { PlayerRole, normalizePlayerRoles } from '../lib/teambuilder/constants';
+import { PlayerRole, normalizePlayerRoles } from '../lib/teambuilder';
 import {
   useUserAttendanceMutation,
   useAdminAttendanceMutation,

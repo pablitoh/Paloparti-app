@@ -46,11 +46,8 @@ export const POSITION_ASSIGNMENT_PATTERN = [
   PLAYER_ROLES.DEFENDER,
 ];
 
-// Tipos para compatibilidad
-export interface PlayerRole {
-  role: string;
-  priority: number;
-}
+// Importar PlayerRole del archivo types
+import { PlayerRole } from './types';
 
 // Utilidad para obtener el rol principal de un jugador con soporte para prioridades de usuario
 export const getPrimaryRole = (

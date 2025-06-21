@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import { POSITION_CONFIG } from '../../../lib/teambuilder/constants';
+import { POSITION_CONFIG } from '../../../lib/teambuilder';
 
 // Constantes para roles de jugadores
 export const PLAYER_ROLES = {

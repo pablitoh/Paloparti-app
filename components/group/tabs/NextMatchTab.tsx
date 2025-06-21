@@ -27,7 +27,7 @@ import {
 } from '../../../services/toastService';
 import type { ParticipantStatus } from '../../../types/group';
 import { normalizeTbdPlayers } from '../../../utils/tbdPlayersUtils';
-import { PlayerRole } from '../../../lib/teambuilder/constants';
+import { PlayerRole } from '../../../lib/teambuilder';
 
 // Import our new components
 import TeamsList from './TeamsList';

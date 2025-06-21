@@ -40,7 +40,7 @@ import type { MatchInterface } from '../../types/match';
 import ManualTeamFormationModal from '../../components/group/modals/ManualTeamFormationModal';
 import SwapPlayersModal from '../../components/group/modals/SwapPlayersModal';
 import Link from 'next/link';
-import { PlayerRole } from '../../lib/teambuilder/constants';
+import { PlayerRole, normalizePlayerRoles } from '../../lib/teambuilder';
 
 // Add AuthUser interface
 interface AuthUser {
@@ -62,7 +62,11 @@ interface LazyNextMatchTabProps extends LazyTabProps {
   currentUserIsAdmin: boolean;
   isUserInGroup: boolean;
   handleAttendance: (status: ParticipantStatus) => Promise<void>;
-  handleRandomizeTeams: (confirmedPlayers?: any[]) => Promise<void>;
+  handleRandomizeTeams: (options?: {
+    balanceByAge?: boolean;
+    balanceByRole?: boolean;
+    balanceByRating?: boolean;
+  }) => Promise<void>;
   handleDeleteMatch: (matchId: string) => Promise<void>;
   setShowReplaceTbdModal: (id: string) => void;
   setShowSwapPlayersModal: (value: boolean) => void;
@@ -88,8 +92,9 @@ interface LazyMembersTabProps extends LazyTabProps {
   user: AuthUser | null;
   currentUserIsAdmin: boolean;
   handleAdminAttendance: (
-    userId: string,
     status: ParticipantStatus,
+    userId: string,
+    targetUserId?: string,
     playerRoles?: PlayerRole[]
   ) => Promise<void>;
   handleLeaveGroup: () => Promise<void>;
@@ -215,8 +220,12 @@ const LazyNextMatchTab = ({
         return;
       }
 
-      // Pass the current next match data to make sure we have the confirmed players
-      await handleRandomizeTeams(apiData?.nextMatchDetails?.confirmedPlayers);
+      // Pass options for team balancing - use default values for now
+      await handleRandomizeTeams({
+        balanceByAge: false,
+        balanceByRole: true,
+        balanceByRating: false,
+      });
       // Don't refetch here as the mutation already handles it
       // This prevents double calls to the API
     } catch (error) {
@@ -263,7 +272,7 @@ const LazyNextMatchTab = ({
         }
         handleDeleteMatch={handleMatchDeletion}
         userAttendanceStatus={(data as ApiResponse)?.userAttendance}
-        userRoles={(data as ApiResponse)?.userRoles || []}
+        userRoles={normalizePlayerRoles((data as ApiResponse)?.userRoles || [])}
         allowFillIn={allowFillIn}
         setAllowFillIn={setAllowFillIn}
         setShowManualTeamFormationModal={setShowManualTeamFormationModal}
@@ -649,6 +658,15 @@ const GroupContent = ({
     allowFillIn: allowFillIn,
   });
 
+  // Wrapper para convertir entre formatos de handleMembershipRequest
+  const wrappedHandleMembershipRequest = async (
+    userId: string,
+    action: 'APPROVE' | 'REJECT'
+  ) => {
+    const convertedAction = action === 'APPROVE' ? 'accept' : 'reject';
+    return handleMembershipRequest(convertedAction, userId);
+  };
+
   // Estados calculados
   const isUserPendingInGroup = useMemo(() => {
     if (!user || !groupBasicData) return false;
@@ -880,7 +898,7 @@ const GroupContent = ({
               key={`requests-tab-${Date.now()}`}
               groupId={groupId}
               basicData={groupBasicData}
-              handleMembershipRequest={handleMembershipRequest}
+              handleMembershipRequest={wrappedHandleMembershipRequest}
             />
           );
         }

@@ -214,13 +214,8 @@ export class TeamBuilder {
 
         // Si no hay rol asignado, buscar en playerRoles
         if (player.playerRoles && player.playerRoles.length > 0) {
-          return player.playerRoles.reduce(
-            (minPriority: number, role: string) => {
-              const priority = ROLE_PRIORITY[role] ?? 999;
-              return priority < minPriority ? priority : minPriority;
-            },
-            999
-          );
+          const primaryRole = getPrimaryRole(player.playerRoles);
+          return primaryRole ? ROLE_PRIORITY[primaryRole] ?? 999 : 999;
         }
 
         // Si no tiene roles, asignar prioridad baja

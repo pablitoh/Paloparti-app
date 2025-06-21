@@ -5,7 +5,7 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import type { ParticipantStatus } from '../../types/group';
-import { POSITION_CONFIG } from '../../lib/teambuilder/constants';
+import { POSITION_CONFIG } from '../../lib/teambuilder';
 
 // Constantes para roles de jugadores
 export const PLAYER_ROLES = {

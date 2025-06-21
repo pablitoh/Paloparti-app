@@ -5,10 +5,7 @@ import { prisma } from '../../lib/prisma';
 import { logGroupEvent } from '../../utils/serverLogEvents';
 import { LogAction } from '../../utils/logTypes';
 import { PLAYER_ROLES } from '../../components/group/AttendanceConfirmation';
-import {
-  PlayerRole,
-  normalizePlayerRoles,
-} from '../../lib/teambuilder/constants';
+import { PlayerRole, normalizePlayerRoles } from '../../lib/teambuilder';
 
 interface ConfirmedPlayer {
   id: string;

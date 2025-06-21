@@ -3,10 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]';
 import { prisma } from '../../../../lib/prisma';
 import { PLAYER_ROLES } from '../../../../components/group/AttendanceConfirmation';
-import {
-  normalizePlayerRoles,
-  PlayerRole,
-} from '../../../../lib/teambuilder/constants';
+import { normalizePlayerRoles, PlayerRole } from '../../../../lib/teambuilder';
 
 // Type definition for TBD Player
 interface TbdPlayer {

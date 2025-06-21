@@ -7,7 +7,7 @@ import {
   ChevronRightIcon,
   ChevronDownIcon,
 } from '@heroicons/react/24/outline';
-import { PLAYER_ROLES, PlayerRole } from '../../../lib/teambuilder/constants';
+import { PLAYER_ROLES, PlayerRole } from '../../../lib/teambuilder';
 
 // Mapeo de roles a iconos y prioridad (para ordenamiento)
 const ROLE_ICONS: Record<

@@ -7,10 +7,7 @@ import { LogAction } from '../../../utils/logTypes';
 import { TeamBuilder } from '../../../lib/teambuilder';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
-import {
-  PlayerRole,
-  normalizePlayerRoles,
-} from '../../../lib/teambuilder/constants';
+import { PlayerRole, normalizePlayerRoles } from '../../../lib/teambuilder';
 
 // Interfaces tipo Member
 type Member = {
