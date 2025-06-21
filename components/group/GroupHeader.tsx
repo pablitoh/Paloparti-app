@@ -53,7 +53,7 @@ const GroupHeader: React.FC<GroupHeaderProps> = ({
   return (
     <div
       ref={headerRef}
-      className={`sticky top-16 z-[9997] bg-primary-500 mb-0 left-0 right-0 w-full transition-all duration-200 ${
+      className={`relative z-[9997] bg-primary-500 mb-0 left-0 right-0 w-full transition-all duration-200 ${
         isSticky
           ? 'rounded-none border-0 shadow-lg'
           : 'rounded-2xl border border-primary-300 shadow-green-lg'

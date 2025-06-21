@@ -5,6 +5,7 @@ import {
   UserPlusIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 import { PLAYER_ROLES, PlayerRole } from '../../../lib/teambuilder/constants';
 
@@ -338,161 +339,153 @@ const TeamsList: React.FC<TeamsListProps> = ({
     }));
 
     return (
-      <div
-        className={`
-        flex items-center justify-between py-3 px-3 rounded-xl transition-all duration-200
-        ${
-          isTbd
-            ? 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
-            : isTeamA
-            ? 'bg-primary-50 border border-primary-200 hover:bg-primary-100 hover:border-primary-300'
-            : 'bg-lime-50 border border-lime-200 hover:bg-lime-100 hover:border-lime-300'
-        }
-        hover:shadow-md
-      `}
-      >
-        <div className='flex items-center gap-3 flex-grow min-w-0'>
-          {/* Avatar with dropdown */}
-          <div className='relative' ref={dropdownRef}>
-            <button
-              onClick={() => {
-                if (currentUserIsAdmin && onSwapPlayer && !isTbd) {
-                  setDropdownOpen(!dropdownOpen);
-                }
-              }}
-              className={`${
-                currentUserIsAdmin && onSwapPlayer && !isTbd
-                  ? 'cursor-pointer hover:ring-2 hover:ring-primary-300 transition-all transform hover:scale-110'
-                  : 'cursor-default'
-              }`}
-              disabled={!currentUserIsAdmin || !onSwapPlayer || isTbd}
-            >
-              {isTbd ? (
-                <div className='h-12 w-12 rounded-full bg-gray-100 border-2 border-gray-300 flex items-center justify-center shadow-sm'>
-                  <UserIcon className='h-6 w-6 text-gray-400' />
-                </div>
-              ) : (
-                <Avatar
-                  src={player.avatar || ''}
-                  alt={player.name || 'Jugador'}
-                  className='h-12 w-12 rounded-full border-2 border-white shadow-md'
-                />
-              )}
-            </button>
-
-            {/* Star Rating below avatar */}
-            {!isTbd && player.starRating !== undefined && (
-              <div className='absolute -bottom-1 left-1/2 transform -translate-x-1/2 bg-gray-100 px-1 py-0.5 rounded text-xs font-medium text-gray-600 whitespace-nowrap'>
-                {player.starRating} ⭐
+      <div className='relative'>
+        <div
+          className={`
+          flex items-center justify-between py-0.5 px-3 pl-8 rounded-xl transition-all duration-200 border-[0.5px]
+          ${
+            isTbd
+              ? 'bg-gradient-to-r from-gray-50 to-gray-100 border-gray-300 hover:from-gray-100 hover:to-gray-200'
+              : isTeamA
+              ? 'bg-gradient-to-r from-primary-50 to-primary-100 border-primary-200 hover:from-primary-100 hover:to-primary-200 hover:border-primary-300'
+              : 'bg-gradient-to-r from-lime-50 to-lime-100 border-lime-200 hover:from-lime-100 hover:to-lime-200 hover:border-lime-300'
+          }
+          hover:shadow-md
+        `}
+        >
+          {/* Player Info - Centered vertically */}
+          <div className='min-w-0 flex-grow flex items-center justify-between'>
+            <div className='min-w-0 flex-grow'>
+              <div className='flex items-center gap-1'>
+                <p className='font-medium text-gray-900 text-sm truncate'>
+                  {player.name || (isTbd ? 'TBD' : 'Jugador sin nombre')}
+                  {player.age && !isTbd && (
+                    <span className='text-gray-400 font-normal ml-1'>
+                      ({player.age})
+                    </span>
+                  )}
+                </p>
               </div>
-            )}
-
-            {/* Dropdown Menu */}
-            {dropdownOpen && currentUserIsAdmin && onSwapPlayer && !isTbd && (
-              <div className='absolute top-12 left-0 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[9999999]'>
-                <button
-                  onClick={() => {
-                    onSwapPlayer(player.id, isTeamA);
-                    setDropdownOpen(false);
-                  }}
-                  className='flex items-center w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors'
-                >
-                  <svg
-                    className='w-4 h-4 mr-2 text-gray-500'
-                    fill='none'
-                    stroke='currentColor'
-                    viewBox='0 0 24 24'
-                  >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      strokeWidth='2'
-                      d='M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4'
-                    />
-                  </svg>
-                  Intercambiar de equipo
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Player Info */}
-          <div className='min-w-0 flex-grow'>
-            <div className='flex items-center gap-1 mb-1'>
-              <p className='font-medium text-gray-900 text-sm truncate'>
-                {player.name || (isTbd ? 'TBD' : 'Jugador sin nombre')}
-                {player.age && !isTbd && (
-                  <span className='text-gray-400 font-normal ml-1'>
-                    ({player.age})
-                  </span>
-                )}
-              </p>
             </div>
 
-            {/* Assigned role and user selected roles */}
+            {/* Role icons and star rating on the right */}
             {!isTbd && (
-              <div className='flex items-center gap-2 mb-1'>
-                {/* Assigned role name */}
-                {player.assignedRole && (
-                  <span className='text-xs font-medium text-lime-700 bg-lime-100 px-2 py-0.5 rounded-full'>
-                    {player.assignedRole === PLAYER_ROLES.GOALKEEPER
-                      ? 'Arquero'
-                      : player.assignedRole === PLAYER_ROLES.DEFENDER
-                      ? 'Defensor'
-                      : player.assignedRole === PLAYER_ROLES.MIDFIELDER
-                      ? 'Mediocampista'
-                      : player.assignedRole === PLAYER_ROLES.FORWARD
-                      ? 'Delantero'
-                      : 'Comodín'}
-                  </span>
-                )}
+              <div className='flex items-center gap-1 ml-3'>
+                {/* Star Rating */}
+                {player.starRating !== undefined &&
+                  player.starRating !== null && (
+                    <div className='bg-white px-1.5 py-0.5 rounded-full text-[9px] font-medium text-gray-600 whitespace-nowrap shadow-sm border border-gray-200'>
+                      {player.starRating} ⭐
+                    </div>
+                  )}
 
-                {/* User selected role icons */}
-                <div className='flex gap-1'>
-                  {roleDisplayData.map((roleData, index) => (
-                    <span
-                      key={index}
-                      className={`flex-shrink-0 ${
-                        roleData.isAssigned
-                          ? 'bg-lime-100 p-1 rounded border border-lime-300'
-                          : roleData.priority === 1
-                          ? 'bg-primary-50 p-1 rounded border border-primary-200'
-                          : 'bg-gray-50 p-1 rounded border border-gray-200'
-                      }`}
-                      title={`${roleData.role} ${
-                        roleData.isAssigned
-                          ? '(Asignado)'
-                          : roleData.priority === 1
-                          ? '(Primario)'
-                          : '(Secundario)'
-                      }`}
-                    >
-                      {roleData.icon}
-                    </span>
-                  ))}
-                </div>
+                {/* Role icons */}
+                {roleDisplayData.map((roleData, index) => (
+                  <span
+                    key={index}
+                    className={`flex-shrink-0 ${
+                      roleData.isAssigned
+                        ? 'bg-lime-100 p-1 rounded border border-lime-300'
+                        : roleData.priority === 1
+                        ? 'bg-primary-50 p-1 rounded border border-primary-200'
+                        : 'bg-gray-50 p-1 rounded border border-gray-200'
+                    }`}
+                    title={`${roleData.role} ${
+                      roleData.isAssigned
+                        ? '(Asignado)'
+                        : roleData.priority === 1
+                        ? '(Primario)'
+                        : '(Secundario)'
+                    }`}
+                  >
+                    {roleData.icon}
+                  </span>
+                ))}
               </div>
             )}
-
-            {/* Status info */}
-            {(player.playerType === 'TBD' || isTbd) && (
-              <span className='text-xs text-gray-500 italic'>
-                Jugador pendiente
-              </span>
-            )}
           </div>
+
+          {/* Admin button */}
+          {currentUserIsAdmin && showReplaceButton && onReplaceTbd && (
+            <button
+              onClick={() => onReplaceTbd(player.id)}
+              className='p-2 rounded-lg bg-primary-50 text-primary-600 border border-primary-200 hover:bg-primary-100 hover:border-primary-300 transition-colors ml-3'
+              title='Reemplazar jugador'
+            >
+              <UserPlusIcon className='h-4 w-4' />
+            </button>
+          )}
         </div>
 
-        {/* Admin button */}
-        {currentUserIsAdmin && showReplaceButton && onReplaceTbd && (
+        {/* Avatar protruding from left border */}
+        <div
+          className='absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 z-30'
+          ref={dropdownRef}
+        >
           <button
-            onClick={() => onReplaceTbd(player.id)}
-            className='p-2 rounded-lg bg-primary-50 text-primary-600 border border-primary-200 hover:bg-primary-100 hover:border-primary-300 transition-colors'
-            title='Reemplazar jugador'
+            onClick={() => {
+              if (currentUserIsAdmin && onSwapPlayer && !isTbd) {
+                setDropdownOpen(!dropdownOpen);
+              }
+            }}
+            className={`relative z-0 ${
+              currentUserIsAdmin && onSwapPlayer && !isTbd
+                ? 'cursor-pointer hover:ring-2 hover:ring-primary-300 transition-all transform hover:scale-110'
+                : 'cursor-default'
+            }`}
+            disabled={!currentUserIsAdmin || !onSwapPlayer || isTbd}
           >
-            <UserPlusIcon className='h-4 w-4' />
+            {isTbd ? (
+              <div className='h-10 w-10 rounded-full bg-gray-100 border-2 border-gray-300 flex items-center justify-center shadow-sm'>
+                <UserIcon className='h-5 w-5 text-gray-400' />
+              </div>
+            ) : (
+              <Avatar
+                src={player.avatar || ''}
+                alt={player.name || 'Jugador'}
+                className='h-10 w-10 rounded-full border-2 border-white shadow-md'
+              />
+            )}
+
+            {/* Small arrow indicator for clickable avatars */}
+            {currentUserIsAdmin && onSwapPlayer && !isTbd && (
+              <div className='absolute -left-1 top-1/2 -translate-y-1/2 bg-white rounded-full p-0.5 shadow-sm border border-gray-200 z-10'>
+                <ChevronDownIcon className='h-2 w-2 text-gray-600' />
+              </div>
+            )}
           </button>
-        )}
+
+          {/* Star Rating below avatar */}
+          {/* Moved to right side with role icons */}
+
+          {/* Dropdown Menu */}
+          {dropdownOpen && currentUserIsAdmin && onSwapPlayer && !isTbd && (
+            <div className='absolute top-12 left-0 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[9999]'>
+              <button
+                onClick={() => {
+                  onSwapPlayer(player.id, isTeamA);
+                  setDropdownOpen(false);
+                }}
+                className='flex items-center w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors'
+              >
+                <svg
+                  className='w-4 h-4 mr-2 text-gray-500'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth='2'
+                    d='M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4'
+                  />
+                </svg>
+                Intercambiar de equipo
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -567,55 +560,61 @@ const TeamsList: React.FC<TeamsListProps> = ({
     const groupedPlayers = groupPlayersByPosition(allPlayers);
 
     return (
-      <div className='rounded-3xl shadow-sm border border-gray-200 min-w-0 flex-shrink-0 w-full md:w-auto transition-all duration-200 hover:shadow-md hover:border-gray-300 bg-white overflow-hidden'>
+      <div className='rounded-3xl shadow-sm border border-gray-200 min-w-0 flex-shrink-0 w-full md:w-auto transition-all duration-200 hover:shadow-md hover:border-gray-300 bg-white overflow-visible'>
         {/* Team Header - New design with gradient */}
         <div
-          className={`p-5 pb-8 ${
+          className={`p-3 pb-2 ${
             isTeamA
               ? 'bg-gradient-to-b from-primary-200 via-primary-100 via-gray-50 to-white'
               : 'bg-gradient-to-b from-lime-200 via-lime-100 via-gray-50 to-white'
-          }`}
+          } rounded-t-3xl`}
         >
-          {/* Team name centered - moved up */}
-          <div className='text-center mb-4'>
+          {/* Top row with age and rating in corners */}
+          <div className='flex justify-between items-start mb-2'>
+            {/* Age on the left */}
+            <div className='text-xs font-medium text-gray-700'>
+              {avgAge !== undefined ? `${avgAge} 🎂` : ''}
+            </div>
+
+            {/* Rating on the right */}
+            <div className='text-xs font-medium text-gray-700'>
+              {avgRating !== undefined ? `${avgRating} ⭐` : ''}
+            </div>
+          </div>
+
+          {/* Team name centered */}
+          <div className='text-center'>
             <h3
-              className={`text-xl font-bold ${
+              className={`text-lg font-bold ${
                 isTeamA ? 'text-primary-900' : 'text-lime-900'
               }`}
             >
               {teamName}
             </h3>
           </div>
-
-          {/* Bottom row with age and rating */}
-          <div className='flex justify-between items-center'>
-            {/* Age on the left */}
-            <div className='text-sm font-medium text-gray-700'>
-              {avgAge !== undefined ? `${avgAge} 🎂` : ''}
-            </div>
-
-            {/* Rating on the right */}
-            <div className='text-sm font-medium text-gray-700'>
-              {avgRating !== undefined ? `${avgRating} ⭐` : ''}
-            </div>
-          </div>
         </div>
 
         {/* Players List Grouped by Position */}
-        <div className='p-5 pt-0 space-y-3'>
+        <div className='px-3 pb-3 space-y-0'>
           {groupedPlayers.map((group, groupIndex) => (
-            <div key={group.position}>
-              {/* Position Header */}
-              <div className='flex items-center mb-2'>
+            <div key={group.position} className='relative'>
+              {/* Position Header - Centered in the space between players */}
+              <div className='flex items-center relative z-20 -my-1'>
                 <div className='flex-grow h-px bg-gray-300'></div>
-                <span className='px-3 text-xs font-medium text-gray-500 bg-gray-50'>
+                <span
+                  className={`px-3 text-xs font-medium rounded-full shadow-sm ${
+                    isTeamA
+                      ? 'text-slate-700 bg-slate-50/50 border border-slate-200'
+                      : 'text-emerald-700 bg-emerald-50/50 border border-emerald-200'
+                  }`}
+                >
                   {getPositionName(group.position)}
                 </span>
                 <div className='flex-grow h-px bg-gray-300'></div>
               </div>
 
               {/* Players in this position */}
-              <div className='space-y-1.5'>
+              <div className='space-y-2'>
                 {group.players.map((player) => (
                   <PlayerItem
                     key={player.id}
@@ -641,7 +640,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
     playerRoles?: PlayerRole[],
     assignedRole?: string
   ): string => {
-    const role = getPrimaryRole(playerRoles) || assignedRole;
+    const role = assignedRole || getPrimaryRole(playerRoles);
 
     if (!role) return 'JUG';
 
@@ -817,36 +816,8 @@ const TeamsList: React.FC<TeamsListProps> = ({
 
           {/* Mobile Slider Layout with better spacing */}
           <div className='md:hidden'>
-            {/* Slider Container */}
-            <div
-              ref={sliderRef}
-              className='flex overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-4 px-4'
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
-              <div className='snap-center min-w-[300px] flex-shrink-0'>
-                <TeamCard
-                  players={playersA}
-                  tbdPlayers={teamATbdPlayers}
-                  teamName={teamAName || 'Equipo A'}
-                  isTeamA={true}
-                  avgAge={effectiveTeamAAvgAge}
-                  avgRating={effectiveTeamAAvgRating}
-                />
-              </div>
-              <div className='snap-center min-w-[300px] flex-shrink-0'>
-                <TeamCard
-                  players={playersB}
-                  tbdPlayers={teamBTbdPlayers}
-                  teamName={teamBName || 'Equipo B'}
-                  isTeamA={false}
-                  avgAge={effectiveTeamBAvgAge}
-                  avgRating={effectiveTeamBAvgRating}
-                />
-              </div>
-            </div>
-
-            {/* Navigation Controls */}
-            <div className='flex justify-center items-center gap-3 mt-4'>
+            {/* Navigation Controls - Moved to top */}
+            <div className='flex justify-center items-center gap-3 mb-4'>
               <button
                 onClick={prevSlide}
                 className={`p-2 rounded-lg transition-colors ${
@@ -884,6 +855,34 @@ const TeamsList: React.FC<TeamsListProps> = ({
               >
                 <ChevronRightIcon className='h-4 w-4' />
               </button>
+            </div>
+
+            {/* Slider Container */}
+            <div
+              ref={sliderRef}
+              className='flex overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-4 px-4'
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              <div className='snap-center min-w-[300px] flex-shrink-0'>
+                <TeamCard
+                  players={playersA}
+                  tbdPlayers={teamATbdPlayers}
+                  teamName={teamAName || 'Equipo A'}
+                  isTeamA={true}
+                  avgAge={effectiveTeamAAvgAge}
+                  avgRating={effectiveTeamAAvgRating}
+                />
+              </div>
+              <div className='snap-center min-w-[300px] flex-shrink-0'>
+                <TeamCard
+                  players={playersB}
+                  tbdPlayers={teamBTbdPlayers}
+                  teamName={teamBName || 'Equipo B'}
+                  isTeamA={false}
+                  avgAge={effectiveTeamBAvgAge}
+                  avgRating={effectiveTeamBAvgRating}
+                />
+              </div>
             </div>
           </div>
         </>

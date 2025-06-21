@@ -39,7 +39,6 @@
     "dotenv": "^16.5.0",
     "firebase": "^11.9.1",
     "formidable": "^3.5.4",
-    "html2canvas": "^1.4.1",
     "jsonwebtoken": "^9.0.2",
     "next-auth": "^4.24.11",
     "rc-util": "^5.40.0",

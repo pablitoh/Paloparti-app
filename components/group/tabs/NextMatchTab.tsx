@@ -10,7 +10,6 @@ import {
   TrashIcon,
   ArrowPathIcon,
   UserGroupIcon,
-  PhotoIcon,
   ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline';
 import Button from '../../../components/Button';
@@ -38,7 +37,6 @@ import AttendanceConfirmation from '../AttendanceConfirmation';
 import TeamFormationNotification from '../TeamFormationNotification';
 import UnassignedPlayersManager from '../UnassignedPlayersManager';
 import DeleteMatchModal from '../modals/DeleteMatchModal';
-import { useScreenshotShare } from '../../../hooks/useScreenshotShare';
 
 // Definición de roles de jugador para ordenar por posición
 const PLAYER_ROLE_PRIORITY = {
@@ -197,7 +195,6 @@ export default function NextMatchTab({
   const [sortTeamsLoading, setSortTeamsLoading] = useState(false);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const { shareTeamsScreenshot } = useScreenshotShare();
   // ELIMINADO: useState innecesario, ahora usamos directamente unassignedPlayersCalculated
   // Estado controlado para teamsFormed
   const [forceTeamsFormed, setForceTeamsFormed] = useState(false);
@@ -850,25 +847,6 @@ export default function NextMatchTab({
     }
   };
 
-  // Función para compartir como imagen
-  const handleShareImage = async () => {
-    setShowActionsDropdown(false);
-
-    try {
-      const shareData = {
-        text: `Equipos sorteados en ${group.name}`,
-        groupName: group.name || 'Grupo',
-        teamAName: group.teamAName || 'Equipo A',
-        teamBName: group.teamBName || 'Equipo B',
-      };
-
-      await shareTeamsScreenshot(matchDetails?.sortCount || 0, shareData);
-    } catch (error) {
-      console.error('Error sharing image:', error);
-      showErrorToast('Error al compartir imagen');
-    }
-  };
-
   // Función para compartir como texto
   const handleShareText = async () => {
     setShowActionsDropdown(false);
@@ -1492,15 +1470,6 @@ _Generado con Paloparti_ 🚀`;
                         {/* Dropdown Menu */}
                         {showActionsDropdown && (
                           <div className='absolute right-0 mt-2 w-52 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[99999]'>
-                            {/* Share as image option */}
-                            <button
-                              onClick={handleShareImage}
-                              className='w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center'
-                            >
-                              <PhotoIcon className='h-4 w-4 mr-2 text-gray-500' />
-                              Compartir como imagen
-                            </button>
-
                             {/* Share as text option */}
                             <button
                               onClick={handleShareText}
