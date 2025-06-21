@@ -164,33 +164,8 @@ export default function MembersTab({
       }));
       setLocalConfirmedCount((prev) => prev + 1);
 
-      // Registrar la acción en los logs con las prioridades
-      if (user && group.id) {
-        const rolesText =
-          roles.length > 0
-            ? roles
-                .sort((a, b) => a.priority - b.priority)
-                .map((r) => `${r.priority}° ${r.role}`)
-                .join(', ')
-            : 'Comodín';
-
-        await createLogEntry({
-          groupId: group.id,
-          action: LogAction.ADMIN_CONFIRMED_ATTENDANCE,
-          performedBy: user.id,
-          performedByName: user.name || user.email || 'Admin',
-          targetUserId: selectedMember.userId,
-          targetUserName: selectedMember.name || 'Miembro',
-          details: {
-            playerRoles: roles,
-            rolesText: rolesText,
-            message: `confirmó la asistencia de **${
-              selectedMember.name || 'Miembro'
-            }** con posiciones: ${rolesText}`,
-          },
-          timestamp: new Date().toISOString(),
-        });
-      }
+      // NO registrar el log aquí ya que la API /api/attendances ya lo hace automáticamente
+      // Esto evita logs duplicados
     } finally {
       setProcessingButton(null);
       setSelectedMember(null);

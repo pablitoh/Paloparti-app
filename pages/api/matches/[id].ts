@@ -373,10 +373,10 @@ export default async function handler(
 
       // Ejecutar todas las operaciones en una sola transacción
       await prisma.$transaction([
-        // 1. Eliminar asistencias asociadas a este partido
-        prisma.matchAttendance.deleteMany({
-          where: { matchId },
-        }),
+        // 1. NO ELIMINAR asistencias - Las mantenemos para el próximo partido
+        // prisma.matchAttendance.deleteMany({
+        //   where: { matchId },
+        // }),
 
         // 2. Eliminar goles asociados
         prisma.goal.deleteMany({

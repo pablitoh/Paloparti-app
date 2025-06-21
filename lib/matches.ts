@@ -116,31 +116,62 @@ export async function createNextMatch(groupId: string) {
         WHERE "id" = ${groupId}
       `;
 
-      // Limpiar explícitamente cualquier asistencia previa para este grupo
-      // Esto garantiza que no haya jugadores confirmados heredados de partidos anteriores
-      await tx.matchAttendance.updateMany({
+      // NO LIMPIAR las asistencias confirmadas - Las preservamos para el nuevo partido
+      // await tx.matchAttendance.updateMany({
+      //   where: {
+      //     groupId: groupId,
+      //     status: 'CONFIRMED',
+      //   },
+      //   data: {
+      //     status: 'PENDING',
+      //     updatedAt: new Date(),
+      //   },
+      // });
+
+      // MANTENER las asistencias existentes del partido anterior
+      // Buscar las últimas asistencias del grupo
+      const previousAttendances = await tx.matchAttendance.findMany({
         where: {
           groupId: groupId,
-          status: 'CONFIRMED',
         },
-        data: {
-          status: 'PENDING',
-          updatedAt: new Date(),
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        distinct: ['userId'], // Obtener solo la asistencia más reciente por usuario
+        select: {
+          userId: true,
+          status: true,
         },
       });
 
-      // Resetear *explícitamente* los estados de asistencia para este nuevo partido
-      // Obtenemos los miembros del grupo
-      const members = await tx.groupMember.findMany({
+      // Para cada asistencia anterior, crear una nueva para el nuevo partido manteniendo el estado
+      for (const attendance of previousAttendances) {
+        await tx.matchAttendance.create({
+          data: {
+            userId: attendance.userId,
+            matchId: newMatch.id,
+            groupId: groupId,
+            matchDate: nextMatchDate,
+            status: attendance.status, // Mantener el estado anterior (CONFIRMED, PENDING, DECLINED)
+          },
+        });
+      }
+
+      // Para miembros que no tenían asistencia previa, crear con estado PENDING
+      const membersWithAttendance = previousAttendances.map((a) => a.userId);
+      const allActiveMembers = await tx.groupMember.findMany({
         where: {
           groupId: groupId,
-          status: 'ACTIVE', // Solo miembros activos
+          status: 'ACTIVE',
         },
         select: { userId: true },
       });
 
-      // Para cada miembro, creamos un registro de asistencia PENDING para el nuevo partido
-      for (const member of members) {
+      const membersWithoutAttendance = allActiveMembers.filter(
+        (member) => !membersWithAttendance.includes(member.userId)
+      );
+
+      for (const member of membersWithoutAttendance) {
         await tx.matchAttendance.create({
           data: {
             userId: member.userId,
@@ -156,7 +187,7 @@ export async function createNextMatch(groupId: string) {
         `Nuevo partido creado automáticamente con ID: ${newMatch.id}`
       );
       console.log(
-        `Asistencias inicializadas a PENDING para ${members.length} miembros`
+        `Asistencias preservadas: ${previousAttendances.length} existentes, ${membersWithoutAttendance.length} nuevas como PENDING`
       );
 
       return newMatch;

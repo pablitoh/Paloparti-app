@@ -18,6 +18,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   useRandomizeTeamsMutation,
   useDeleteMatchMutation,
+  useResetAttendanceMutation,
 } from '../../../services/reactQueryHooks';
 import { useUserAttendanceMutation } from '../../../services/groupHooks';
 import {
@@ -195,6 +196,7 @@ export default function NextMatchTab({
   const [sortTeamsLoading, setSortTeamsLoading] = useState(false);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [clearAttendancesLoading, setClearAttendancesLoading] = useState(false);
   // ELIMINADO: useState innecesario, ahora usamos directamente unassignedPlayersCalculated
   // Estado controlado para teamsFormed
   const [forceTeamsFormed, setForceTeamsFormed] = useState(false);
@@ -255,6 +257,7 @@ export default function NextMatchTab({
   const userAttendanceMutation = useUserAttendanceMutation();
   const randomizeTeamsMutation = useRandomizeTeamsMutation();
   const deleteMatchMutation = useDeleteMatchMutation();
+  const resetAttendanceMutation = useResetAttendanceMutation();
 
   // Get match details from group
   const matchDetails = group?.nextMatchDetails || null;
@@ -925,6 +928,25 @@ _Generado con Paloparti_ 🚀`;
     }
   };
 
+  const handleClearAttendances = async () => {
+    if (!matchDetails?.id) return;
+
+    setClearAttendancesLoading(true);
+    try {
+      await resetAttendanceMutation.mutateAsync({
+        matchId: matchDetails.id,
+        groupId: id,
+      });
+
+      showSuccessToast('Asistencias limpiadas correctamente');
+    } catch (error) {
+      console.error('Error clearing attendances:', error);
+      showErrorToast('Error al limpiar las asistencias');
+    } finally {
+      setClearAttendancesLoading(false);
+    }
+  };
+
   // Calculate progress percentage
   const progressPercentage = Math.min(
     Math.round((confirmedCount / requiredPlayers) * 100),
@@ -1465,6 +1487,31 @@ _Generado con Paloparti_ 🚀`;
 
                             {/* Divider */}
                             <div className='my-1 border-t border-gray-200'></div>
+
+                            {/* Clear attendances option */}
+                            <button
+                              onClick={() => {
+                                handleClearAttendances();
+                                setShowActionsDropdown(false);
+                              }}
+                              className='w-full px-3 py-2 text-left text-sm text-orange-600 hover:bg-orange-50 transition-colors flex items-center'
+                              disabled={clearAttendancesLoading}
+                            >
+                              <svg
+                                className='h-4 w-4 mr-2'
+                                fill='none'
+                                viewBox='0 0 24 24'
+                                stroke='currentColor'
+                              >
+                                <path
+                                  strokeLinecap='round'
+                                  strokeLinejoin='round'
+                                  strokeWidth={2}
+                                  d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'
+                                />
+                              </svg>
+                              Limpiar asistencias
+                            </button>
 
                             {/* Delete option */}
                             <button
