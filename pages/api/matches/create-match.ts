@@ -3938,14 +3938,28 @@ export default async function handler(
             'Usando algoritmo completamente aleatorio (sin criterios de balance)'
           );
           [autoTeamA, autoTeamB] = createRandomTeams(mappedMembers);
-        } else if (balanceByRating && balanceByRole && balanceByAge) {
+        // DIAGNÓSTICO: Log detallado de parámetros de balanceo
+        console.log('🔍 DIAGNÓSTICO DE PARÁMETROS:', {
+          balanceByRole,
+          balanceByAge,
+          balanceByRating,
+          useRandomAlgorithm,
+          mappedMembersCount: mappedMembers.length,
+          isResort,
+        });
+
+        if (balanceByRating && balanceByRole && balanceByAge) {
+          console.log('🎯 EJECUTANDO: createBalancedTeamsByMultiCriteria');
           // Usar el nuevo algoritmo multicriteria para los tres criterios
-          console.log('Usando el nuevo algoritmo de balanceo multicriteria');
           [autoTeamA, autoTeamB] =
             createBalancedTeamsByMultiCriteria(mappedMembers);
         } else if (balanceByRating && balanceByRole) {
-          // Combinar balanceo por rating y rol (usando el combinado pero ignorando edad)
-          [autoTeamA, autoTeamB] = createCombinedBalancedTeams(mappedMembers);
+          console.log('🎯 EJECUTANDO: TeamBuilder (rating + rol)');
+          // CAMBIO: Usar TeamBuilder para garantizar formaciones mínimas
+          const teamBuilder = new TeamBuilder(mappedMembers as any);
+          const [teamA, teamB] = teamBuilder.buildTeams();
+          autoTeamA = teamA as Member[];
+          autoTeamB = teamB as Member[];
         } else if (balanceByRating && balanceByAge) {
           // Balanceo por rating y edad (podríamos también usar el combinado aquí)
           [autoTeamA, autoTeamB] = createCombinedBalancedTeams(mappedMembers);
