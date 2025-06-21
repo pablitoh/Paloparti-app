@@ -3950,16 +3950,26 @@ export default async function handler(
           // Balanceo por rating y edad (podríamos también usar el combinado aquí)
           [autoTeamA, autoTeamB] = createCombinedBalancedTeams(mappedMembers);
         } else if (balanceByRole && balanceByAge) {
-          // Balanceo inteligente por rol (primario + secundario + comodín + aleatorio)
-          [autoTeamA, autoTeamB] =
-            createIntelligentRoleBalancedTeams(mappedMembers);
+          // Usar TeamBuilder con formaciones mínimas garantizadas (4-3-3 o 4-4-2)
+          console.log(
+            '🎯 Usando TeamBuilder con formaciones mínimas garantizadas...'
+          );
+          const teamBuilder = new TeamBuilder(mappedMembers as any);
+          const [teamA, teamB] = teamBuilder.buildTeams();
+          autoTeamA = teamA as Member[];
+          autoTeamB = teamB as Member[];
         } else if (balanceByRating) {
           // Solo balanceo por rating
           [autoTeamA, autoTeamB] = createRatingBalancedTeams(mappedMembers);
         } else if (balanceByRole) {
-          // Solo balanceo inteligente por rol
-          [autoTeamA, autoTeamB] =
-            createIntelligentRoleBalancedTeams(mappedMembers);
+          // Usar TeamBuilder con formaciones mínimas garantizadas (4-3-3 o 4-4-2)
+          console.log(
+            '🎯 Usando TeamBuilder con formaciones mínimas garantizadas...'
+          );
+          const teamBuilder = new TeamBuilder(mappedMembers as any);
+          const [teamA, teamB] = teamBuilder.buildTeams();
+          autoTeamA = teamA as Member[];
+          autoTeamB = teamB as Member[];
         } else if (balanceByAge) {
           // Solo balanceo por edad
           [autoTeamA, autoTeamB] = createBalancedTeams(mappedMembers);
