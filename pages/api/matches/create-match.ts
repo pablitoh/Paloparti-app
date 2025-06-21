@@ -27,6 +27,9 @@ import {
   createRandomTeams,
 } from '../../../lib/matches/advancedBalancer';
 
+// Importar nuevo algoritmo unificado
+import { createUnifiedBalancedTeams } from '../../../lib/matches/unifiedBalancer';
+
 // Importar utilidades de partidos
 import {
   calculateAverageAge,
@@ -304,19 +307,23 @@ export default async function handler(
         .map((playerId: string) => members.find((m) => m.id === playerId))
         .filter(Boolean);
     } else {
-      // Modo automático: usar algoritmos de balanceo
-      console.log('🎯 Modo automático: seleccionando algoritmo de balanceo');
+      // Modo automático: usar el nuevo algoritmo unificado
+      console.log('🎯 Modo automático: usando algoritmo unificado de balance');
 
       if (useRandomAlgorithm) {
         console.log('🎲 Usando algoritmo completamente aleatorio');
         [teamAMembers, teamBMembers] = createRandomTeams(members);
-      } else if (balanceByRating && !balanceByAge && !balanceByRole) {
-        console.log('⭐ Balanceando solo por rating');
-        [teamAMembers, teamBMembers] = createRatingBalancedTeams(members);
       } else {
-        console.log('🎯 Usando algoritmo inteligente balanceado por rol');
-        [teamAMembers, teamBMembers] =
-          createIntelligentRoleBalancedTeams(members);
+        console.log('🎯 Usando nuevo algoritmo unificado');
+        console.log(
+          `⚙️ Opciones: edad=${balanceByAge}, rating=${balanceByRating}, posición=${balanceByRole}`
+        );
+
+        [teamAMembers, teamBMembers] = createUnifiedBalancedTeams(members, {
+          balanceByAge,
+          balanceByRating,
+          balanceByRole,
+        });
       }
     }
 
