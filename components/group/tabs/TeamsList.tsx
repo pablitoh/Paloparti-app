@@ -312,24 +312,41 @@ const TeamsList: React.FC<TeamsListProps> = ({
       role: string;
       priority: number;
       isAssigned: boolean;
+      isForced: boolean;
     }[] = [];
 
     if (userSelectedRoles.length > 0) {
-      // Si tiene posiciones preferidas, mostrar solo esas (máximo 2)
+      // Mostrar todas las posiciones preferidas del jugador
       userSelectedRoles.forEach((roleObj) => {
         displayRoles.push({
           role: roleObj.role,
           priority: roleObj.priority,
-          isAssigned:
-            player.assignedRole === roleObj.role && !player.positionForced,
+          isAssigned: player.assignedRole === roleObj.role,
+          isForced:
+            player.assignedRole === roleObj.role &&
+            (player.positionForced || false),
         });
       });
+
+      // Si el rol asignado no está entre sus preferencias, agregarlo también
+      if (
+        player.assignedRole &&
+        !userSelectedRoles.some((r) => r.role === player.assignedRole)
+      ) {
+        displayRoles.push({
+          role: player.assignedRole,
+          priority: 999, // Al final
+          isAssigned: true,
+          isForced: true,
+        });
+      }
     } else if (player.assignedRole) {
-      // Si no tiene posiciones preferidas, mostrar solo la asignada (forzada)
+      // Si no tiene posiciones preferidas, mostrar la asignada
       displayRoles.push({
         role: player.assignedRole,
         priority: 1,
-        isAssigned: false, // Siempre forzada si no tenía preferencias
+        isAssigned: true,
+        isForced: true, // Siempre forzada si no tenía preferencias
       });
     }
 
@@ -341,6 +358,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
         ROLE_ICONS[roleData.role]?.icon ||
         ROLE_ICONS[PLAYER_ROLES.WILDCARD]?.icon,
       isAssigned: roleData.isAssigned,
+      isForced: roleData.isForced,
       priority: roleData.priority,
     }));
 
@@ -389,22 +407,33 @@ const TeamsList: React.FC<TeamsListProps> = ({
                 {roleDisplayData.map((roleData, index) => (
                   <span
                     key={index}
-                    className={`flex-shrink-0 ${
+                    className={`flex-shrink-0 relative ${
                       roleData.isAssigned
-                        ? 'bg-lime-100 p-1 rounded border border-lime-300'
+                        ? roleData.isForced
+                          ? 'bg-red-100 p-1 rounded border border-red-300' // Asignado forzado (rojo)
+                          : 'bg-lime-100 p-1 rounded border border-lime-300' // Asignado natural (verde)
                         : roleData.priority === 1
-                        ? 'bg-primary-50 p-1 rounded border border-primary-200'
-                        : 'bg-gray-50 p-1 rounded border border-gray-200'
+                        ? 'bg-primary-50 p-1 rounded border border-primary-200' // Preferencia primaria
+                        : 'bg-gray-50 p-1 rounded border border-gray-200' // Preferencia secundaria
                     }`}
                     title={`${roleData.role} ${
                       roleData.isAssigned
-                        ? '(Asignado)'
+                        ? roleData.isForced
+                          ? '(Asignado - Forzado)'
+                          : '(Asignado - Natural)'
                         : roleData.priority === 1
-                        ? '(Primario)'
-                        : '(Secundario)'
+                        ? '(Preferencia Primaria)'
+                        : '(Preferencia Secundaria)'
                     }`}
                   >
                     {roleData.icon}
+                    {/* Indicator for forced assignments */}
+                    {roleData.isAssigned && roleData.isForced && (
+                      <div
+                        className='absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full'
+                        title='Posición forzada'
+                      />
+                    )}
                   </span>
                 ))}
               </div>

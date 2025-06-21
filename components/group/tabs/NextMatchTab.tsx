@@ -680,27 +680,38 @@ export default function NextMatchTab({
           '🔄 Forzando invalidaciones para asegurar actualización UI'
         );
 
-        // Invalidar inmediatamente
-        queryClient.invalidateQueries({
-          queryKey: ['group', 'nextMatch', id],
-          exact: true,
-          refetchType: 'all',
-        });
+        // Forzar state updates directos
+        setForcedTeamA([]);
+        setForcedTeamB([]);
+        setForceTeamsFormed(true);
 
-        // Invalidar básicos del grupo también
-        queryClient.invalidateQueries({
-          queryKey: ['group', 'basic', id],
-          refetchType: 'active',
-        });
-
-        // Invalidación adicional con delay para casos edge
-        setTimeout(() => {
-          console.log('🔄 Invalidación adicional después de 200ms');
+        // Estrategia de invalidación agresiva con múltiples retries
+        const invalidateQueries = () => {
           queryClient.invalidateQueries({
             queryKey: ['group', 'nextMatch', id],
+            exact: true,
             refetchType: 'all',
           });
-        }, 200);
+
+          queryClient.invalidateQueries({
+            queryKey: ['group', 'basic', id],
+            refetchType: 'active',
+          });
+
+          // Forzar refetch inmediato
+          queryClient.refetchQueries({
+            queryKey: ['group', 'nextMatch', id],
+            exact: true,
+          });
+        };
+
+        // Invalidar inmediatamente
+        invalidateQueries();
+
+        // Invalidaciones adicionales con diferentes delays
+        setTimeout(invalidateQueries, 100);
+        setTimeout(invalidateQueries, 300);
+        setTimeout(invalidateQueries, 500);
 
         // Notificar al usuario que los equipos han sido sorteados
         showSuccessToast('Equipos sorteados exitosamente');

@@ -560,13 +560,13 @@ export const useRandomizeTeamsMutation = () => {
     onSuccess: (data, variables) => {
       console.log('🔄 Sorteo exitoso, actualizando caché...');
 
-      // 1. Actualizar datos en el caché directamente
+      // 1. Actualizar datos en el caché directamente con timestamp
       queryClient.setQueryData(
         ['group', 'nextMatch', variables.groupId],
         (oldData: any) => {
           if (!oldData) return oldData;
 
-          return {
+          const updatedData = {
             ...oldData,
             nextMatchDetails: data.match
               ? {
@@ -578,9 +578,20 @@ export const useRandomizeTeamsMutation = () => {
                   teamAAvgAge: data.teamAAvgAge,
                   teamBAvgAge: data.teamBAvgAge,
                   sortCount: data.match.sortCount,
+                  updatedAt: new Date().toISOString(), // Forzar cambio
                 }
               : oldData.nextMatchDetails,
+            lastUpdated: new Date().toISOString(), // Timestamp para forzar re-render
           };
+
+          console.log('🔄 Cache actualizado con nuevos datos:', {
+            teamACount: data.teamA?.length,
+            teamBCount: data.teamB?.length,
+            sortCount: data.match?.sortCount,
+            timestamp: updatedData.lastUpdated,
+          });
+
+          return updatedData;
         }
       );
 
