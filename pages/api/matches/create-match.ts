@@ -380,11 +380,25 @@ export default async function handler(
       }
     });
 
-    // Generar jugadores TBD si es necesario
-    const tbdPlayersTeamA = allowTbdPlayers
+    // Generar jugadores TBD SOLO si realmente es necesario
+    // Si ya tenemos jugadores suficientes en total, no crear TBD
+    const totalRealPlayers = finalTeamA.length + finalTeamB.length;
+    const shouldCreateTbdPlayers =
+      allowTbdPlayers && totalRealPlayers < requiredPlayersPerTeam * 2;
+
+    console.log(`🤖 Evaluando TBD players:`, {
+      allowTbdPlayers,
+      totalRealPlayers,
+      requiredTotal: requiredPlayersPerTeam * 2,
+      shouldCreateTbdPlayers,
+      teamASize: finalTeamA.length,
+      teamBSize: finalTeamB.length,
+    });
+
+    const tbdPlayersTeamA = shouldCreateTbdPlayers
       ? addTbdPlayers(finalTeamA, true, requiredPlayersPerTeam)
       : [];
-    const tbdPlayersTeamB = allowTbdPlayers
+    const tbdPlayersTeamB = shouldCreateTbdPlayers
       ? addTbdPlayers(finalTeamB, false, requiredPlayersPerTeam)
       : [];
 

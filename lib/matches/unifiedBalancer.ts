@@ -115,6 +115,9 @@ class UnifiedTeamBalancer {
     // NUEVO: Algoritmo de asignación óptima global
     this.performGlobalOptimalAssignment(members);
 
+    // NUEVO: Asegurar que TODOS los jugadores sean asignados
+    this.assignAllRemainingPlayers(members);
+
     // Verificación final y ajustes
     this.finalizeTeams();
 
@@ -918,6 +921,52 @@ class UnifiedTeamBalancer {
     return ages.length > 0
       ? ages.reduce((sum, age) => sum + age, 0) / ages.length
       : 0;
+  }
+
+  private assignAllRemainingPlayers(members: Member[]): void {
+    console.log(
+      '\n🔄 Fase adicional: Asignando TODOS los jugadores restantes...'
+    );
+
+    const unassignedPlayers = members.filter(
+      (member) => !this.assignedPlayerIds.has(member.id)
+    );
+
+    if (unassignedPlayers.length === 0) {
+      console.log('✅ Todos los jugadores ya fueron asignados');
+      return;
+    }
+
+    console.log(
+      `🎯 Asignando ${unassignedPlayers.length} jugadores restantes...`
+    );
+
+    // Ordenar por criterios de balance
+    const sortedPlayers = this.sortPlayersByBalanceCriteria(unassignedPlayers);
+
+    // Distribuir alternando equipos para mantener balance
+    sortedPlayers.forEach((player, index) => {
+      // Determinar a qué equipo asignar basado en el balance actual
+      const isTeamA = this.shouldAssignToTeamA();
+
+      // Determinar la mejor posición para este jugador en el equipo seleccionado
+      const bestPosition = this.determineBestPositionForPlayer(player, isTeamA);
+
+      // Solo marcar como forzado si NO tiene esta posición entre sus preferencias
+      const isForced = !hasRole(player.playerRoles, bestPosition);
+
+      this.assignPlayerToTeam(player, bestPosition, isTeamA, isForced);
+
+      console.log(
+        `   ✅ ${player.name} → Equipo ${
+          isTeamA ? 'A' : 'B'
+        } como ${bestPosition}${isForced ? ' (FORZADO)' : ''}`
+      );
+    });
+
+    console.log(
+      `✅ Todos los ${unassignedPlayers.length} jugadores restantes asignados`
+    );
   }
 
   private convertPlayerToGoalkeeper(isTeamA: boolean): void {
