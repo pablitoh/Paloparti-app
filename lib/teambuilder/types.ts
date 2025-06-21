@@ -7,6 +7,7 @@ export type Member = {
   role: string;
   playerRoles?: string[] | PlayerRole[]; // Backward compatibility + new format
   assignedRole?: string; // Rol asignado para la formación
+  positionForced?: boolean; // Indica si la posición fue forzada (no es preferida del jugador)
   starRating?: number; // Nivel de habilidad del jugador (0-5)
 };
 

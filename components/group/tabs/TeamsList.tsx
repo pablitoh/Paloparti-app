@@ -5,7 +5,6 @@ import {
   UserPlusIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 import { PLAYER_ROLES, PlayerRole } from '../../../lib/teambuilder';
 
@@ -63,6 +62,7 @@ interface Player {
   playerType?: string;
   playerRoles?: PlayerRole[];
   assignedRole?: string;
+  positionForced?: boolean;
   age?: number;
   starRating?: number;
 }
@@ -75,6 +75,7 @@ interface TbdPlayer {
   playerType?: string;
   playerRoles?: PlayerRole[];
   assignedRole?: string;
+  positionForced?: boolean;
   age?: number;
   starRating?: number;
 }
@@ -257,7 +258,12 @@ const TeamsList: React.FC<TeamsListProps> = ({
     isTeamA,
   }) => {
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [dropdownPosition, setDropdownPosition] = useState({
+      top: 0,
+      left: 0,
+    });
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const avatarRef = useRef<HTMLButtonElement>(null);
 
     // Handle click outside to close dropdown
     useEffect(() => {
@@ -312,7 +318,8 @@ const TeamsList: React.FC<TeamsListProps> = ({
       displayRoles.push({
         role: roleObj.role,
         priority: roleObj.priority,
-        isAssigned: player.assignedRole === roleObj.role,
+        isAssigned:
+          player.assignedRole === roleObj.role && !player.positionForced,
       });
     });
 
@@ -323,7 +330,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
       displayRoles.push({
         role: player.assignedRole,
         priority: 999,
-        isAssigned: true,
+        isAssigned: !player.positionForced, // No highlight si es forzado
       });
     }
 
@@ -423,8 +430,17 @@ const TeamsList: React.FC<TeamsListProps> = ({
           ref={dropdownRef}
         >
           <button
+            ref={avatarRef}
             onClick={() => {
               if (currentUserIsAdmin && onSwapPlayer && !isTbd) {
+                // Calcular posición del dropdown
+                if (avatarRef.current) {
+                  const rect = avatarRef.current.getBoundingClientRect();
+                  setDropdownPosition({
+                    top: rect.bottom + window.scrollY + 4,
+                    left: rect.left + window.scrollX,
+                  });
+                }
                 setDropdownOpen(!dropdownOpen);
               }
             }}
@@ -446,13 +462,6 @@ const TeamsList: React.FC<TeamsListProps> = ({
                 className='h-10 w-10 rounded-full border-2 border-white shadow-md'
               />
             )}
-
-            {/* Small arrow indicator for clickable avatars */}
-            {currentUserIsAdmin && onSwapPlayer && !isTbd && (
-              <div className='absolute -left-1 top-1/2 -translate-y-1/2 bg-white rounded-full p-0.5 shadow-sm border border-gray-200 z-10'>
-                <ChevronDownIcon className='h-2 w-2 text-gray-600' />
-              </div>
-            )}
           </button>
 
           {/* Star Rating below avatar */}
@@ -460,7 +469,13 @@ const TeamsList: React.FC<TeamsListProps> = ({
 
           {/* Dropdown Menu */}
           {dropdownOpen && currentUserIsAdmin && onSwapPlayer && !isTbd && (
-            <div className='absolute top-12 left-0 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[9999]'>
+            <div
+              className='fixed w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-[999999]'
+              style={{
+                top: `${dropdownPosition.top}px`,
+                left: `${dropdownPosition.left}px`,
+              }}
+            >
               <button
                 onClick={() => {
                   onSwapPlayer(player.id, isTeamA);

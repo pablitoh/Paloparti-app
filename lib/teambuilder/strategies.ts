@@ -326,7 +326,22 @@ export class RoleBalanceStrategy implements BalanceStrategy {
 
       // Si encontramos un jugador, asignarlo a esta posición
       if (player) {
-        team.push({ ...player, assignedRole: position });
+        // Verificar si la posición es forzada (no está en los roles preferidos del jugador)
+        const playerPreferredRoles = player.playerRoles || [];
+        const isPositionForced = !playerPreferredRoles.some((role) => {
+          if (typeof role === 'string') {
+            return role === position;
+          } else if (role && typeof role === 'object' && 'role' in role) {
+            return role.role === position;
+          }
+          return false;
+        });
+
+        team.push({
+          ...player,
+          assignedRole: position,
+          positionForced: isPositionForced,
+        });
         return true;
       }
 
@@ -424,7 +439,22 @@ export class RoleBalanceStrategy implements BalanceStrategy {
           assignedRole = minRole;
         }
 
-        currentTeam.push({ ...player, assignedRole });
+        // Verificar si el rol es forzado
+        const playerPreferredRoles = player.playerRoles || [];
+        const isRoleForced = !playerPreferredRoles.some((role) => {
+          if (typeof role === 'string') {
+            return role === assignedRole;
+          } else if (role && typeof role === 'object' && 'role' in role) {
+            return role.role === assignedRole;
+          }
+          return false;
+        });
+
+        currentTeam.push({
+          ...player,
+          assignedRole,
+          positionForced: isRoleForced,
+        });
         currentTeam = currentTeam === teamA ? teamB : teamA;
       }
     }
@@ -647,8 +677,28 @@ export class RoleBalanceStrategy implements BalanceStrategy {
           }
 
           if (player) {
-            team.push({ ...player, assignedRole: position });
-            console.log(`✅ Asignado ${player.name} como ${position}`);
+            // Verificar si la posición es forzada (no está en los roles preferidos del jugador)
+            const playerPreferredRoles = player.playerRoles || [];
+            const isPositionForced = !playerPreferredRoles.some((role) => {
+              if (typeof role === 'string') {
+                return role === position;
+              } else if (role && typeof role === 'object' && 'role' in role) {
+                return role.role === position;
+              }
+              return false;
+            });
+
+            team.push({
+              ...player,
+              assignedRole: position,
+              positionForced: isPositionForced,
+            });
+
+            console.log(
+              `✅ Asignado ${player.name} como ${position}${
+                isPositionForced ? ' (FORZADO)' : ''
+              }`
+            );
           }
         }
       });
@@ -703,8 +753,23 @@ export class RoleBalanceStrategy implements BalanceStrategy {
       // Determinar el rol más apropiado basado en las necesidades del equipo
       const bestRole = this.determineBestRoleForTeam(player, currentTeam);
 
+      // Verificar si el rol es forzado
+      const playerPreferredRoles = player.playerRoles || [];
+      const isRoleForced = !playerPreferredRoles.some((role) => {
+        if (typeof role === 'string') {
+          return role === bestRole;
+        } else if (role && typeof role === 'object' && 'role' in role) {
+          return role.role === bestRole;
+        }
+        return false;
+      });
+
       // Asignar el jugador al equipo actual
-      currentTeam.push({ ...player, assignedRole: bestRole });
+      currentTeam.push({
+        ...player,
+        assignedRole: bestRole,
+        positionForced: isRoleForced,
+      });
 
       // Alternar al siguiente equipo
       currentTeam = currentTeam === teamA ? teamB : teamA;
