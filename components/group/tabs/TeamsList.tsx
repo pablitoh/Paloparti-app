@@ -314,23 +314,22 @@ const TeamsList: React.FC<TeamsListProps> = ({
       isAssigned: boolean;
     }[] = [];
 
-    userSelectedRoles.forEach((roleObj) => {
-      displayRoles.push({
-        role: roleObj.role,
-        priority: roleObj.priority,
-        isAssigned:
-          player.assignedRole === roleObj.role && !player.positionForced,
+    if (userSelectedRoles.length > 0) {
+      // Si tiene posiciones preferidas, mostrar solo esas (máximo 2)
+      userSelectedRoles.forEach((roleObj) => {
+        displayRoles.push({
+          role: roleObj.role,
+          priority: roleObj.priority,
+          isAssigned:
+            player.assignedRole === roleObj.role && !player.positionForced,
+        });
       });
-    });
-
-    if (
-      player.assignedRole &&
-      !userSelectedRoles.some((r) => r.role === player.assignedRole)
-    ) {
+    } else if (player.assignedRole) {
+      // Si no tiene posiciones preferidas, mostrar solo la asignada (forzada)
       displayRoles.push({
         role: player.assignedRole,
-        priority: 999,
-        isAssigned: !player.positionForced, // No highlight si es forzado
+        priority: 1,
+        isAssigned: false, // Siempre forzada si no tenía preferencias
       });
     }
 
