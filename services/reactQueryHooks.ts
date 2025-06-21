@@ -558,40 +558,15 @@ export const useRandomizeTeamsMutation = () => {
       return response.json();
     },
     onSuccess: (data, variables) => {
-      // Actualizar el caché del próximo partido directamente
-      // This approach updates the cache without triggering a refetch
+      // Simplificar: solo invalidar para forzar refetch completo
       const queryKey = ['group', 'nextMatch', variables.groupId];
-      queryClient.setQueryData(queryKey, (oldData: any) => {
-        if (!oldData) return oldData;
 
-        // Añadir log para depuración de promedios de edad
-        console.log('Actualizando caché con promedios de edad:', {
-          teamAAvgAge: data.teamAAvgAge,
-          teamBAvgAge: data.teamBAvgAge,
-          teamA: data.teamA?.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            age: p.age,
-          })),
-          teamB: data.teamB?.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            age: p.age,
-          })),
-        });
+      console.log('🔄 Invalidando caché después de sorteo exitoso');
 
-        return {
-          ...oldData,
-          nextMatchDetails: {
-            ...oldData.nextMatchDetails,
-            playersA: data.teamA,
-            playersB: data.teamB,
-            tbdPlayers: data.tbdPlayers,
-            teamAAvgAge: data.teamAAvgAge, // Añadir promedios de edad al caché
-            teamBAvgAge: data.teamBAvgAge, // Añadir promedios de edad al caché
-            sortCount: (oldData.nextMatchDetails?.sortCount || 0) + 1, // Incrementar correctamente el sortCount
-          },
-        };
+      // Invalidar las queries para forzar un refetch completo
+      queryClient.invalidateQueries({
+        queryKey: queryKey,
+        exact: true,
       });
 
       showSuccessToast('Equipos formados aleatoriamente');

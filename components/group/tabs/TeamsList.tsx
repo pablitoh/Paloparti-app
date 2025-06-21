@@ -798,6 +798,13 @@ const TeamsList: React.FC<TeamsListProps> = ({
     );
   };
 
+  // Agregar logging para debugging
+  console.log(`🎯 TeamsList renderizado con sortCount: ${sortCount}`, {
+    playersACount: playersA.length,
+    playersBCount: playersB.length,
+    teamsListKey: sortCount,
+  });
+
   return (
     <div
       id={`teams-list-container-${sortCount}`}

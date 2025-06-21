@@ -634,124 +634,25 @@ export default function NextMatchTab({
           }
         );
 
-        // Almacenar los equipos recibidos para mostrarlos inmediatamente
-        if (response?.teamA) {
-          // Asegurar que todos los jugadores tengan edades
-          const processedTeamA = ensurePlayerAges(response.teamA);
-          // Ordenar los jugadores por posición
-          setForcedTeamA(sortPlayersByRole(processedTeamA));
-        }
-
-        if (response?.teamB) {
-          // Asegurar que todos los jugadores tengan edades
-          const processedTeamB = ensurePlayerAges(response.teamB);
-          // Ordenar los jugadores por posición
-          setForcedTeamB(sortPlayersByRole(processedTeamB));
-        }
-
-        // Guardar los promedios de edad siempre que estén disponibles en la respuesta
-        // Las edades promedio se calculan automáticamente
-        console.log('Edades promedio del sorteo:', {
-          teamAAvgAge: response?.teamAAvgAge,
-          teamBAvgAge: response?.teamBAvgAge,
-        });
+        // Limpiar estados locales forzados
+        setForcedTeamA([]);
+        setForcedTeamB([]);
 
         // Incrementar la clave para forzar un nuevo renderizado del componente TeamsList
-        setTeamsListKey((prevKey) => prevKey + 1);
-
-        // Disparar evento personalizado para notificar la actualización de los promedios de edad
-        window.dispatchEvent(
-          new CustomEvent('teams-sorted', {
-            detail: {
-              teamAAvgAge:
-                response?.teamAAvgAge !== undefined
-                  ? response.teamAAvgAge
-                  : calculateApproximateAge(response?.teamA || []),
-              teamBAvgAge:
-                response?.teamBAvgAge !== undefined
-                  ? response.teamBAvgAge
-                  : calculateApproximateAge(response?.teamB || []),
-            },
-          })
-        );
-
-        // Actualizar manualmente el caché de React Query para reflejar el cambio inmediatamente
-        queryClient.setQueryData(['group', 'nextMatch', id], (oldData: any) => {
-          if (!oldData) return oldData;
-
-          // Procesar tbdPlayers de la respuesta
-          let updatedTbdPlayers = oldData.nextMatchDetails.tbdPlayers;
-
-          if (response?.tbdPlayers) {
-            // Si la respuesta incluye tbdPlayers en formato {teamA, teamB}
-            if (response.tbdPlayers.teamA || response.tbdPlayers.teamB) {
-              const teamATbd = response.tbdPlayers.teamA || [];
-              const teamBTbd = response.tbdPlayers.teamB || [];
-
-              // Convertir al formato de array plano con isTeamA
-              updatedTbdPlayers = [
-                ...teamATbd.map((p: any) => ({
-                  ...p,
-                  isTeamA: true,
-                  playerType: 'TBD',
-                })),
-                ...teamBTbd.map((p: any) => ({
-                  ...p,
-                  isTeamA: false,
-                  playerType: 'TBD',
-                })),
-              ];
-            } else {
-              // Si ya es un array, usarlo directamente
-              updatedTbdPlayers = response.tbdPlayers;
-            }
-          }
-
-          console.log(
-            'Actualizando caché después de sortear, incrementando sortCount, con promedios de edad:',
-            response?.teamAAvgAge,
-            response?.teamBAvgAge
-          );
-
-          // Ordenar los equipos antes de guardarlos en la caché
-          let sortedPlayersA =
-            response?.teamA || oldData.nextMatchDetails.playersA;
-          let sortedPlayersB =
-            response?.teamB || oldData.nextMatchDetails.playersB;
-
-          if (sortedPlayersA && sortedPlayersA.length > 0) {
-            sortedPlayersA = sortPlayersByRole(sortedPlayersA);
-          }
-
-          if (sortedPlayersB && sortedPlayersB.length > 0) {
-            sortedPlayersB = sortPlayersByRole(sortedPlayersB);
-          }
-
-          // Incrementar sortCount en lugar de forzarlo a 1
-          const currentSortCount = oldData.nextMatchDetails.sortCount || 0;
-          const newSortCount = currentSortCount + 1;
-
-          // Crear una copia de los datos con sortCount incrementado
-          return {
-            ...oldData,
-            nextMatchDetails: {
-              ...oldData.nextMatchDetails,
-              sortCount: newSortCount, // Incrementar sortCount correctamente
-              // Si la respuesta incluye los equipos, actualizar también
-              playersA: sortedPlayersA,
-              playersB: sortedPlayersB,
-              tbdPlayers: updatedTbdPlayers,
-              teamAAvgAge: response?.teamAAvgAge,
-              teamBAvgAge: response?.teamBAvgAge,
-            },
-          };
+        setTeamsListKey((prevKey) => {
+          const newKey = prevKey + 1;
+          console.log(`🔄 Incrementando teamsListKey: ${prevKey} → ${newKey}`);
+          return newKey;
         });
 
-        // Invalidar todas las consultas relacionadas con este grupo y partido para forzar la actualización eventual
-        queryClient.invalidateQueries({
-          queryKey: ['group', 'nextMatch', id],
-          exact: true,
-        });
+        // Forzar una actualización completa después de un breve delay
+        setTimeout(() => {
+          console.log('🔄 Forzando invalidación adicional después de 100ms');
+          queryClient.invalidateQueries({
+            queryKey: ['group', 'nextMatch', id],
+            exact: true,
+          });
+        }, 100);
 
         // Notificar al usuario que los equipos han sido sorteados
         showSuccessToast('Equipos sorteados exitosamente');
