@@ -254,7 +254,7 @@ export default async function handler(
       `👥 Jugadores con asistencia confirmada: ${confirmedAttendances.length}`
     );
 
-    // Extraer playerRoles desde tbdPlayers del match
+    // Los roles se guardan en tbdPlayers.playerRoles, no en matchAttendance
     let playerRolesFromMatch: Record<string, any> = {};
     if (matchForRoles?.tbdPlayers) {
       try {
@@ -265,20 +265,39 @@ export default async function handler(
 
         if (tbdData?.playerRoles) {
           playerRolesFromMatch = tbdData.playerRoles;
-          console.log(
-            '🎯 Roles de jugadores extraídos del match:',
-            Object.keys(playerRolesFromMatch).length
-          );
         }
       } catch (error) {
         console.error('Error parsing tbdPlayers:', error);
       }
     }
 
+    console.log(
+      `🎯 Roles obtenidos desde match tbdPlayers: ${
+        Object.keys(playerRolesFromMatch).length
+      }`
+    );
+
     // Convertir a formato Member
     const members: Member[] = confirmedAttendances.map((attendance: any) => {
       const userId = attendance.user.id;
-      const userPlayerRoles = playerRolesFromMatch[userId] || [];
+
+      // Obtener roles desde tbdPlayers del match
+      let userPlayerRoles = [];
+      const rolesFromMatch = playerRolesFromMatch[userId];
+
+      if (
+        rolesFromMatch &&
+        Array.isArray(rolesFromMatch) &&
+        rolesFromMatch.length > 0
+      ) {
+        // Convertir a formato correcto si es necesario
+        userPlayerRoles = rolesFromMatch.map((role: any, index: number) => {
+          if (typeof role === 'string') {
+            return { role, priority: index + 1 };
+          }
+          return role; // Ya está en formato { role, priority }
+        });
+      }
 
       // Calcular edad dinámicamente si hay fecha de nacimiento
       let calculatedAge = null;
@@ -295,6 +314,10 @@ export default async function handler(
         }
         calculatedAge = age;
       }
+
+      console.log(
+        `👤 ${attendance.user.name}: ${userPlayerRoles.length} roles encontrados`
+      );
 
       return {
         id: userId,
