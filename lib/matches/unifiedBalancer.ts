@@ -112,8 +112,14 @@ class UnifiedTeamBalancer {
     // Determinar formación basada en las posiciones disponibles
     this.determineFormation(members);
 
-    // NUEVO: Algoritmo de asignación óptima global
-    this.performGlobalOptimalAssignment(members);
+    // Clasificar jugadores por posición para algoritmo estructurado
+    const playersByPosition = this.classifyPlayersByPosition(members);
+
+    // Usar algoritmo estructurado para GARANTIZAR formaciones correctas
+    this.assignGoalkeepers(playersByPosition);
+    this.guaranteeMinimumPositions(playersByPosition);
+    this.completeFormations(playersByPosition);
+    this.distributeRemainingPlayers(playersByPosition);
 
     // NUEVO: Asegurar que TODOS los jugadores sean asignados
     this.assignAllRemainingPlayers(members);

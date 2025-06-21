@@ -606,7 +606,24 @@ export default function NextMatchTab({
         });
 
         await handleSortTeams();
-        // The parent component handles invalidation/refetch
+
+        // CORREGIDO: Asegurar invalidación también cuando usamos handler personalizado
+        console.log('🔄 Invalidando después de handler personalizado');
+
+        // Incrementar key para forzar re-render de TeamsList
+        setTeamsListKey((prevKey) => {
+          const newKey = prevKey + 1;
+          console.log(`🔄 Incrementando teamsListKey: ${prevKey} → ${newKey}`);
+          return newKey;
+        });
+
+        // Invalidar queries para asegurar actualización
+        await queryClient.invalidateQueries({
+          queryKey: ['group', 'nextMatch', id],
+          exact: true,
+          refetchType: 'all',
+        });
+
         return; // CORREGIDO: Importante agregar return para evitar ejecutar el else
       } else {
         // Mostrar un estado de carga para mejorar la experiencia de usuario
@@ -675,43 +692,50 @@ export default function NextMatchTab({
           return newKey;
         });
 
-        // Forzar invalidaciones múltiples para asegurar la actualización
-        console.log(
-          '🔄 Forzando invalidaciones para asegurar actualización UI'
-        );
+        // Estrategia de invalidación mejorada y más directa
+        console.log('🔄 Forzando actualización de UI después del sorteo');
 
-        // Forzar state updates directos
+        // 1. Actualizar estados locales inmediatamente
         setForcedTeamA([]);
         setForcedTeamB([]);
         setForceTeamsFormed(true);
 
-        // Estrategia de invalidación agresiva con múltiples retries
-        const invalidateQueries = () => {
-          queryClient.invalidateQueries({
+        // 2. Incrementar key para forzar re-render de TeamsList
+        setTeamsListKey((prevKey) => {
+          const newKey = prevKey + 1;
+          console.log(`🔄 Incrementando teamsListKey: ${prevKey} → ${newKey}`);
+          return newKey;
+        });
+
+        // 3. Estrategia de invalidación más agresiva
+        const performInvalidation = async () => {
+          // Invalidar con refetch inmediato
+          await queryClient.invalidateQueries({
             queryKey: ['group', 'nextMatch', id],
             exact: true,
             refetchType: 'all',
           });
 
+          // Forzar refetch adicional para asegurar datos frescos
+          await queryClient.refetchQueries({
+            queryKey: ['group', 'nextMatch', id],
+            exact: true,
+            type: 'active',
+          });
+
+          // También invalidar el grupo básico
           queryClient.invalidateQueries({
             queryKey: ['group', 'basic', id],
             refetchType: 'active',
           });
-
-          // Forzar refetch inmediato
-          queryClient.refetchQueries({
-            queryKey: ['group', 'nextMatch', id],
-            exact: true,
-          });
         };
 
-        // Invalidar inmediatamente
-        invalidateQueries();
+        // Ejecutar invalidación inmediatamente
+        performInvalidation();
 
-        // Invalidaciones adicionales con diferentes delays
-        setTimeout(invalidateQueries, 100);
-        setTimeout(invalidateQueries, 300);
-        setTimeout(invalidateQueries, 500);
+        // Invalidaciones adicionales con delays para asegurar actualización
+        setTimeout(performInvalidation, 200);
+        setTimeout(performInvalidation, 500);
 
         // Notificar al usuario que los equipos han sido sorteados
         showSuccessToast('Equipos sorteados exitosamente');
