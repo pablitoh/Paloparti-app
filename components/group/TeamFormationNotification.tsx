@@ -175,9 +175,16 @@ const TeamFormationNotification = ({
 
   // Función para manejar el toggle aleatorio
   const handleRandomToggle = (value: boolean) => {
+    console.log('🐛 DEBUG - Modo aleatorio cambiando:', {
+      value,
+      isRandomMode,
+    });
     setIsRandomMode?.(value);
     if (value) {
       // Si se activa aleatorio, desactivar todos los demás
+      console.log(
+        '🐛 DEBUG - Desactivando todos los otros balances por modo aleatorio'
+      );
       setBalanceByAge?.(false);
       setBalanceByRole?.(false);
       setBalanceByRating?.(false);
@@ -189,6 +196,11 @@ const TeamFormationNotification = ({
     setter: ((value: boolean) => void) | undefined,
     value: boolean
   ) => {
+    console.log('🐛 DEBUG - Toggle cambiado:', {
+      setter: setter?.name,
+      value,
+      isRandomMode,
+    });
     if (isRandomMode && value) {
       // Si está en modo aleatorio y se intenta activar otro, desactivar aleatorio
       setIsRandomMode?.(false);
@@ -286,7 +298,13 @@ const TeamFormationNotification = ({
                     {setBalanceByAge &&
                       renderToggle(
                         balanceByAge && !isRandomMode,
-                        (value) => handleOtherToggle(setBalanceByAge, value),
+                        (value) => {
+                          console.log(
+                            '🐛 DEBUG - Balance por edad cambiando:',
+                            { value, balanceByAge, isRandomMode }
+                          );
+                          handleOtherToggle(setBalanceByAge, value);
+                        },
                         'Por edad',
                         '👥'
                       )}
@@ -295,7 +313,13 @@ const TeamFormationNotification = ({
                     {setBalanceByRating &&
                       renderToggle(
                         balanceByRating && !isRandomMode,
-                        (value) => handleOtherToggle(setBalanceByRating, value),
+                        (value) => {
+                          console.log(
+                            '🐛 DEBUG - Balance por rating cambiando:',
+                            { value, balanceByRating, isRandomMode }
+                          );
+                          handleOtherToggle(setBalanceByRating, value);
+                        },
                         'Por nivel',
                         '⭐'
                       )}

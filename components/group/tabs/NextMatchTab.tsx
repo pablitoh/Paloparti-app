@@ -615,6 +615,26 @@ export default function NextMatchTab({
           return;
         }
 
+        // Debug: Log all state values before making the API call
+        const payloadValues = {
+          balanceByAge: balanceByAge && !isRandomMode,
+          balanceByRole: balanceByRole && !isRandomMode,
+          balanceByRating: balanceByRating && !isRandomMode,
+          allowTbdPlayers: allowFillIn,
+          useRandomAlgorithm: useRandomAlgorithm,
+          // También los valores crudos para debug
+          rawBalanceByAge: balanceByAge,
+          rawBalanceByRole: balanceByRole,
+          rawBalanceByRating: balanceByRating,
+          rawIsRandomMode: isRandomMode,
+          rawAllowFillIn: allowFillIn,
+        };
+
+        console.log(
+          '🐛 DEBUG - Estados antes de enviar al backend:',
+          payloadValues
+        );
+
         const response = await randomizeTeamsMutation.mutateAsync({
           groupId: id,
           matchId: matchDetails.id,
