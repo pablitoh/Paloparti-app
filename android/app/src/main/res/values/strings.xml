@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Paloparti</string>
+    <string name="title_activity_main">Paloparti</string>
+    <string name="package_name">com.paloparti.app</string>
+    <string name="custom_url_scheme">com.paloparti.app</string>
+    <string name="server_client_id">TU_GOOGLE_CLIENT_ID.apps.googleusercontent.com</string>
+</resources>

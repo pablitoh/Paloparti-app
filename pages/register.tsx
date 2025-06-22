@@ -3,8 +3,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useAuth } from '../contexts/AuthContext';
 import { clearAuthState, getSafeCallbackUrl } from '../lib/authUtils';
-import { GetServerSideProps } from 'next';
-import { getSession, signIn } from 'next-auth/react';
+import { signIn } from 'next-auth/react';
 import { subYears, format, differenceInYears } from 'date-fns';
 import DatePickerField from '../components/DatePickerField';
 
@@ -13,47 +12,14 @@ import DatePickerField from '../components/DatePickerField';
  * Sin gestión compleja de redirects para evitar loops
  */
 
-export const getServerSideProps: GetServerSideProps = async (context) => {
-  try {
-    // Verificar si hay sesión activa
-    const session = await getSession(context);
-
-    // Si el usuario ya está autenticado, redirigir según callbackUrl
-    if (session) {
-      const callbackUrl = context.query.callbackUrl as string | undefined;
-      const redirectUrl = getSafeCallbackUrl(callbackUrl, '/groups');
-
-      return {
-        redirect: {
-          destination: redirectUrl,
-          permanent: false,
-        },
-      };
-    }
-
-    // Si no hay sesión, mostrar página de registro
-    return {
-      props: {
-        callbackUrl: context.query.callbackUrl || null,
-      },
-    };
-  } catch (error) {
-    console.error('Error en getServerSideProps de register:', error);
-    return {
-      props: {
-        callbackUrl: null,
-      },
-    };
-  }
-};
-
 interface RegisterProps {
   callbackUrl?: string | null;
 }
 
-export default function Register({ callbackUrl }: RegisterProps) {
+export default function Register() {
   const router = useRouter();
   const { register, user, loading: authLoading } = useAuth();
+  const callbackUrl = router.query.callbackUrl as string | undefined;
 
   // Calculate maximum date (12 years ago from today) to ensure minimum age of 12
   const maxDate = format(subYears(new Date(), 12), 'yyyy-MM-dd');

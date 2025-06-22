@@ -443,6 +443,55 @@ export default async function handler(
     const matchLocation = location || 'Por definir';
 
     if (isResort && existingMatch) {
+      // Capturar equipos anteriores antes de eliminarlos
+      const previousTeamAPlayers = await prisma.matchPlayer.findMany({
+        where: {
+          matchId: existingMatch.id,
+          isTeamA: true,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      const previousTeamBPlayers = await prisma.matchPlayer.findMany({
+        where: {
+          matchId: existingMatch.id,
+          isTeamA: false,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      // Preparar equipos anteriores para el log
+      previousTeams = {
+        teamA: previousTeamAPlayers.map(
+          (player: { userId: string; user: { name: string | null } }) => ({
+            id: player.userId,
+            name: player.user.name || 'Jugador',
+            role: 'N/A',
+          })
+        ),
+        teamB: previousTeamBPlayers.map(
+          (player: { userId: string; user: { name: string | null } }) => ({
+            id: player.userId,
+            name: player.user.name || 'Jugador',
+            role: 'N/A',
+          })
+        ),
+      };
+
       // Eliminar jugadores actuales
       await prisma.matchPlayer.deleteMany({
         where: { matchId: existingMatch.id },
@@ -532,14 +581,47 @@ export default async function handler(
     const sortedTeamA = sortPlayersByRole(finalTeamA);
     const sortedTeamB = sortPlayersByRole(finalTeamB);
 
+    // Preparar datos de los equipos para el log
+    const teamAPlayersForLog = sortedTeamA.map((player) => ({
+      id: player.id,
+      name: player.name,
+      role: player.assignedRole || player.playerRoles?.[0] || 'Wildcard',
+    }));
+
+    const teamBPlayersForLog = sortedTeamB.map((player) => ({
+      id: player.id,
+      name: player.name,
+      role: player.assignedRole || player.playerRoles?.[0] || 'Wildcard',
+    }));
+
+    // Determinar si es realmente un re-sorteo (no el primer sorteo)
+    const isActualResort =
+      isResort && existingMatch && existingMatch.sortCount > 0;
+
     // Registrar evento en logs
     await logGroupEvent(
       groupId,
       userId,
-      isResort ? LogAction.MATCH_CREATED : LogAction.MATCH_CREATED,
-      isResort
-        ? `Equipos reorganizados para el partido`
-        : `Nuevo partido creado: ${teamAName} vs ${teamBName}`
+      isActualResort ? LogAction.TEAM_RESORTED : LogAction.TEAM_SORTED,
+      {
+        matchId: match.id,
+        matchDate: matchDate,
+        matchLocation: matchLocation,
+        teamAName: teamAName,
+        teamBName: teamBName,
+        newTeams: {
+          teamA: teamAPlayersForLog,
+          teamB: teamBPlayersForLog,
+        },
+        totalPlayers: finalTeamA.length + finalTeamB.length,
+        tbdPlayersCount: tbdPlayersTeamA.length + tbdPlayersTeamB.length,
+        balancingCriteria: {
+          byAge: balanceByAge,
+          byRole: balanceByRole,
+          byRating: balanceByRating,
+        },
+        ...(isActualResort && { previousTeams }),
+      }
     );
 
     console.log(

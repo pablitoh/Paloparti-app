@@ -56,8 +56,12 @@ const nextConfig = {
 
     return config;
   },
+
   // Asegurar que la producción funcione correctamente
   output: 'standalone',
+  images: {
+    unoptimized: true,
+  },
   transpilePackages: ['rc-util', '@rc-component/util', 'antd'],
 };
 

@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma';
 import { PrismaClient } from '@prisma/client';
 import { getCurrentUser } from '../../../../lib/auth';
 import { Prisma } from '@prisma/client';
+import { logGroupEvent } from '../../../../utils/serverLogEvents';
+import { LogAction } from '../../../../utils/logTypes';
 
 interface Player {
   userId: string;
@@ -266,9 +268,137 @@ export default async function handler(
       },
     });
 
+    // Obtener los equipos anteriores antes de la transacción
+    const previousTeamAPlayers = await prisma.matchPlayer.findMany({
+      where: {
+        matchId: id,
+        isTeamA: true,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+          },
+        },
+      },
+    });
+
+    const previousTeamBPlayers = await prisma.matchPlayer.findMany({
+      where: {
+        matchId: id,
+        isTeamA: false,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+          },
+        },
+      },
+    });
+
+    // Obtener TBD players anteriores del match
+    let previousTbdPlayers: TbdPlayer[] = [];
+    try {
+      const previousMatch = await prisma.match.findUnique({
+        where: { id },
+        select: { tbdPlayers: true },
+      });
+
+      if (previousMatch?.tbdPlayers) {
+        const tbdData =
+          typeof previousMatch.tbdPlayers === 'string'
+            ? JSON.parse(previousMatch.tbdPlayers)
+            : previousMatch.tbdPlayers;
+
+        if (Array.isArray(tbdData)) {
+          previousTbdPlayers = tbdData;
+        }
+      }
+    } catch (error) {
+      console.error('Error parsing previous TBD players:', error);
+    }
+
     // Get TBD players for each team
     const tbdPlayersTeamA = tbdPlayersArray.filter((p) => p.isTeamA === true);
     const tbdPlayersTeamB = tbdPlayersArray.filter((p) => p.isTeamA === false);
+
+    // Preparar equipos anteriores para el log (incluyendo TBD players)
+    const previousTbdTeamA = previousTbdPlayers.filter(
+      (p) => p.isTeamA === true
+    );
+    const previousTbdTeamB = previousTbdPlayers.filter(
+      (p) => p.isTeamA === false
+    );
+
+    const previousTeams = {
+      teamA: [
+        ...previousTeamAPlayers.map(
+          (player: {
+            userId: string;
+            user: { name: string | null; image: string | null };
+          }) => ({
+            id: player.userId,
+            name: player.user.name || 'Jugador',
+            role: 'N/A',
+          })
+        ),
+        ...previousTbdTeamA.map((p) => ({
+          id: p.id,
+          name: p.name,
+          role: 'TBD',
+        })),
+      ],
+      teamB: [
+        ...previousTeamBPlayers.map(
+          (player: {
+            userId: string;
+            user: { name: string | null; image: string | null };
+          }) => ({
+            id: player.userId,
+            name: player.user.name || 'Jugador',
+            role: 'N/A',
+          })
+        ),
+        ...previousTbdTeamB.map((p) => ({
+          id: p.id,
+          name: p.name,
+          role: 'TBD',
+        })),
+      ],
+    };
+
+    // Preparar equipos nuevos para el log
+    const newTeams = {
+      teamA: [
+        ...teamAPlayers.map((p) => ({
+          id: p.userId,
+          name: p.name || 'Jugador',
+          role: 'N/A',
+        })),
+        ...tbdPlayersTeamA.map((p) => ({
+          id: p.id,
+          name: p.name,
+          role: 'TBD',
+        })),
+      ],
+      teamB: [
+        ...initialTeamBPlayers.map((p) => ({
+          id: p.userId,
+          name: p.name || 'Jugador',
+          role: 'N/A',
+        })),
+        ...tbdPlayersTeamB.map((p) => ({
+          id: p.id,
+          name: p.name,
+          role: 'TBD',
+        })),
+      ],
+    };
 
     // Preparar la respuesta
     const enhancedMatch = {
@@ -303,6 +433,24 @@ export default async function handler(
       ],
       tbdPlayers: tbdPlayersArray,
     };
+
+    // Registrar el evento en el log
+    await logGroupEvent(match.group.id, user.id, LogAction.TEAM_RESORTED, {
+      matchId: id,
+      matchDate: match.date,
+      matchLocation: match.location,
+      teamAName: match.teamA || 'Equipo A',
+      teamBName: match.teamB || 'Equipo B',
+      previousTeams,
+      newTeams,
+      totalPlayers: teamAPlayers.length + initialTeamBPlayers.length,
+      tbdPlayersCount: tbdPlayersArray.length,
+      balancingCriteria: {
+        byAge: false,
+        byRole: false,
+        byRating: false, // Re-sorteo manual, sin criterios automáticos
+      },
+    });
 
     return res.status(200).json({
       message: 'Equipos resortados correctamente',

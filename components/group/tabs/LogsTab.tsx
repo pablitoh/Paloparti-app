@@ -50,8 +50,14 @@ const actionToGroup: Record<string, string> = {
 
 // Mapeo de tipos de acción a mensajes legibles
 const actionMessages: Record<string, (details: any) => string> = {
-  [LogAction.TEAM_SORTED]: () => 'formó equipos',
-  [LogAction.TEAM_RESORTED]: () => 'reordenó los equipos',
+  [LogAction.TEAM_SORTED]: (details) =>
+    `sorteó los equipos${
+      details?.totalPlayers ? ` (${details.totalPlayers} jugadores)` : ''
+    }`,
+  [LogAction.TEAM_RESORTED]: (details) =>
+    `re-sorteó los equipos${
+      details?.totalPlayers ? ` (${details.totalPlayers} jugadores)` : ''
+    }`,
   [LogAction.MATCH_DELETED]: () => 'eliminó un partido',
   [LogAction.MATCH_CREATED]: () => 'creó un nuevo partido',
   [LogAction.PLAYER_REPLACED]: (details) =>
@@ -565,170 +571,146 @@ const LogsTab: React.FC<LogsTabProps> = ({ groupId }) => {
                       </div>
                     )}
 
-                  {log.action === LogAction.TEAM_RESORTED &&
-                    log.details.previousTeams && (
-                      <div className='mt-2 pl-6 text-xs text-gray-500'>
-                        <details>
-                          <summary className='cursor-pointer hover:text-blue-600'>
-                            Ver equipos (antes/después)
-                          </summary>
-                          <div className='mt-2 p-2 bg-gray-50 rounded-md'>
-                            <p className='font-semibold'>Equipos anteriores:</p>
-                            <div className='grid grid-cols-2 gap-2 mt-1'>
-                              <div>
-                                <p className='font-medium'>Equipo A:</p>
-                                <ul className='list-disc pl-5'>
-                                  {log.details.previousTeams.teamA.map(
-                                    (player: any) => (
-                                      <li key={player.id}>
-                                        {player.name}
-                                        {player.role && (
-                                          <span className='text-gray-500 ml-1'>
-                                            ({player.role})
-                                          </span>
-                                        )}
-                                      </li>
-                                    )
-                                  )}
-                                </ul>
-                              </div>
-                              <div>
-                                <p className='font-medium'>Equipo B:</p>
-                                <ul className='list-disc pl-5'>
-                                  {log.details.previousTeams.teamB.map(
-                                    (player: any) => (
-                                      <li key={player.id}>
-                                        {player.name}
-                                        {player.role && (
-                                          <span className='text-gray-500 ml-1'>
-                                            ({player.role})
-                                          </span>
-                                        )}
-                                      </li>
-                                    )
-                                  )}
-                                </ul>
-                              </div>
-                            </div>
-                            <p className='font-semibold mt-2'>
-                              Nuevos equipos:
-                            </p>
-                            <div className='grid grid-cols-2 gap-2 mt-1'>
-                              <div>
-                                <p className='font-medium'>Equipo A:</p>
-                                <ul className='list-disc pl-5'>
-                                  {log.details.newTeams.teamA.map(
-                                    (player: any) => (
-                                      <li key={player.id}>
-                                        {player.name}
-                                        {player.role && (
-                                          <span className='text-gray-500 ml-1'>
-                                            ({player.role})
-                                          </span>
-                                        )}
-                                      </li>
-                                    )
-                                  )}
-                                </ul>
-                              </div>
-                              <div>
-                                <p className='font-medium'>Equipo B:</p>
-                                <ul className='list-disc pl-5'>
-                                  {log.details.newTeams.teamB.map(
-                                    (player: any) => (
-                                      <li key={player.id}>
-                                        {player.name}
-                                        {player.role && (
-                                          <span className='text-gray-500 ml-1'>
-                                            ({player.role})
-                                          </span>
-                                        )}
-                                      </li>
-                                    )
-                                  )}
-                                </ul>
-                              </div>
-                            </div>
-                            {log.details.balancingCriteria && (
-                              <div className='mt-3 pt-2 border-t border-gray-200'>
-                                <p className='font-semibold text-xs'>
-                                  Criterios de balanceo:
-                                </p>
-                                <div className='mt-1 text-xs'>
-                                  {log.details.balancingCriteria.byAge && (
-                                    <span className='inline-block bg-blue-100 text-blue-800 rounded-full px-2 py-0.5 text-xs mr-2'>
-                                      Balanceo por edad
-                                    </span>
-                                  )}
-                                  {log.details.balancingCriteria.byRole && (
-                                    <span className='inline-block bg-green-100 text-green-800 rounded-full px-2 py-0.5 text-xs mr-2'>
-                                      Balanceo por posición
-                                    </span>
-                                  )}
-                                  {log.details.balancingCriteria.byRating && (
-                                    <span className='inline-block bg-purple-100 text-purple-800 rounded-full px-2 py-0.5 text-xs mr-2'>
-                                      Balanceo por habilidad
-                                    </span>
-                                  )}
-                                  {!log.details.balancingCriteria.byAge &&
-                                    !log.details.balancingCriteria.byRole &&
-                                    !log.details.balancingCriteria.byRating && (
-                                      <span className='inline-block bg-gray-100 text-gray-800 rounded-full px-2 py-0.5 text-xs'>
-                                        Aleatorio
-                                      </span>
-                                    )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </details>
-                      </div>
-                    )}
-
-                  {log.action === LogAction.TEAM_SORTED &&
+                  {(log.action === LogAction.TEAM_SORTED ||
+                    log.action === LogAction.TEAM_RESORTED) &&
                     log.details.newTeams && (
                       <div className='mt-2 pl-6 text-xs text-gray-500'>
                         <details>
                           <summary className='cursor-pointer hover:text-blue-600'>
-                            Ver equipos
+                            {log.action === LogAction.TEAM_RESORTED
+                              ? 'Ver equipos anteriores y nuevos'
+                              : 'Ver equipos'}
                           </summary>
-                          <div className='mt-2 p-2 bg-gray-50 rounded-md'>
-                            <div className='grid grid-cols-2 gap-2 mt-1'>
-                              <div>
-                                <p className='font-medium'>Equipo A:</p>
-                                <ul className='list-disc pl-5'>
-                                  {log.details.newTeams.teamA.map(
-                                    (player: any) => (
-                                      <li key={player.id}>
-                                        {player.name}
-                                        {player.role && (
-                                          <span className='text-gray-500 ml-1'>
-                                            ({player.role})
-                                          </span>
-                                        )}
-                                      </li>
-                                    )
-                                  )}
-                                </ul>
+                          <div
+                            className={`mt-2 p-3 rounded-md border ${
+                              log.action === LogAction.TEAM_RESORTED
+                                ? 'bg-gradient-to-r from-red-50 to-green-50'
+                                : 'bg-green-50 border-green-200'
+                            }`}
+                          >
+                            {/* Equipos anteriores - solo para re-sorteos */}
+                            {log.action === LogAction.TEAM_RESORTED &&
+                              log.details.previousTeams && (
+                                <>
+                                  <div className='mb-4'>
+                                    <div className='flex items-center mb-2'>
+                                      <span className='text-red-600 font-semibold'>
+                                        🔄 Equipos anteriores:
+                                      </span>
+                                    </div>
+                                    <div className='grid grid-cols-2 gap-3'>
+                                      <div className='bg-red-50 p-2 rounded border border-red-200'>
+                                        <p className='font-medium text-red-800'>
+                                          Equipo A:
+                                        </p>
+                                        <ul className='list-disc pl-4 mt-1'>
+                                          {log.details.previousTeams.teamA.map(
+                                            (player: any) => (
+                                              <li
+                                                key={player.id}
+                                                className='text-red-700'
+                                              >
+                                                {player.name}
+                                                {player.role &&
+                                                  player.role !== 'N/A' && (
+                                                    <span className='text-red-600 ml-1'>
+                                                      ({player.role})
+                                                    </span>
+                                                  )}
+                                              </li>
+                                            )
+                                          )}
+                                        </ul>
+                                      </div>
+                                      <div className='bg-red-50 p-2 rounded border border-red-200'>
+                                        <p className='font-medium text-red-800'>
+                                          Equipo B:
+                                        </p>
+                                        <ul className='list-disc pl-4 mt-1'>
+                                          {log.details.previousTeams.teamB.map(
+                                            (player: any) => (
+                                              <li
+                                                key={player.id}
+                                                className='text-red-700'
+                                              >
+                                                {player.name}
+                                                {player.role &&
+                                                  player.role !== 'N/A' && (
+                                                    <span className='text-red-600 ml-1'>
+                                                      ({player.role})
+                                                    </span>
+                                                  )}
+                                              </li>
+                                            )
+                                          )}
+                                        </ul>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className='border-t border-gray-300 pt-3 mb-3'></div>
+                                </>
+                              )}
+
+                            {/* Equipos nuevos/sorteados */}
+                            <div>
+                              <div className='flex items-center mb-2'>
+                                <span className='text-green-600 font-semibold'>
+                                  {log.action === LogAction.TEAM_RESORTED
+                                    ? '✨ Nuevos equipos:'
+                                    : '⚽ Equipos sorteados:'}
+                                </span>
                               </div>
-                              <div>
-                                <p className='font-medium'>Equipo B:</p>
-                                <ul className='list-disc pl-5'>
-                                  {log.details.newTeams.teamB.map(
-                                    (player: any) => (
-                                      <li key={player.id}>
-                                        {player.name}
-                                        {player.role && (
-                                          <span className='text-gray-500 ml-1'>
-                                            ({player.role})
-                                          </span>
-                                        )}
-                                      </li>
-                                    )
-                                  )}
-                                </ul>
+                              <div className='grid grid-cols-2 gap-3'>
+                                <div className='bg-green-50 p-2 rounded border border-green-200'>
+                                  <p className='font-medium text-green-800'>
+                                    Equipo A:
+                                  </p>
+                                  <ul className='list-disc pl-4 mt-1'>
+                                    {log.details.newTeams.teamA.map(
+                                      (player: any) => (
+                                        <li
+                                          key={player.id}
+                                          className='text-green-700'
+                                        >
+                                          {player.name}
+                                          {player.role &&
+                                            player.role !== 'N/A' && (
+                                              <span className='text-green-600 ml-1'>
+                                                ({player.role})
+                                              </span>
+                                            )}
+                                        </li>
+                                      )
+                                    )}
+                                  </ul>
+                                </div>
+                                <div className='bg-green-50 p-2 rounded border border-green-200'>
+                                  <p className='font-medium text-green-800'>
+                                    Equipo B:
+                                  </p>
+                                  <ul className='list-disc pl-4 mt-1'>
+                                    {log.details.newTeams.teamB.map(
+                                      (player: any) => (
+                                        <li
+                                          key={player.id}
+                                          className='text-green-700'
+                                        >
+                                          {player.name}
+                                          {player.role &&
+                                            player.role !== 'N/A' && (
+                                              <span className='text-green-600 ml-1'>
+                                                ({player.role})
+                                              </span>
+                                            )}
+                                        </li>
+                                      )
+                                    )}
+                                  </ul>
+                                </div>
                               </div>
                             </div>
+
+                            {/* Criterios de balanceo - solo si existen */}
                             {log.details.balancingCriteria && (
                               <div className='mt-3 pt-2 border-t border-gray-200'>
                                 <p className='font-semibold text-xs'>

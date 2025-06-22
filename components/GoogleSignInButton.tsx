@@ -1,5 +1,7 @@
 import { signIn } from 'next-auth/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 
 interface GoogleSignInButtonProps {
   callbackUrl?: string;
@@ -12,13 +14,43 @@ export default function GoogleSignInButton({
 }: GoogleSignInButtonProps) {
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      GoogleAuth.initialize();
+    }
+  }, []);
+
   const handleGoogleSignIn = async () => {
     try {
       setLoading(true);
-      await signIn('google', {
-        callbackUrl,
-        redirect: true,
-      });
+
+      if (Capacitor.isNativePlatform()) {
+        // Usar el plugin nativo en Android
+        const response = await GoogleAuth.signIn();
+
+        // Convertir la respuesta del plugin al formato que espera NextAuth
+        const credentials = {
+          access_token: response.authentication.accessToken,
+          id_token: response.authentication.idToken,
+          // Incluir los campos adicionales que necesitamos
+          email: response.email,
+          name: response.name,
+          picture: response.imageUrl,
+        };
+
+        // Llamar a NextAuth con las credenciales
+        await signIn('google', {
+          ...credentials,
+          callbackUrl,
+          redirect: true,
+        });
+      } else {
+        // En web, usar el flujo normal de NextAuth
+        await signIn('google', {
+          callbackUrl,
+          redirect: true,
+        });
+      }
     } catch (error) {
       console.error('Error en Google Sign-In:', error);
       setLoading(false);

@@ -27,6 +27,7 @@ yarn-error.log*
 .env
 .env.production
 .env.test
+.env.android
 !.env.example
 !.env.*.example
 config_local_db.txt

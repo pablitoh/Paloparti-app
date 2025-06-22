@@ -6,21 +6,21 @@ import Layout from '../components/Layout';
 import Button from '../components/Button';
 import BirthdateModal from '../components/BirthdateModal';
 import { useQueryClient } from '@tanstack/react-query';
+import GroupCard from '../components/GroupCard';
 
 // Define types for the Group interface
-interface GroupMember {
-  id: string;
-  role: 'ADMIN' | 'MEMBER';
-}
-
 interface Group {
   id: string;
   name: string;
   description: string;
   sport: string;
   location: string;
-  members: GroupMember[];
-  userStatus?: string;
+  members: Array<{
+    id: string;
+    role: string;
+  }>;
+  userStatus: string;
+  nextMatch?: string | Date;
   nextMatchDate?: string;
   nextMatchLocation?: string;
 }
@@ -115,7 +115,7 @@ export default function Groups() {
   }, [status, router]);
 
   // Forzar recarga al hacer clic en un grupo
-  const handleGroupClick = (groupId: string) => {
+  const handleGroupClick = async (groupId: string) => {
     console.log(
       `Navegando a grupo ${groupId} - Invalidando consultas relevantes`
     );
@@ -123,7 +123,6 @@ export default function Groups() {
       queryKey: ['group', groupId],
       refetchType: 'active',
     });
-    router.push(`/group/${groupId}`);
   };
 
   const handleBirthdateModalClose = () => {
@@ -287,130 +286,31 @@ export default function Groups() {
           ) : (
             <div className='grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3'>
               {userGroups.map((group) => (
-                <div
+                <GroupCard
                   key={group.id}
-                  className={`bg-white rounded-2xl shadow-green-lg p-6 transition-all duration-200 transform hover:scale-105 ${
-                    group.userStatus !== 'PENDING'
-                      ? 'hover:shadow-green cursor-pointer'
-                      : 'opacity-90 cursor-default'
-                  }`}
-                  onClick={() => {
-                    if (group.userStatus !== 'PENDING') {
-                      handleGroupClick(group.id);
-                    }
-                  }}
-                >
-                  {/* Estado pendiente (solo si aplica) */}
-                  {group.userStatus === 'PENDING' && (
-                    <div className='flex items-center justify-end mb-4'>
-                      <span className='px-3 py-1 text-xs font-medium text-warning-700 bg-warning-100 rounded-full'>
-                        Pendiente
-                      </span>
-                    </div>
+                  id={group.id}
+                  name={group.name}
+                  sport={group.sport}
+                  membersCount={group.members.length}
+                  nextMatch={
+                    group.nextMatch
+                      ? new Date(group.nextMatch).toLocaleDateString('es-ES', {
+                          weekday: 'long',
+                          day: 'numeric',
+                          month: 'long',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : undefined
+                  }
+                  description={group.description}
+                  location={group.location}
+                  userStatus={group.userStatus}
+                  isAdmin={group.members.some(
+                    (member) =>
+                      member.id === session?.user?.id && member.role === 'ADMIN'
                   )}
-
-                  {/* Contenido principal */}
-                  <div className='mb-4'>
-                    <div className='flex items-center gap-2 mb-2'>
-                      <h2 className='text-xl font-bold text-gray-900'>
-                        {group.name}
-                      </h2>
-                      {group.members.some(
-                        (member) =>
-                          member.id === session?.user?.id &&
-                          member.role === 'ADMIN'
-                      ) && (
-                        <span className='px-2 py-1 text-xs font-medium text-primary-700 bg-primary-100 rounded-full'>
-                          Admin
-                        </span>
-                      )}
-                    </div>
-                    <p className='text-gray-600 text-sm mb-3 line-clamp-2'>
-                      {group.description}
-                    </p>
-                  </div>
-
-                  {/* Información del grupo */}
-                  <div className='space-y-2 mb-4'>
-                    <div className='flex items-center text-sm text-gray-500'>
-                      <svg
-                        className='w-4 h-4 mr-2 text-primary-500'
-                        fill='none'
-                        stroke='currentColor'
-                        viewBox='0 0 24 24'
-                      >
-                        <path
-                          strokeLinecap='round'
-                          strokeLinejoin='round'
-                          strokeWidth='2'
-                          d='M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z'
-                        />
-                        <path
-                          strokeLinecap='round'
-                          strokeLinejoin='round'
-                          strokeWidth='2'
-                          d='M15 11a3 3 0 11-6 0 3 3 0 016 0z'
-                        />
-                      </svg>
-                      <span>{group.location}</span>
-                    </div>
-                    <div className='flex items-center text-sm text-gray-500'>
-                      <svg
-                        className='w-4 h-4 mr-2 text-primary-500'
-                        fill='none'
-                        stroke='currentColor'
-                        viewBox='0 0 24 24'
-                      >
-                        <path
-                          strokeLinecap='round'
-                          strokeLinejoin='round'
-                          strokeWidth='2'
-                          d='M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z'
-                        />
-                      </svg>
-                      <span>{group.members.length} miembros</span>
-                    </div>
-                  </div>
-
-                  {/* Próximo partido (si existe) */}
-                  {group.nextMatchDate && (
-                    <div className='mt-4 p-3 bg-primary-50 rounded-xl border-l-4 border-primary-400'>
-                      <p className='text-xs font-medium text-primary-700 mb-1'>
-                        Próximo partido
-                      </p>
-                      <p className='text-sm text-primary-600'>
-                        {group.nextMatchDate}
-                      </p>
-                      {group.nextMatchLocation && (
-                        <p className='text-xs text-primary-500'>
-                          {group.nextMatchLocation}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Indicador de hover solo para grupos activos */}
-                  {group.userStatus !== 'PENDING' && (
-                    <div className='mt-4 pt-4 border-t border-gray-200'>
-                      <div className='flex items-center justify-center text-primary-600 text-sm font-medium group-hover:text-primary-700'>
-                        <span>Ver detalles</span>
-                        <svg
-                          className='w-4 h-4 ml-1 transform group-hover:translate-x-1 transition-transform'
-                          fill='none'
-                          stroke='currentColor'
-                          viewBox='0 0 24 24'
-                        >
-                          <path
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                            strokeWidth='2'
-                            d='M9 5l7 7-7 7'
-                          />
-                        </svg>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                />
               ))}
             </div>
           )}
