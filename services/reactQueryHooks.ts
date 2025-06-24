@@ -103,32 +103,28 @@ const normalizeGroupData = (data: any) => {
   try {
     // Process the next match details if present
     if (data.nextMatchDetails) {
-      // Asegurémonos de que playersA y playersB estén disponibles
-      if (data.nextMatchDetails.playersA) {
-        // Si ya es un array, no lo procesamos
-        if (!Array.isArray(data.nextMatchDetails.playersA)) {
-          try {
-            data.nextMatchDetails.playersA = JSON.parse(
-              data.nextMatchDetails.playersA
-            );
-          } catch (e) {
-            console.error('Error parsing playersA:', e);
-            data.nextMatchDetails.playersA = [];
-          }
+      // Parsear teamA y teamB si están como strings
+      if (
+        data.nextMatchDetails.teamA &&
+        !Array.isArray(data.nextMatchDetails.teamA)
+      ) {
+        try {
+          data.nextMatchDetails.teamA = JSON.parse(data.nextMatchDetails.teamA);
+        } catch (e) {
+          console.error('Error parsing teamA:', e);
+          data.nextMatchDetails.teamA = [];
         }
       }
 
-      if (data.nextMatchDetails.playersB) {
-        // Si ya es un array, no lo procesamos
-        if (!Array.isArray(data.nextMatchDetails.playersB)) {
-          try {
-            data.nextMatchDetails.playersB = JSON.parse(
-              data.nextMatchDetails.playersB
-            );
-          } catch (e) {
-            console.error('Error parsing playersB:', e);
-            data.nextMatchDetails.playersB = [];
-          }
+      if (
+        data.nextMatchDetails.teamB &&
+        !Array.isArray(data.nextMatchDetails.teamB)
+      ) {
+        try {
+          data.nextMatchDetails.teamB = JSON.parse(data.nextMatchDetails.teamB);
+        } catch (e) {
+          console.error('Error parsing teamB:', e);
+          data.nextMatchDetails.teamB = [];
         }
       }
 
@@ -139,20 +135,20 @@ const normalizeGroupData = (data: any) => {
     // Process all matches in the group
     if (data.matches && Array.isArray(data.matches)) {
       data.matches = data.matches.map((match: any) => {
-        // Procesar playersA y playersB para cada partido
-        if (match.playersA && !Array.isArray(match.playersA)) {
+        // Parsear teamA y teamB para cada partido
+        if (match.teamA && !Array.isArray(match.teamA)) {
           try {
-            match.playersA = JSON.parse(match.playersA);
+            match.teamA = JSON.parse(match.teamA);
           } catch (e) {
-            match.playersA = [];
+            match.teamA = [];
           }
         }
 
-        if (match.playersB && !Array.isArray(match.playersB)) {
+        if (match.teamB && !Array.isArray(match.teamB)) {
           try {
-            match.playersB = JSON.parse(match.playersB);
+            match.teamB = JSON.parse(match.teamB);
           } catch (e) {
-            match.playersB = [];
+            match.teamB = [];
           }
         }
 

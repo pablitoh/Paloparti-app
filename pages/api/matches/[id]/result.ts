@@ -31,19 +31,11 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  console.log('🎯 ENDPOINT RESULT: Iniciando handler...');
-  console.log('   - Método:', req.method);
-  console.log('   - URL params:', req.query);
-  console.log('   - Body:', JSON.stringify(req.body, null, 2));
-
   // Verificar autenticación
   const user = await getCurrentUser(req);
   if (!user) {
-    console.log('❌ ENDPOINT RESULT: Usuario no autenticado');
     return res.status(401).json({ message: 'No autenticado' });
   }
-
-  console.log('✅ ENDPOINT RESULT: Usuario autenticado:', user.id);
 
   // Solo permitir PATCH
   if (req.method !== 'PATCH') {
@@ -142,10 +134,6 @@ export default async function handler(
       }
     }
 
-    console.log(
-      `🔍 ANTES DE ACTUALIZAR - Status actual del partido: ${match.status}`
-    );
-
     // Actualizar el partido con los nuevos resultados
     const updatedMatch = await prisma.match.update({
       where: { id },
@@ -155,10 +143,6 @@ export default async function handler(
         status: 'COMPLETED', // Marcar como completado
       },
     });
-
-    console.log(
-      `🔍 DESPUÉS DE ACTUALIZAR - Status nuevo del partido: ${updatedMatch.status}`
-    );
 
     // Get team names from the group
     const groupDetails = await prisma.group.findUnique({
@@ -227,19 +211,7 @@ export default async function handler(
 
     // Resetear los estados de asistencia para futuros partidos si es necesario
     try {
-      console.log(`🔍 VERIFICANDO CONDICIÓN PARA CREAR NUEVO PARTIDO:`);
-      console.log(`   - Status original: ${match.status}`);
-      console.log(`   - Status nuevo: ${updatedMatch.status}`);
-      console.log(
-        `   - Condición cumplida: ${
-          match.status === 'PENDING' && updatedMatch.status === 'COMPLETED'
-        }`
-      );
-
       if (match.status === 'PENDING' && updatedMatch.status === 'COMPLETED') {
-        console.log(
-          `✅ CONDICIÓN CUMPLIDA - Iniciando creación de nuevo partido...`
-        );
         // Guardar el ID del grupo y los datos necesarios antes de cambiar el estado
         const groupId = match.groupId;
 
@@ -261,13 +233,8 @@ export default async function handler(
         `;
 
         // Crear un nuevo partido automáticamente que reemplazará al actual
-        console.log(`🚀 Intentando crear nuevo partido para grupo: ${groupId}`);
         const newMatch = await createNextMatch(groupId);
         if (newMatch) {
-          console.log(
-            `✅ Nuevo partido creado automáticamente después de completar el partido anterior: ${newMatch.id}`
-          );
-
           // Asegurar que el nuevo partido tenga 0 jugadores confirmados
           // Esto es redundante ya que createNextMatch ya lo hace, pero es una garantía adicional
           await prisma.matchAttendance.updateMany({
@@ -280,17 +247,7 @@ export default async function handler(
               updatedAt: new Date(),
             },
           });
-
-          console.log(
-            `✅ Asistencias para el nuevo partido inicializadas a PENDING`
-          );
-        } else {
-          console.error(
-            `❌ ERROR: No se pudo crear el nuevo partido para el grupo ${groupId}`
-          );
         }
-      } else {
-        console.log(`❌ CONDICIÓN NO CUMPLIDA - No se creará nuevo partido`);
 
         console.log(
           `Estados de asistencia para futuros partidos y actual del grupo ${match.groupId} actualizados correctamente`

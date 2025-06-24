@@ -5,12 +5,14 @@ interface UnassignedPlayersNotificationProps {
   unassignedCount: number;
   onRandomizeTeams: () => Promise<void>;
   isLoading?: boolean;
+  teamsFormed: boolean;
 }
 
 const UnassignedPlayersNotification = ({
   unassignedCount,
   onRandomizeTeams,
   isLoading = false,
+  teamsFormed,
 }: UnassignedPlayersNotificationProps) => {
   const hasUnassignedPlayers = unassignedCount > 0;
   const backgroundColor = hasUnassignedPlayers ? 'bg-yellow-50' : 'bg-blue-50';
@@ -63,10 +65,15 @@ const UnassignedPlayersNotification = ({
                   : 'jugadores confirmados'}{' '}
                 que no{' '}
                 {unassignedCount === 1 ? 'está asignado' : 'están asignados'} a
-                ningún equipo.
+                ningún equipo.{' '}
+                {!teamsFormed && 'Los equipos no están formados correctamente.'}
               </>
             ) : (
-              <>Todos los jugadores confirmados están asignados a equipos.</>
+              <>
+                {teamsFormed
+                  ? 'Todos los jugadores confirmados están asignados a equipos.'
+                  : 'Los equipos no están formados correctamente, aunque todos los jugadores están asignados.'}
+              </>
             )}
           </p>
           <div className='mt-3 text-sm md:mt-0 md:ml-6'>

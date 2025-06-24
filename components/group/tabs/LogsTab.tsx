@@ -84,10 +84,12 @@ const actionMessages: Record<string, (details: any) => string> = {
         : 'Pendiente';
 
     const positionsText =
-      details.status === 'CONFIRMED' &&
-      details.playerRoles &&
-      details.playerRoles.length > 0
-        ? ` (Posiciones: ${details.playerRoles.join(', ')})`
+      details.status === 'CONFIRMED' && details.playerRoles
+        ? ` (Posiciones: ${
+            Array.isArray(details.playerRoles)
+              ? details.playerRoles.join(', ')
+              : details.playerRoles
+          })`
         : '';
 
     return `actualizó su asistencia a "${statusText}"${positionsText}`;
@@ -103,8 +105,14 @@ const actionMessages: Record<string, (details: any) => string> = {
     const positionsText =
       details.status === 'CONFIRMED' &&
       details.playerRoles &&
-      details.playerRoles.length > 0
-        ? ` (Posiciones: ${details.playerRoles.join(', ')})`
+      (Array.isArray(details.playerRoles)
+        ? details.playerRoles.length > 0
+        : details.playerRoles.length > 0)
+        ? ` (Posiciones: ${
+            Array.isArray(details.playerRoles)
+              ? details.playerRoles.join(', ')
+              : details.playerRoles
+          })`
         : '';
 
     return `actualizó la asistencia de **${
@@ -112,26 +120,16 @@ const actionMessages: Record<string, (details: any) => string> = {
     }** a "${statusText}"${positionsText}`;
   },
   [LogAction.ADMIN_CONFIRMED_ATTENDANCE]: (details) => {
-    // Usar el mensaje predefinido si está disponible, sino construir uno
-    if (details.message) {
-      return details.message;
-    }
-
     // Si no hay playerRoles en el log, significa que no se proporcionaron roles específicos
-    if (!details.playerRoles || details.playerRoles.length === 0) {
+    if (!details.playerRoles) {
       return `confirmó la asistencia de **${
         details.userName || 'un jugador'
       }**`;
     }
 
-    // Si hay roles, convertirlos a texto legible
-    const rolesText = details.playerRoles
-      .map((role: any) => (typeof role === 'string' ? role : role.role))
-      .join(', ');
-
     return `confirmó la asistencia de **${
       details.userName || 'un jugador'
-    }** con posiciones: ${rolesText}`;
+    }** con posiciones: ${details.playerRoles}`;
   },
   [LogAction.USER_ROLE_CHANGED]: (details) =>
     `cambió el rol de **${details.targetUser?.name || 'un usuario'}** a ${

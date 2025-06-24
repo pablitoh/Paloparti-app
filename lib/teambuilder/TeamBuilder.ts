@@ -1,11 +1,21 @@
-import { Member, BalanceStrategy, TeamBuilderOptions } from './types';
+import {
+  Member,
+  BalanceStrategy,
+  TeamBuilderOptions,
+  PlayerRole,
+} from './types';
 import {
   RoleBalanceStrategy,
   AgeBalanceStrategy,
   SkillBalanceStrategy,
   CombinedBalanceStrategy,
 } from './strategies';
-import { ROLE_PRIORITY, getPrimaryRole } from './constants';
+import {
+  ROLE_PRIORITY,
+  getPrimaryRole,
+  PLAYER_ROLES,
+  normalizePlayerRoles,
+} from './constants';
 
 // Clase principal para construir equipos
 export class TeamBuilder {
@@ -15,39 +25,30 @@ export class TeamBuilder {
   private teamB: Member[] = [];
   private playersByRole: Record<string, Member[]> = {};
   private playersWithoutRole: Member[] = [];
+  private balanceStrategy: CombinedBalanceStrategy;
+  private config: {
+    balanceByRole: boolean;
+    balanceByAge: boolean;
+    balanceByRating: boolean;
+  };
 
   constructor(players: Member[]) {
-    this.players = [...players]; // Copia defensiva
+    this.players = players;
+    this.balanceStrategy = new CombinedBalanceStrategy();
+    this.config = {
+      balanceByRole: true,
+      balanceByAge: true,
+      balanceByRating: true,
+    };
   }
 
   // Configurar las estrategias según las opciones seleccionadas
-  configure(options: TeamBuilderOptions): TeamBuilder {
-    // Limpiar estrategias existentes
-    this.strategies = [];
-
-    // Determinar qué estrategias aplicar según los checkboxes
-    if (
-      options.balanceByRole &&
-      options.balanceByAge &&
-      options.balanceByRating
-    ) {
-      // Si todos los criterios están seleccionados, usar la estrategia combinada
-      this.addStrategy(new CombinedBalanceStrategy());
-    } else {
-      // Añadir estrategias individuales según lo seleccionado
-      if (options.balanceByRole) {
-        this.addStrategy(new RoleBalanceStrategy());
-      }
-
-      if (options.balanceByAge) {
-        this.addStrategy(new AgeBalanceStrategy());
-      }
-
-      if (options.balanceByRating) {
-        this.addStrategy(new SkillBalanceStrategy());
-      }
-    }
-
+  configure(config: {
+    balanceByRole: boolean;
+    balanceByAge: boolean;
+    balanceByRating: boolean;
+  }): TeamBuilder {
+    this.config = config;
     return this;
   }
 
@@ -59,174 +60,285 @@ export class TeamBuilder {
 
   // Método principal para construir equipos
   buildTeams(): [Member[], Member[]] {
-    // Resetear equipos
-    this.teamA = [];
-    this.teamB = [];
+    const teamA: Member[] = [];
+    const teamB: Member[] = [];
 
-    if (this.strategies.length === 0) {
-      // Si no hay estrategias, usar formación aleatoria
-      this.applyRandomFormation();
-    } else {
-      // Clasificar jugadores por roles para las estrategias que lo necesiten
-      this.classifyPlayersByRoles();
+    // Copia de jugadores para no modificar el original
+    let remainingPlayers = [...this.players];
 
-      // Aplicar las estrategias en orden
-      this.strategies.forEach((strategy) => {
-        strategy.applyStrategy(
-          this.players,
-          this.teamA,
-          this.teamB,
-          this.playersByRole,
-          this.playersWithoutRole
-        );
-      });
+    // Distribuir jugadores forzados primero
+    const forcedPlayers = remainingPlayers.filter((p) => p.positionForced);
+    remainingPlayers = remainingPlayers.filter((p) => !p.positionForced);
+
+    // Asignar jugadores forzados manteniendo sus roles
+    forcedPlayers.forEach((player, index) => {
+      const assignedPlayer = { ...player, assignedRole: player.role };
+      if (index % 2 === 0) {
+        teamA.push(assignedPlayer);
+      } else {
+        teamB.push(assignedPlayer);
+      }
+    });
+
+    // Asignar arqueros
+    if (this.config.balanceByRole) {
+      this.assignGoalkeepers(remainingPlayers, teamA, teamB);
     }
 
-    // Asegurar que ambos equipos tengan la misma cantidad de jugadores reales
-    this.ensureEvenRealPlayerDistribution();
+    // Distribuir jugadores restantes
+    if (this.config.balanceByRole) {
+      this.distributeByRole(remainingPlayers, teamA, teamB);
+    } else {
+      this.distributePlayersEvenly(remainingPlayers, teamA, teamB);
+    }
 
-    // Ordenar los equipos por posición (requerido)
-    this.sortTeamsByPosition();
+    // Balancear por edad y rating si está configurado
+    if (this.config.balanceByAge || this.config.balanceByRating) {
+      this.balanceTeams(teamA, teamB);
+    }
 
-    return [this.teamA, this.teamB];
+    return [teamA, teamB];
   }
 
-  // Método para formación aleatoria cuando no hay estrategias
-  private applyRandomFormation(): void {
-    const shuffled = [...this.players].sort(() => Math.random() - 0.5);
-    const halfLength = Math.ceil(shuffled.length / 2);
-
-    this.teamA = shuffled.slice(0, halfLength);
-    this.teamB = shuffled.slice(halfLength);
+  private shufflePlayers(players: Member[]): Member[] {
+    const shuffled = [...players];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
   }
 
-  // Método para clasificar jugadores por rol
-  private classifyPlayersByRoles(): void {
-    this.playersByRole = {};
-    this.playersWithoutRole = [];
-
-    // Clasificar jugadores según su rol principal
-    this.players.forEach((player) => {
-      const primaryRole = getPrimaryRole(player.playerRoles);
-      if (primaryRole) {
-        if (!this.playersByRole[primaryRole]) {
-          this.playersByRole[primaryRole] = [];
-        }
-        this.playersByRole[primaryRole].push(player);
+  private distributePlayersEvenly(
+    players: Member[],
+    teamA: Member[],
+    teamB: Member[]
+  ): void {
+    const shuffledPlayers = this.shufflePlayers(players);
+    shuffledPlayers.forEach((player, index) => {
+      if (index % 2 === 0) {
+        teamA.push(player);
       } else {
-        this.playersWithoutRole.push(player);
+        teamB.push(player);
       }
     });
   }
 
-  // Método para asegurar que ambos equipos tengan la misma cantidad de jugadores reales
-  private ensureEvenRealPlayerDistribution(): void {
-    // Identificar jugadores reales vs TBD en cada equipo
-    const realPlayersA = this.teamA.filter(
-      (p) => p && p.id && !p.id.toString().startsWith('tbd-')
+  private findBestPlayerForRole(
+    players: Member[],
+    role: PlayerRole,
+    team: Member[]
+  ): Member | null {
+    const shuffledPlayers = this.shufflePlayers(players);
+    return (
+      shuffledPlayers.find((p) => p.role === role) ||
+      shuffledPlayers.find((p) => p.playerRoles?.includes(role)) ||
+      null
     );
-    const realPlayersB = this.teamB.filter(
-      (p) => p && p.id && !p.id.toString().startsWith('tbd-')
+  }
+
+  private findBestPlayerForBalance(
+    players: Member[],
+    team: Member[],
+    otherTeam: Member[]
+  ): Member | null {
+    if (players.length === 0) return null;
+
+    const shuffledPlayers = this.shufflePlayers(players);
+
+    const getAverages = (team: Member[]) => ({
+      age: team.reduce((sum, p) => sum + (p.age || 0), 0) / team.length,
+      rating:
+        team.reduce((sum, p) => sum + (p.starRating || 0), 0) / team.length,
+    });
+
+    const teamAvg = getAverages(team);
+    const otherTeamAvg = getAverages(otherTeam);
+
+    let bestPlayer = shuffledPlayers[0];
+    let minDiff = Infinity;
+
+    shuffledPlayers.forEach((player) => {
+      const newTeamAvg = getAverages([...team, player]);
+      const ageDiff = Math.abs(newTeamAvg.age - otherTeamAvg.age);
+      const ratingDiff = Math.abs(newTeamAvg.rating - otherTeamAvg.rating);
+      const totalDiff = ageDiff + ratingDiff;
+
+      if (totalDiff < minDiff) {
+        minDiff = totalDiff;
+        bestPlayer = player;
+      }
+    });
+
+    return bestPlayer;
+  }
+
+  private assignGoalkeepers(
+    players: Member[],
+    teamA: Member[],
+    teamB: Member[]
+  ): void {
+    const goalkeepers = players.filter(
+      (p) => p.role === 'Arquero' || p.playerRoles?.includes('Arquero')
     );
 
-    // Verificar si hay desbalance de jugadores reales
-    const realPlayerDiff = Math.abs(realPlayersA.length - realPlayersB.length);
+    if (goalkeepers.length >= 2) {
+      // Si hay suficientes arqueros, asignar uno a cada equipo
+      const shuffledGoalkeepers = this.shufflePlayers(goalkeepers);
+      teamA.push({ ...shuffledGoalkeepers[0], assignedRole: 'Arquero' });
+      teamB.push({ ...shuffledGoalkeepers[1], assignedRole: 'Arquero' });
 
-    if (realPlayerDiff > 1) {
-      console.log(
-        `Corrigiendo desbalance de jugadores reales: A=${realPlayersA.length}, B=${realPlayersB.length}`
+      // Remover los arqueros asignados de la lista de jugadores
+      players.splice(players.indexOf(goalkeepers[0]), 1);
+      players.splice(players.indexOf(goalkeepers[1]), 1);
+    } else {
+      // Si no hay suficientes arqueros, buscar candidatos
+      const candidate1 = this.findGoalkeeperCandidate(players);
+      const candidate2 = this.findGoalkeeperCandidate(
+        players.filter((p) => p !== candidate1)
       );
 
-      // Determinar qué equipo tiene más jugadores reales
-      const sourceTeam =
-        realPlayersA.length > realPlayersB.length ? realPlayersA : realPlayersB;
-      const targetTeam =
-        realPlayersA.length > realPlayersB.length ? realPlayersB : realPlayersA;
-      const movingFromAtoB = realPlayersA.length > realPlayersB.length;
+      if (candidate1) {
+        teamA.push({ ...candidate1, assignedRole: 'Arquero' });
+        players.splice(players.indexOf(candidate1), 1);
+      }
+      if (candidate2) {
+        teamB.push({ ...candidate2, assignedRole: 'Arquero' });
+        players.splice(players.indexOf(candidate2), 1);
+      }
+    }
+  }
 
-      // Calcular cuántos jugadores reales mover
-      const playersToMove = Math.floor(realPlayerDiff / 2);
+  private findGoalkeeperCandidate(players: Member[]): Member | null {
+    // Buscar en este orden: Defensor -> Mediocampista -> Delantero -> Comodín
+    const roles: PlayerRole[] = [
+      'Defensor',
+      'Mediocampo',
+      'Delantero',
+      'Comodín',
+    ];
 
-      // Realizar las transferencias
-      for (let i = 0; i < playersToMove; i++) {
-        if (sourceTeam.length > 0) {
-          // Obtener un jugador para mover (aleatorio para evitar patrones)
-          const playerIndex = Math.floor(Math.random() * sourceTeam.length);
-          const playerToMove = sourceTeam.splice(playerIndex, 1)[0];
-          targetTeam.push(playerToMove);
+    const shuffledPlayers = this.shufflePlayers(players);
+    for (const role of roles) {
+      const candidate = shuffledPlayers.find((p) => p.role === role);
+      if (candidate) return candidate;
+    }
 
-          // Actualizar los arrays originales
-          if (movingFromAtoB) {
-            // Eliminar de A
-            const indexInTeamA = this.teamA.findIndex(
-              (p) => p.id === playerToMove.id
-            );
-            if (indexInTeamA !== -1) {
-              this.teamA.splice(indexInTeamA, 1);
-              this.teamB.push(playerToMove);
-            }
-          } else {
-            // Eliminar de B
-            const indexInTeamB = this.teamB.findIndex(
-              (p) => p.id === playerToMove.id
-            );
-            if (indexInTeamB !== -1) {
-              this.teamB.splice(indexInTeamB, 1);
-              this.teamA.push(playerToMove);
-            }
+    return shuffledPlayers[0] || null;
+  }
+
+  private distributeByRole(
+    players: Member[],
+    teamA: Member[],
+    teamB: Member[]
+  ): void {
+    const formation =
+      players.length >= 22
+        ? {
+            DEFENDERS: 4,
+            MIDFIELDERS: 3,
+            FORWARDS: 3,
+          }
+        : {
+            DEFENDERS: Math.floor((players.length - 2) * 0.4),
+            MIDFIELDERS: Math.floor((players.length - 2) * 0.3),
+            FORWARDS: Math.ceil((players.length - 2) * 0.3),
+          };
+
+    // Clasificar jugadores por rol
+    const playersByRole: Record<PlayerRole, Member[]> = {
+      Arquero: [],
+      Defensor: [],
+      Mediocampo: [],
+      Delantero: [],
+      Comodín: [],
+    };
+
+    players.forEach((player) => {
+      const role = (player.role as PlayerRole) || 'Comodín';
+      playersByRole[role].push(player);
+    });
+
+    // Distribuir por rol
+    const roles: PlayerRole[] = ['Defensor', 'Mediocampo', 'Delantero'];
+
+    roles.forEach((role) => {
+      const playersInRole = playersByRole[role] || [];
+      const targetCount =
+        formation[
+          role === 'Defensor'
+            ? 'DEFENDERS'
+            : role === 'Mediocampo'
+            ? 'MIDFIELDERS'
+            : 'FORWARDS'
+        ];
+
+      const shuffledPlayers = this.shufflePlayers(playersInRole);
+      for (
+        let i = 0;
+        i < Math.min(shuffledPlayers.length, targetCount * 2);
+        i++
+      ) {
+        const player = shuffledPlayers[i];
+        if (i % 2 === 0) {
+          teamA.push({ ...player, assignedRole: role });
+        } else {
+          teamB.push({ ...player, assignedRole: role });
+        }
+        players.splice(players.indexOf(player), 1);
+      }
+    });
+
+    // Distribuir jugadores restantes
+    this.distributePlayersEvenly(players, teamA, teamB);
+  }
+
+  private balanceTeams(teamA: Member[], teamB: Member[]): void {
+    const getAverages = (team: Member[]) => ({
+      age: team.reduce((sum, p) => sum + (p.age || 0), 0) / team.length,
+      rating:
+        team.reduce((sum, p) => sum + (p.starRating || 0), 0) / team.length,
+    });
+
+    const avgA = getAverages(teamA);
+    const avgB = getAverages(teamB);
+
+    // Si hay desbalance significativo, intentar intercambiar jugadores
+    if (
+      Math.abs(avgA.age - avgB.age) > 5 ||
+      Math.abs(avgA.rating - avgB.rating) > 1
+    ) {
+      for (let i = 0; i < teamA.length; i++) {
+        for (let j = 0; j < teamB.length; j++) {
+          // No intercambiar arqueros ni jugadores forzados
+          if (
+            teamA[i].assignedRole === 'Arquero' ||
+            teamB[j].assignedRole === 'Arquero' ||
+            teamA[i].positionForced ||
+            teamB[j].positionForced
+          ) {
+            continue;
+          }
+
+          // Calcular promedios después del intercambio
+          const tempA = [...teamA];
+          const tempB = [...teamB];
+          [tempA[i], tempB[j]] = [tempB[j], tempA[i]];
+          const newAvgA = getAverages(tempA);
+          const newAvgB = getAverages(tempB);
+
+          // Si el intercambio mejora el balance, aplicarlo
+          if (
+            Math.abs(newAvgA.age - newAvgB.age) <
+              Math.abs(avgA.age - avgB.age) &&
+            Math.abs(newAvgA.rating - newAvgB.rating) <
+              Math.abs(avgA.rating - avgB.rating)
+          ) {
+            [teamA[i], teamB[j]] = [teamB[j], teamA[i]];
+            return; // Salir después del primer intercambio exitoso
           }
         }
       }
-
-      console.log(
-        `Balance final de jugadores reales: A=${
-          this.teamA.filter(
-            (p) => p && p.id && !p.id.toString().startsWith('tbd-')
-          ).length
-        }, B=${
-          this.teamB.filter(
-            (p) => p && p.id && !p.id.toString().startsWith('tbd-')
-          ).length
-        }`
-      );
     }
-  }
-
-  // Método para ordenar equipos por posición
-  private sortTeamsByPosition(): void {
-    this.teamA = this.sortPlayersByRole(this.teamA);
-    this.teamB = this.sortPlayersByRole(this.teamB);
-  }
-
-  // Utilidad para ordenar jugadores por rol
-  private sortPlayersByRole(players: Member[]): Member[] {
-    if (!players || !Array.isArray(players)) return players;
-
-    return [...players].sort((a, b) => {
-      const getRolePriority = (player: Member) => {
-        // Priorizar el rol asignado si existe
-        if (
-          player.assignedRole &&
-          ROLE_PRIORITY[player.assignedRole] !== undefined
-        ) {
-          return ROLE_PRIORITY[player.assignedRole];
-        }
-
-        // Si no hay rol asignado, buscar en playerRoles
-        if (player.playerRoles && player.playerRoles.length > 0) {
-          const primaryRole = getPrimaryRole(player.playerRoles);
-          return primaryRole ? ROLE_PRIORITY[primaryRole] ?? 999 : 999;
-        }
-
-        // Si no tiene roles, asignar prioridad baja
-        return 999;
-      };
-
-      const priorityA = getRolePriority(a);
-      const priorityB = getRolePriority(b);
-
-      // Ordenar por prioridad de rol
-      return priorityA - priorityB;
-    });
   }
 }

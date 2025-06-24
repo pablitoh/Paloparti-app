@@ -1,37 +1,63 @@
-import { Participant, ParticipantStatus } from './participant';
+import { PlayerRoleType } from '../lib/teambuilder/types';
 
 export type RecurrenceType = 'none' | 'weekly' | 'biweekly' | 'monthly';
+
+export interface PlayerRole {
+  role: PlayerRoleType;
+  priority: number;
+}
+
+export interface Player {
+  id: string;
+  name: string | null;
+  avatar: string | null;
+  playerType?: string;
+  playerRoles?: PlayerRole[];
+  assignedRole?: PlayerRoleType;
+  age?: number | null;
+  isTeamA?: boolean;
+  starRating?: number;
+  birthdate?: string | Date | null;
+  positionForced?: boolean;
+}
+
+export interface TbdPlayer {
+  id: string;
+  name: string;
+  isTeamA: boolean;
+  avatar: string | null;
+  playerType?: string;
+  age?: number | null;
+  playerRoles?: PlayerRole[];
+  assignedRole?: PlayerRoleType;
+  positionForced?: boolean;
+  starRating?: number;
+}
 
 export interface MatchInterface {
   id: string;
   date: string | Date;
   location: string;
-  teamA: string;
-  teamB: string;
+  teamA: string | Player[];
+  teamB: string | Player[];
   scoreA: number;
   scoreB: number;
   status: string;
-  playersA?: Array<{
-    id: string;
-    name: string | null;
-    avatar: string | null;
-  }>;
-  playersB?: Array<{
-    id: string;
-    name: string | null;
-    avatar: string | null;
-  }>;
-  confirmedPlayers?: Array<{
-    id: string;
-    name: string | null;
-    avatar: string | null;
-  }>;
-  tbdPlayers?: Array<{
-    id: string;
-    name: string;
-    isTeamA: boolean;
-    avatar: string | null;
-  }>;
+  playersA?: Player[];
+  playersB?: Player[];
+  confirmedPlayers?: Player[];
+  tbdPlayers?: TbdPlayer[] | { teamA: TbdPlayer[]; teamB: TbdPlayer[] };
+  pendingPlayers?: Player[];
+  declinedPlayers?: Player[];
+  sortCount?: number;
+  teamAAvgAge?: number;
+  teamBAvgAge?: number;
+  unassignedCount?: number;
+}
+
+export interface Participant extends Player {
+  status?: string;
+  roles?: PlayerRole[];
 }
 
 export interface Match {

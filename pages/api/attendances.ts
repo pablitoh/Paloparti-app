@@ -133,37 +133,7 @@ export default async function handler(
       });
     }
 
-    // Actualizar TBD players para almacenar los roles (ya que no tenemos campo metadata)
-    if (status === 'CONFIRMED' && validatedRoles.length > 0) {
-      try {
-        // Obtener TBD players actuales o inicializar objeto vacío
-        let tbdPlayers = match.tbdPlayers
-          ? typeof match.tbdPlayers === 'string'
-            ? JSON.parse(match.tbdPlayers as string)
-            : match.tbdPlayers
-          : {};
-
-        // Asegurarnos de que tbdPlayers tenga la estructura correcta
-        if (!tbdPlayers.playerRoles) {
-          tbdPlayers.playerRoles = {};
-        }
-
-        // Guardar los roles del jugador usando su ID como clave
-        tbdPlayers.playerRoles[targetUserId] = validatedRoles;
-
-        // Actualizar el campo tbdPlayers en la tabla Match
-        await prisma.match.update({
-          where: { id: matchId },
-          data: {
-            tbdPlayers: tbdPlayers,
-          },
-        });
-      } catch (error) {
-        console.error('Error al actualizar tbdPlayers:', error);
-      }
-    }
-
-    // Upsert attendance record in a single query
+    // Upsert attendance record with playerRoles in MatchAttendance
     const attendance = await prisma.matchAttendance.upsert({
       where: {
         userId_matchId: {
@@ -173,6 +143,10 @@ export default async function handler(
       },
       update: {
         status: status,
+        playerRoles:
+          status === 'CONFIRMED' && validatedRoles.length > 0
+            ? validatedRoles
+            : null,
         updatedAt: new Date(),
       },
       create: {
@@ -181,6 +155,10 @@ export default async function handler(
         groupId: targetGroupId,
         matchDate: match.date,
         status: status,
+        playerRoles:
+          status === 'CONFIRMED' && validatedRoles.length > 0
+            ? validatedRoles
+            : null,
       },
     });
 
@@ -195,27 +173,31 @@ export default async function handler(
           {
             matchId,
             status,
-            playerRoles: validatedRoles,
+            playerRoles: validatedRoles.map((role) => role.role),
           }
         );
       } else {
-        // Si un administrador está actualizando la asistencia de otro usuario
+        // Admin está actualizando la asistencia de otro usuario
+        // Obtener el usuario objetivo para el log
         const targetUser = await prisma.user.findUnique({
           where: { id: targetUserId },
-          select: { id: true, name: true },
+          select: { name: true },
         });
 
         await logGroupEvent(
           targetGroupId,
           session.user.id,
-          LogAction.ADMIN_CONFIRMED_ATTENDANCE,
+          LogAction.ADMIN_ATTENDANCE_UPDATED,
           {
             matchId,
             userId: targetUserId,
             userName: targetUser?.name,
             status,
-            // Solo incluir playerRoles en el log si se proporcionaron roles específicos
-            ...(rolesWereProvided && { playerRoles: validatedRoles }),
+            // Incluir roles solo si se proporcionaron y el estado es CONFIRMED
+            ...(status === 'CONFIRMED' &&
+              rolesWereProvided && {
+                playerRoles: validatedRoles.map((role) => role.role),
+              }),
           }
         );
       }

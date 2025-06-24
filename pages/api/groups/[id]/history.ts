@@ -102,37 +102,71 @@ export default async function handler(
         })
       );
 
-      // Separar jugadores en equipos A y B basados en isTeamA
-      const teamAPlayers = (match.matchPlayers as any[])
-        .filter((player: any) => player.isTeamA)
-        .map((player: any) => ({
-          id: player.userId,
-          name: player.user?.name || null,
-          avatar: player.user?.image || null,
-          isTeamA: true,
-          birthdate: player.user?.birthdate || null,
-        }));
+      // Parsear equipos desde JSON strings o usar los matchPlayers como fallback
+      let teamAPlayers: any[] = [];
+      let teamBPlayers: any[] = [];
 
-      const teamBPlayers = (match.matchPlayers as any[])
-        .filter((player: any) => !player.isTeamA)
-        .map((player: any) => ({
-          id: player.userId,
-          name: player.user?.name || null,
-          avatar: player.user?.image || null,
-          isTeamA: false,
-        }));
+      // Intentar parsear teamA y teamB como JSON
+      try {
+        if (match.teamA && typeof match.teamA === 'string') {
+          teamAPlayers = JSON.parse(match.teamA);
+        }
+      } catch (error) {
+        console.log(
+          'Could not parse teamA as JSON, using matchPlayers fallback'
+        );
+      }
+
+      try {
+        if (match.teamB && typeof match.teamB === 'string') {
+          teamBPlayers = JSON.parse(match.teamB);
+        }
+      } catch (error) {
+        console.log(
+          'Could not parse teamB as JSON, using matchPlayers fallback'
+        );
+      }
+
+      // Si no se pudieron parsear los equipos, usar matchPlayers como fallback
+      if (teamAPlayers.length === 0 || teamBPlayers.length === 0) {
+        teamAPlayers = (match.matchPlayers as any[])
+          .filter((player: any) => player.isTeamA)
+          .map((player: any) => ({
+            id: player.userId || player.user?.id,
+            name: player.user?.name || null,
+            avatar: player.user?.image || null,
+            age: player.user?.age || null,
+            birthdate: player.user?.birthdate || null,
+            playerRoles: [], // No tenemos esta información en matchPlayers
+            starRating: null, // No tenemos esta información en matchPlayers
+            assignedRole: null,
+            positionForced: false,
+          }));
+
+        teamBPlayers = (match.matchPlayers as any[])
+          .filter((player: any) => !player.isTeamA)
+          .map((player: any) => ({
+            id: player.userId || player.user?.id,
+            name: player.user?.name || null,
+            avatar: player.user?.image || null,
+            age: player.user?.age || null,
+            birthdate: player.user?.birthdate || null,
+            playerRoles: [], // No tenemos esta información en matchPlayers
+            starRating: null, // No tenemos esta información en matchPlayers
+            assignedRole: null,
+            positionForced: false,
+          }));
+      }
 
       return {
         id: match.id,
         date: match.date,
         location: match.location,
-        teamA: match.teamA,
-        teamB: match.teamB,
+        teamA: teamAPlayers, // Ahora es un array como en next-match
+        teamB: teamBPlayers, // Ahora es un array como en next-match
         scoreA: match.scoreA,
         scoreB: match.scoreB,
         status: match.status,
-        playersA: teamAPlayers,
-        playersB: teamBPlayers,
         goals: processedGoals,
         createdAt: match.createdAt,
       };

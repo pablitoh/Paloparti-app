@@ -1,15 +1,15 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
 import { prisma } from '../../../../lib/prisma';
 import { getGroupLogs } from '../../../../utils/serverLogEvents';
+import { getCurrentUser } from '../../../../lib/auth';
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const session = await getSession({ req });
+  const user = await getCurrentUser(req, res);
 
-  if (!session) {
+  if (!user) {
     return res.status(401).json({ message: 'No autorizado' });
   }
 
@@ -25,7 +25,7 @@ export default async function handler(
       where: {
         groupId_userId: {
           groupId,
-          userId: session.user.id,
+          userId: user.id,
         },
       },
     });

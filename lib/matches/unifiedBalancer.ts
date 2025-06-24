@@ -1,21 +1,43 @@
-import { Member } from './types';
+import { Member, PlayerRoleType } from '../teambuilder/types';
 import { PLAYER_ROLES } from './constants';
 import { PlayerRole } from '../teambuilder';
+import { assignFlexibleRole } from './roleUtils';
+
+// Type assertion to ensure PLAYER_ROLES values match PlayerRoleType
+const TYPED_ROLES = {
+  GOALKEEPER: 'Arquero' as PlayerRoleType,
+  DEFENDER: 'Defensor' as PlayerRoleType,
+  MIDFIELDER: 'Mediocampo' as PlayerRoleType,
+  FORWARD: 'Delantero' as PlayerRoleType,
+  WILDCARD: 'Comodín' as PlayerRoleType,
+};
+
+// Type for formations
+type Formation = {
+  Arquero: number;
+  Defensor: number;
+  Mediocampo: number;
+  Delantero: number;
+  Comodín: number;
+  total: number;
+};
 
 // Configuración de formaciones
-const FORMATIONS = {
+const FORMATIONS: Record<'4-3-3' | '4-4-2', Formation> = {
   '4-3-3': {
-    [PLAYER_ROLES.GOALKEEPER]: 1,
-    [PLAYER_ROLES.DEFENDER]: 4,
-    [PLAYER_ROLES.MIDFIELDER]: 3,
-    [PLAYER_ROLES.FORWARD]: 3,
+    Arquero: 1,
+    Defensor: 4,
+    Mediocampo: 3,
+    Delantero: 3,
+    Comodín: 0,
     total: 11,
   },
   '4-4-2': {
-    [PLAYER_ROLES.GOALKEEPER]: 1,
-    [PLAYER_ROLES.DEFENDER]: 4,
-    [PLAYER_ROLES.MIDFIELDER]: 4,
-    [PLAYER_ROLES.FORWARD]: 2,
+    Arquero: 1,
+    Defensor: 4,
+    Mediocampo: 4,
+    Delantero: 2,
+    Comodín: 0,
     total: 11,
   },
 };
@@ -23,12 +45,12 @@ const FORMATIONS = {
 // Utilidades para trabajar con roles de jugadores
 const getPrimaryRole = (
   playerRoles?: PlayerRole[] | string[]
-): string | undefined => {
+): PlayerRoleType | undefined => {
   if (!playerRoles || playerRoles.length === 0) return undefined;
 
-  // Si es un array de strings, devolver el primero
+  // Si es un array de strings
   if (typeof playerRoles[0] === 'string') {
-    return playerRoles[0] as string;
+    return playerRoles[0] as PlayerRoleType;
   }
 
   // Si es un array de objetos PlayerRole, devolver el de mayor prioridad (menor número)
@@ -39,12 +61,12 @@ const getPrimaryRole = (
 
 const getSecondaryRole = (
   playerRoles?: PlayerRole[] | string[]
-): string | undefined => {
+): PlayerRoleType | undefined => {
   if (!playerRoles || playerRoles.length < 2) return undefined;
 
   // Si es un array de strings, devolver el segundo
   if (typeof playerRoles[0] === 'string') {
-    return playerRoles[1] as string;
+    return playerRoles[1] as PlayerRoleType;
   }
 
   // Si es un array de objetos PlayerRole, devolver el segundo de mayor prioridad
@@ -54,14 +76,14 @@ const getSecondaryRole = (
 };
 
 const hasRole = (
-  playerRoles: PlayerRole[] | string[] | undefined,
-  role: string
+  playerRoles: PlayerRole[] | PlayerRoleType[] | undefined,
+  role: PlayerRoleType
 ): boolean => {
   if (!playerRoles || playerRoles.length === 0) return false;
 
-  // Si es un array de strings
+  // Si es un array de strings (PlayerRoleType)
   if (typeof playerRoles[0] === 'string') {
-    return (playerRoles as string[]).includes(role);
+    return (playerRoles as PlayerRoleType[]).includes(role);
   }
 
   // Si es un array de objetos PlayerRole
@@ -71,7 +93,7 @@ const hasRole = (
 type PositionCount = Record<string, number>;
 
 interface AssignedPlayer extends Member {
-  assignedRole: string;
+  assignedRole: PlayerRoleType;
   positionForced: boolean; // Si fue forzado a una posición que no eligió
 }
 
@@ -80,6 +102,24 @@ interface BalanceOptions {
   balanceByRating?: boolean;
   balanceByRole?: boolean;
 }
+
+// Helper function to convert string role to PlayerRoleType
+const toPlayerRoleType = (role: string): PlayerRoleType => {
+  switch (role) {
+    case PLAYER_ROLES.GOALKEEPER:
+      return TYPED_ROLES.GOALKEEPER;
+    case PLAYER_ROLES.DEFENDER:
+      return TYPED_ROLES.DEFENDER;
+    case PLAYER_ROLES.MIDFIELDER:
+      return TYPED_ROLES.MIDFIELDER;
+    case PLAYER_ROLES.FORWARD:
+      return TYPED_ROLES.FORWARD;
+    case PLAYER_ROLES.WILDCARD:
+      return TYPED_ROLES.WILDCARD;
+    default:
+      throw new Error(`Invalid role: ${role}`);
+  }
+};
 
 class UnifiedTeamBalancer {
   private assignedPlayerIds = new Set<string>();
@@ -117,12 +157,20 @@ class UnifiedTeamBalancer {
 
     // Usar algoritmo estructurado para GARANTIZAR formaciones correctas
     this.assignGoalkeepers(playersByPosition);
+    this.balanceTeams(); // Nuevo: Balance después de arqueros
+
     this.guaranteeMinimumPositions(playersByPosition);
+    this.balanceTeams(); // Nuevo: Balance después de posiciones mínimas
+
     this.completeFormations(playersByPosition);
+    this.balanceTeams(); // Nuevo: Balance después de completar formaciones
+
     this.distributeRemainingPlayers(playersByPosition);
+    this.balanceTeams(); // Nuevo: Balance después de distribuir restantes
 
     // NUEVO: Asegurar que TODOS los jugadores sean asignados
     this.assignAllRemainingPlayers(members);
+    this.balanceTeams(); // Nuevo: Balance final
 
     // Verificación final y ajustes
     this.finalizeTeams();
@@ -138,40 +186,38 @@ class UnifiedTeamBalancer {
   private determineFormation(members: Member[]): void {
     // Contar jugadores por posición preferida
     const positionCounts = {
-      [PLAYER_ROLES.MIDFIELDER]: 0,
-      [PLAYER_ROLES.FORWARD]: 0,
+      [TYPED_ROLES.MIDFIELDER]: 0,
+      [TYPED_ROLES.FORWARD]: 0,
     };
 
     members.forEach((member) => {
       const primaryRole = getPrimaryRole(member.playerRoles);
       const secondaryRole = getSecondaryRole(member.playerRoles);
 
-      if (primaryRole === PLAYER_ROLES.MIDFIELDER)
-        positionCounts[PLAYER_ROLES.MIDFIELDER]++;
-      else if (secondaryRole === PLAYER_ROLES.MIDFIELDER)
-        positionCounts[PLAYER_ROLES.MIDFIELDER] += 0.5;
+      if (primaryRole === TYPED_ROLES.MIDFIELDER)
+        positionCounts[TYPED_ROLES.MIDFIELDER]++;
+      else if (secondaryRole === TYPED_ROLES.MIDFIELDER)
+        positionCounts[TYPED_ROLES.MIDFIELDER] += 0.5;
 
-      if (primaryRole === PLAYER_ROLES.FORWARD)
-        positionCounts[PLAYER_ROLES.FORWARD]++;
-      else if (secondaryRole === PLAYER_ROLES.FORWARD)
-        positionCounts[PLAYER_ROLES.FORWARD] += 0.5;
+      if (primaryRole === TYPED_ROLES.FORWARD)
+        positionCounts[TYPED_ROLES.FORWARD]++;
+      else if (secondaryRole === TYPED_ROLES.FORWARD)
+        positionCounts[TYPED_ROLES.FORWARD] += 0.5;
     });
 
     // Usar 4-4-2 si hay más mediocampistas que delanteros
     this.formation =
-      positionCounts[PLAYER_ROLES.MIDFIELDER] >
-      positionCounts[PLAYER_ROLES.FORWARD]
+      positionCounts[TYPED_ROLES.MIDFIELDER] >
+      positionCounts[TYPED_ROLES.FORWARD]
         ? '4-4-2'
         : '4-3-3';
 
     console.log(`📋 Formación seleccionada: ${this.formation}`);
     console.log(
-      `   Mediocampistas disponibles: ${
-        positionCounts[PLAYER_ROLES.MIDFIELDER]
-      }`
+      `   Mediocampistas disponibles: ${positionCounts[TYPED_ROLES.MIDFIELDER]}`
     );
     console.log(
-      `   Delanteros disponibles: ${positionCounts[PLAYER_ROLES.FORWARD]}`
+      `   Delanteros disponibles: ${positionCounts[TYPED_ROLES.FORWARD]}`
     );
   }
 
@@ -180,10 +226,10 @@ class UnifiedTeamBalancer {
 
     const targetFormation = FORMATIONS[this.formation];
     const needed = {
-      [PLAYER_ROLES.GOALKEEPER]: 2, // 1 por equipo
-      [PLAYER_ROLES.DEFENDER]: targetFormation[PLAYER_ROLES.DEFENDER] * 2,
-      [PLAYER_ROLES.MIDFIELDER]: targetFormation[PLAYER_ROLES.MIDFIELDER] * 2,
-      [PLAYER_ROLES.FORWARD]: targetFormation[PLAYER_ROLES.FORWARD] * 2,
+      [TYPED_ROLES.GOALKEEPER]: 2, // 1 por equipo
+      [TYPED_ROLES.DEFENDER]: targetFormation['Defensor'] * 2,
+      [TYPED_ROLES.MIDFIELDER]: targetFormation['Mediocampo'] * 2,
+      [TYPED_ROLES.FORWARD]: targetFormation['Delantero'] * 2,
     };
 
     console.log('🎯 Posiciones requeridas:', needed);
@@ -193,10 +239,10 @@ class UnifiedTeamBalancer {
 
     // Asignar posiciones en orden de criticidad: Arqueros > Defensores > Mediocampo > Delanteros
     const positions = [
-      PLAYER_ROLES.GOALKEEPER,
-      PLAYER_ROLES.DEFENDER,
-      PLAYER_ROLES.MIDFIELDER,
-      PLAYER_ROLES.FORWARD,
+      TYPED_ROLES.GOALKEEPER,
+      TYPED_ROLES.DEFENDER,
+      TYPED_ROLES.MIDFIELDER,
+      TYPED_ROLES.FORWARD,
     ];
 
     positions.forEach((position) => {
@@ -215,22 +261,22 @@ class UnifiedTeamBalancer {
 
   private createOptimizedCandidatePool(members: Member[]) {
     const pool = {
-      [PLAYER_ROLES.GOALKEEPER]: [] as Array<{
+      [TYPED_ROLES.GOALKEEPER]: [] as Array<{
         player: Member;
         priority: number;
         balanceScore: number;
       }>,
-      [PLAYER_ROLES.DEFENDER]: [] as Array<{
+      [TYPED_ROLES.DEFENDER]: [] as Array<{
         player: Member;
         priority: number;
         balanceScore: number;
       }>,
-      [PLAYER_ROLES.MIDFIELDER]: [] as Array<{
+      [TYPED_ROLES.MIDFIELDER]: [] as Array<{
         player: Member;
         priority: number;
         balanceScore: number;
       }>,
-      [PLAYER_ROLES.FORWARD]: [] as Array<{
+      [TYPED_ROLES.FORWARD]: [] as Array<{
         player: Member;
         priority: number;
         balanceScore: number;
@@ -265,7 +311,7 @@ class UnifiedTeamBalancer {
       }
 
       // Si no tiene posiciones específicas o es comodín, agregar a todas con prioridad 3
-      if (!primaryRole || primaryRole === PLAYER_ROLES.WILDCARD) {
+      if (!primaryRole || primaryRole === TYPED_ROLES.WILDCARD) {
         Object.keys(pool).forEach((position) => {
           pool[position].push({
             player: member,
@@ -320,119 +366,72 @@ class UnifiedTeamBalancer {
       priority: number;
       balanceScore: number;
     }>,
-    position: string,
+    position: PlayerRoleType,
     needed: number
   ): void {
-    let assigned = 0;
-    let teamACount = 0;
-    let teamBCount = 0;
-    const maxPerTeam = Math.ceil(needed / 2);
+    // Ordenar candidatos por prioridad y balance
+    const sortedCandidates = [...candidates].sort((a, b) => {
+      // Primero por prioridad
+      if (a.priority !== b.priority) {
+        return a.priority - b.priority;
+      }
+      // Luego por balance score
+      return b.balanceScore - a.balanceScore;
+    });
 
-    for (const candidate of candidates) {
+    // Asignar los mejores candidatos
+    let assigned = 0;
+    for (const candidate of sortedCandidates) {
       if (assigned >= needed) break;
       if (this.assignedPlayerIds.has(candidate.player.id)) continue;
 
-      // Decidir equipo basado en balance
-      let assignToTeamA: boolean;
-      if (teamACount < maxPerTeam && teamBCount < maxPerTeam) {
-        assignToTeamA = this.shouldAssignToTeamA();
-      } else if (teamACount < maxPerTeam) {
-        assignToTeamA = true;
-      } else if (teamBCount < maxPerTeam) {
-        assignToTeamA = false;
-      } else {
-        break; // Ya llenamos ambos equipos para esta posición
-      }
+      const isTeamA = this.shouldAssignToTeamA();
+      const isForced = !hasRole(candidate.player.playerRoles, position);
 
-      // CORREGIDO: Lógica más inteligente para determinar si es forzado
-      // Solo marcar como forzado si el jugador NO TIENE este rol entre sus preferencias
-      const hasThisRole = hasRole(candidate.player.playerRoles, position);
-      const isForced = !hasThisRole;
-
-      this.assignPlayerToTeam(
-        candidate.player,
-        position,
-        assignToTeamA,
-        isForced
-      );
-
-      if (assignToTeamA) teamACount++;
-      else teamBCount++;
+      this.assignPlayerToTeam(candidate.player, position, isTeamA, isForced);
       assigned++;
-
-      console.log(
-        `   ✅ ${candidate.player.name} → Equipo ${
-          assignToTeamA ? 'A' : 'B'
-        } (prioridad ${candidate.priority}${isForced ? ' - FORZADO' : ''})`
-      );
-    }
-
-    if (assigned < needed) {
-      console.log(
-        `   ⚠️ Solo se asignaron ${assigned}/${needed} jugadores para ${position}`
-      );
     }
   }
 
   private classifyPlayersByPosition(members: Member[]) {
     const playersByPosition: Record<
-      string,
-      {
-        primary: Member[];
-        secondary: Member[];
-        wildcard: Member[];
-      }
+      PlayerRoleType,
+      { primary: Member[]; secondary: Member[]; wildcard: Member[] }
     > = {
-      [PLAYER_ROLES.GOALKEEPER]: { primary: [], secondary: [], wildcard: [] },
-      [PLAYER_ROLES.DEFENDER]: { primary: [], secondary: [], wildcard: [] },
-      [PLAYER_ROLES.MIDFIELDER]: { primary: [], secondary: [], wildcard: [] },
-      [PLAYER_ROLES.FORWARD]: { primary: [], secondary: [], wildcard: [] },
+      Arquero: { primary: [], secondary: [], wildcard: [] },
+      Defensor: { primary: [], secondary: [], wildcard: [] },
+      Mediocampo: { primary: [], secondary: [], wildcard: [] },
+      Delantero: { primary: [], secondary: [], wildcard: [] },
+      Comodín: { primary: [], secondary: [], wildcard: [] },
     };
 
     members.forEach((member) => {
       const primaryRole = getPrimaryRole(member.playerRoles);
       const secondaryRole = getSecondaryRole(member.playerRoles);
 
-      // Si no tiene roles definidos, va a wildcard para todas las posiciones
-      if (!primaryRole) {
+      // Si no tiene roles específicos o es comodín, va a wildcard para todas las posiciones
+      if (!primaryRole || primaryRole === TYPED_ROLES.WILDCARD) {
         Object.keys(playersByPosition).forEach((position) => {
-          playersByPosition[position].wildcard.push(member);
+          playersByPosition[position as PlayerRoleType].wildcard.push(member);
         });
         return;
       }
 
-      // Si es comodín, va a wildcard para todas las posiciones
-      if (primaryRole === PLAYER_ROLES.WILDCARD) {
-        Object.keys(playersByPosition).forEach((position) => {
-          playersByPosition[position].wildcard.push(member);
-        });
-        return;
+      // Asignar rol primario
+      if (playersByPosition[primaryRole as PlayerRoleType]) {
+        playersByPosition[primaryRole as PlayerRoleType].primary.push(member);
       }
 
-      // Asignar a posición primaria
-      if (playersByPosition[primaryRole]) {
-        playersByPosition[primaryRole].primary.push(member);
-      }
-
-      // Asignar a posición secundaria si existe
+      // Asignar rol secundario si existe y no es comodín
       if (
         secondaryRole &&
-        secondaryRole !== PLAYER_ROLES.WILDCARD &&
-        playersByPosition[secondaryRole]
+        secondaryRole !== TYPED_ROLES.WILDCARD &&
+        playersByPosition[secondaryRole as PlayerRoleType]
       ) {
-        playersByPosition[secondaryRole].secondary.push(member);
+        playersByPosition[secondaryRole as PlayerRoleType].secondary.push(
+          member
+        );
       }
-    });
-
-    console.log('\n📊 Clasificación de jugadores por posición:');
-    Object.entries(playersByPosition).forEach(([position, players]) => {
-      const total =
-        players.primary.length +
-        players.secondary.length +
-        players.wildcard.length;
-      console.log(
-        `   ${position}: ${total} total (${players.primary.length} prim, ${players.secondary.length} sec, ${players.wildcard.length} wild)`
-      );
     });
 
     return playersByPosition;
@@ -440,13 +439,13 @@ class UnifiedTeamBalancer {
 
   private assignGoalkeepers(
     playersByPosition: Record<
-      string,
+      PlayerRoleType,
       { primary: Member[]; secondary: Member[]; wildcard: Member[] }
     >
   ): void {
     console.log('\n🥅 Fase 1: Asignando arqueros...');
 
-    const gkData = playersByPosition[PLAYER_ROLES.GOALKEEPER];
+    const gkData = playersByPosition[TYPED_ROLES.GOALKEEPER];
     const candidates: { player: Member; priority: number }[] = [];
 
     // Prioridad 1: Arqueros primarios
@@ -513,12 +512,12 @@ class UnifiedTeamBalancer {
       // CORREGIDO: Solo marcar como forzado si NO tiene arquero entre sus roles
       const isForced = !hasRole(
         candidate.player.playerRoles,
-        PLAYER_ROLES.GOALKEEPER
+        TYPED_ROLES.GOALKEEPER
       );
 
       this.assignPlayerToTeam(
         candidate.player,
-        PLAYER_ROLES.GOALKEEPER,
+        TYPED_ROLES.GOALKEEPER,
         isTeamA,
         isForced
       );
@@ -532,10 +531,10 @@ class UnifiedTeamBalancer {
 
     // Verificar si cada equipo tiene al menos un arquero
     const teamAGoalkeepers = this.getPositionCount(this.teamA)[
-      PLAYER_ROLES.GOALKEEPER
+      TYPED_ROLES.GOALKEEPER
     ];
     const teamBGoalkeepers = this.getPositionCount(this.teamB)[
-      PLAYER_ROLES.GOALKEEPER
+      TYPED_ROLES.GOALKEEPER
     ];
 
     console.log(
@@ -554,136 +553,356 @@ class UnifiedTeamBalancer {
   private assignEmergencyGoalkeeper(
     isTeamA: boolean,
     playersByPosition: Record<
-      string,
+      PlayerRoleType,
       { primary: Member[]; secondary: Member[]; wildcard: Member[] }
     >
   ): void {
     console.log(
-      `🚨 Asignando arquero de emergencia al equipo ${isTeamA ? 'A' : 'B'}`
+      `🚨 Asignando arquero de emergencia para equipo ${isTeamA ? 'A' : 'B'}`
     );
 
-    // Buscar cualquier jugador no asignado en todas las posiciones
+    const team = isTeamA ? this.teamA : this.teamB;
+    const otherTeam = isTeamA ? this.teamB : this.teamA;
+
+    // Buscar un jugador del otro equipo que tenga arquero como rol secundario
+    const candidateFromOtherTeam = otherTeam.find((player) => {
+      const secondaryRole = getSecondaryRole(player.playerRoles);
+      return secondaryRole === TYPED_ROLES.GOALKEEPER;
+    });
+
+    if (candidateFromOtherTeam) {
+      // Intercambiar con un jugador del equipo actual
+      const playerToSwap = team[0];
+      if (playerToSwap) {
+        // Actualizar asignaciones
+        candidateFromOtherTeam.assignedRole = playerToSwap.assignedRole;
+        playerToSwap.assignedRole = TYPED_ROLES.GOALKEEPER;
+        playerToSwap.positionForced = !hasRole(
+          playerToSwap.playerRoles,
+          TYPED_ROLES.GOALKEEPER
+        );
+
+        // Mover jugadores entre equipos
+        const otherTeamIndex = otherTeam.indexOf(candidateFromOtherTeam);
+        const teamIndex = team.indexOf(playerToSwap);
+        if (otherTeamIndex !== -1 && teamIndex !== -1) {
+          otherTeam[otherTeamIndex] = playerToSwap;
+          team[teamIndex] = candidateFromOtherTeam;
+        }
+
+        console.log(
+          `   ✅ Intercambio: ${playerToSwap.name} ↔ ${candidateFromOtherTeam.name}`
+        );
+        return;
+      }
+    }
+
+    // Si no se pudo intercambiar, buscar un jugador no asignado
     const availablePlayers = this.getAllAvailablePlayers(playersByPosition);
-
     if (availablePlayers.length > 0) {
-      // Tomar el primero disponible
       const player = availablePlayers[0];
-      // CORREGIDO: Solo marcar como forzado si NO tiene arquero entre sus roles
-      const isForced = !hasRole(player.playerRoles, PLAYER_ROLES.GOALKEEPER);
-
       this.assignPlayerToTeam(
         player,
-        PLAYER_ROLES.GOALKEEPER,
+        TYPED_ROLES.GOALKEEPER,
         isTeamA,
-        isForced
+        !hasRole(player.playerRoles, TYPED_ROLES.GOALKEEPER)
       );
-      console.log(
-        `   ✅ ${player.name} → Equipo ${
-          isTeamA ? 'A' : 'B'
-        } (ARQUERO DE EMERGENCIA${isForced ? ' - FORZADO' : ''})`
-      );
-    } else {
-      console.log(
-        `   ❌ No hay jugadores disponibles para arquero de emergencia en equipo ${
-          isTeamA ? 'A' : 'B'
-        }`
-      );
+      console.log(`   ✅ Asignado nuevo: ${player.name}`);
+      return;
     }
+
+    console.log('   ❌ No se encontró jugador para asignar como arquero');
   }
 
   private guaranteeMinimumPositions(
     playersByPosition: Record<
-      string,
+      PlayerRoleType,
       { primary: Member[]; secondary: Member[]; wildcard: Member[] }
     >
   ): void {
-    console.log('\n🎯 Fase 2: Garantizando al menos 1 de cada posición...');
+    console.log('\n🎯 Garantizando posiciones mínimas por formación');
+    const formation = FORMATIONS[this.formation];
 
-    const positions = [
-      PLAYER_ROLES.DEFENDER,
-      PLAYER_ROLES.MIDFIELDER,
-      PLAYER_ROLES.FORWARD,
-    ];
+    // Primero asignar roles primarios hasta alcanzar el mínimo requerido
+    Object.entries(formation).forEach(([position, required]) => {
+      if (position === 'total' || position === 'Comodín') return;
+      const positionType = position as PlayerRoleType;
+      const neededPerTeam = Math.floor(required / 2);
 
-    positions.forEach((position) => {
-      const teamACount = this.getPositionCount(this.teamA)[position];
-      const teamBCount = this.getPositionCount(this.teamB)[position];
+      console.log(
+        `\n📊 Posición ${position}: necesarios ${neededPerTeam} por equipo`
+      );
 
-      // Asegurar que cada equipo tenga al menos 1 de esta posición
-      if (teamACount === 0) {
-        this.assignBestPlayerForPosition(position, playersByPosition, true);
+      // Primero intentar con roles primarios
+      while (
+        this.getPositionCount(this.teamA)[positionType] < neededPerTeam ||
+        this.getPositionCount(this.teamB)[positionType] < neededPerTeam
+      ) {
+        const success = this.assignBestPlayerForPosition(
+          positionType,
+          playersByPosition,
+          this.shouldAssignToTeamA(),
+          true,
+          true
+        );
+
+        if (!success) break;
       }
-      if (teamBCount === 0) {
-        this.assignBestPlayerForPosition(position, playersByPosition, false);
+
+      // Si no se alcanzó el mínimo con roles primarios, usar secundarios
+      while (
+        this.getPositionCount(this.teamA)[positionType] < neededPerTeam ||
+        this.getPositionCount(this.teamB)[positionType] < neededPerTeam
+      ) {
+        const success = this.assignBestPlayerForPosition(
+          positionType,
+          playersByPosition,
+          this.shouldAssignToTeamA(),
+          false,
+          true
+        );
+
+        if (!success) {
+          // Si no hay más jugadores disponibles para esta posición, intentar convertir comodines
+          this.fillPositionWithWildcards(positionType, neededPerTeam);
+          break;
+        }
       }
+
+      // Verificar y loggear el resultado
+      const teamACount = this.getPositionCount(this.teamA)[positionType];
+      const teamBCount = this.getPositionCount(this.teamB)[positionType];
+      console.log(
+        `   ✓ ${position} asignados - Equipo A: ${teamACount}, Equipo B: ${teamBCount}`
+      );
     });
+  }
+
+  private hasRole(player: Member, role: PlayerRoleType): boolean {
+    // player.playerRoles es siempre PlayerRoleType[] según la definición del tipo Member
+    return player.playerRoles?.includes(role) ?? false;
+  }
+
+  private fillPositionWithWildcards(
+    position: PlayerRoleType,
+    neededPerTeam: number
+  ): void {
+    const formation = FORMATIONS[this.formation];
+    const teamACount = this.getPositionCount(this.teamA)[position];
+    const teamBCount = this.getPositionCount(this.teamB)[position];
+
+    // Verificar si algún equipo necesita más jugadores en esta posición
+    if (teamACount < neededPerTeam || teamBCount < neededPerTeam) {
+      const availableWildcards = this.teamA
+        .concat(this.teamB)
+        .filter(
+          (player) =>
+            player.assignedRole === TYPED_ROLES.WILDCARD &&
+            !this.hasRole(player, position)
+        );
+
+      // Distribuir comodines según sea necesario
+      availableWildcards.forEach((wildcard) => {
+        const currentTeamA = this.teamA.includes(wildcard);
+        const targetTeamA = teamACount < neededPerTeam;
+
+        // Si el jugador está en el equipo equivocado, moverlo
+        if (currentTeamA !== targetTeamA) {
+          if (currentTeamA) {
+            this.teamA = this.teamA.filter((p) => p.id !== wildcard.id);
+            this.teamB.push({
+              ...wildcard,
+              assignedRole: position,
+              positionForced: true,
+            });
+          } else {
+            this.teamB = this.teamB.filter((p) => p.id !== wildcard.id);
+            this.teamA.push({
+              ...wildcard,
+              assignedRole: position,
+              positionForced: true,
+            });
+          }
+        } else {
+          // Solo actualizar el rol
+          wildcard.assignedRole = position;
+          wildcard.positionForced = true;
+        }
+      });
+    }
   }
 
   private completeFormations(
     playersByPosition: Record<
-      string,
+      PlayerRoleType,
       { primary: Member[]; secondary: Member[]; wildcard: Member[] }
     >
   ): void {
-    console.log('\n🏗️ Fase 3: Completando formaciones...');
-
-    const targetFormation = FORMATIONS[this.formation];
+    const formationConfig = FORMATIONS[this.formation];
     const positions = [
-      PLAYER_ROLES.DEFENDER,
-      PLAYER_ROLES.MIDFIELDER,
-      PLAYER_ROLES.FORWARD,
+      TYPED_ROLES.DEFENDER,
+      TYPED_ROLES.MIDFIELDER,
+      TYPED_ROLES.FORWARD,
     ];
 
+    // Completar cada posición hasta alcanzar el número requerido por la formación
     positions.forEach((position) => {
-      const needed = targetFormation[position];
-      const teamACount = this.getPositionCount(this.teamA)[position];
-      const teamBCount = this.getPositionCount(this.teamB)[position];
+      const requiredPerTeam = Math.floor(formationConfig[position] / 2);
+
+      console.log(
+        `\n📊 Completando ${position}: necesarios ${requiredPerTeam} por equipo`
+      );
 
       // Completar equipo A
-      for (let i = teamACount; i < needed; i++) {
-        this.assignBestPlayerForPosition(position, playersByPosition, true);
+      const currentTeamA = this.teamA.filter(
+        (p) => p.assignedRole === position
+      ).length;
+      const neededTeamA = Math.max(0, requiredPerTeam - currentTeamA);
+
+      console.log(
+        `   Equipo A: tiene ${currentTeamA}, necesita ${neededTeamA} más`
+      );
+
+      for (let i = 0; i < neededTeamA; i++) {
+        // Intentar primero con roles primarios
+        let success = this.assignBestPlayerForPosition(
+          position,
+          playersByPosition,
+          true,
+          true, // Solo roles primarios
+          false
+        );
+
+        // Si no hay primarios disponibles, intentar con secundarios/comodines
+        if (!success) {
+          success = this.assignBestPlayerForPosition(
+            position,
+            playersByPosition,
+            true,
+            false, // Permitir roles secundarios y comodines
+            false
+          );
+        }
+
+        if (!success) {
+          console.log(
+            `   ⚠️ No hay más jugadores disponibles para ${position}`
+          );
+          break;
+        }
       }
 
       // Completar equipo B
-      for (let i = teamBCount; i < needed; i++) {
-        this.assignBestPlayerForPosition(position, playersByPosition, false);
+      const currentTeamB = this.teamB.filter(
+        (p) => p.assignedRole === position
+      ).length;
+      const neededTeamB = Math.max(0, requiredPerTeam - currentTeamB);
+
+      console.log(
+        `   Equipo B: tiene ${currentTeamB}, necesita ${neededTeamB} más`
+      );
+
+      for (let i = 0; i < neededTeamB; i++) {
+        // Intentar primero con roles primarios
+        let success = this.assignBestPlayerForPosition(
+          position,
+          playersByPosition,
+          false,
+          true, // Solo roles primarios
+          false
+        );
+
+        // Si no hay primarios disponibles, intentar con secundarios/comodines
+        if (!success) {
+          success = this.assignBestPlayerForPosition(
+            position,
+            playersByPosition,
+            false,
+            false, // Permitir roles secundarios y comodines
+            false
+          );
+        }
+
+        if (!success) {
+          console.log(
+            `   ⚠️ No hay más jugadores disponibles para ${position}`
+          );
+          break;
+        }
       }
+
+      // Verificar y loggear el resultado final
+      const finalTeamACount = this.teamA.filter(
+        (p) => p.assignedRole === position
+      ).length;
+      const finalTeamBCount = this.teamB.filter(
+        (p) => p.assignedRole === position
+      ).length;
+
+      console.log(
+        `   ✓ ${position} final - Equipo A: ${finalTeamACount}, Equipo B: ${finalTeamBCount}`
+      );
     });
   }
 
   private assignBestPlayerForPosition(
-    position: string,
+    position: PlayerRoleType,
     playersByPosition: Record<
-      string,
+      PlayerRoleType,
       { primary: Member[]; secondary: Member[]; wildcard: Member[] }
     >,
-    isTeamA: boolean
-  ): void {
+    isTeamA: boolean,
+    usePrimaryOnly: boolean,
+    isGuaranteePhase: boolean = false
+  ): boolean {
     const positionData = playersByPosition[position];
-
-    // Buscar el mejor candidato siguiendo el orden de prioridad
     let bestCandidate: { player: Member; priority: number } | null = null;
 
-    // Prioridad 1: Jugadores con esta posición como primaria
+    // Función auxiliar para verificar si un jugador puede ser asignado a una posición
+    const canAssignToPosition = (
+      player: Member,
+      checkPrimaryOnly: boolean
+    ): boolean => {
+      const primaryRole = getPrimaryRole(player.playerRoles);
+      const secondaryRole = getSecondaryRole(player.playerRoles);
+
+      if (checkPrimaryOnly) {
+        return primaryRole === position;
+      }
+
+      return (
+        primaryRole === position ||
+        secondaryRole === position ||
+        primaryRole === TYPED_ROLES.WILDCARD
+      );
+    };
+
+    // Primero buscar en jugadores primarios
     for (const player of positionData.primary) {
-      if (!this.assignedPlayerIds.has(player.id)) {
+      if (
+        !this.assignedPlayerIds.has(player.id) &&
+        canAssignToPosition(player, usePrimaryOnly)
+      ) {
         bestCandidate = { player, priority: 1 };
         break;
       }
     }
 
-    // Prioridad 2: Jugadores con esta posición como secundaria
-    if (!bestCandidate) {
+    // Si no encontramos en primarios y no estamos limitados a ellos, buscar en secundarios
+    if (!bestCandidate && !usePrimaryOnly) {
       for (const player of positionData.secondary) {
-        if (!this.assignedPlayerIds.has(player.id)) {
+        if (
+          !this.assignedPlayerIds.has(player.id) &&
+          canAssignToPosition(player, false)
+        ) {
           bestCandidate = { player, priority: 2 };
           break;
         }
       }
     }
 
-    // Prioridad 3: Jugadores comodín
-    if (!bestCandidate) {
+    // Si aún no encontramos y no estamos limitados a primarios, buscar en comodines
+    if (!bestCandidate && !usePrimaryOnly) {
       for (const player of positionData.wildcard) {
         if (!this.assignedPlayerIds.has(player.id)) {
           bestCandidate = { player, priority: 3 };
@@ -692,17 +911,10 @@ class UnifiedTeamBalancer {
       }
     }
 
-    // Prioridad 4: Cualquier jugador disponible (forzado)
-    if (!bestCandidate) {
-      const allAvailable = this.getAllAvailablePlayers(playersByPosition);
-      if (allAvailable.length > 0) {
-        bestCandidate = { player: allAvailable[0], priority: 4 };
-      }
-    }
-
     if (bestCandidate) {
-      // CORREGIDO: Solo marcar como forzado si NO tiene este rol entre sus preferencias
-      const isForced = !hasRole(bestCandidate.player.playerRoles, position);
+      const primaryRole = getPrimaryRole(bestCandidate.player.playerRoles);
+      const isForced =
+        primaryRole !== position && primaryRole !== TYPED_ROLES.WILDCARD;
 
       this.assignPlayerToTeam(
         bestCandidate.player,
@@ -712,16 +924,22 @@ class UnifiedTeamBalancer {
       );
 
       console.log(
-        `   ✅ ${bestCandidate.player.name} → ${position} (Equipo ${
+        `   ✅ ${bestCandidate.player.name} → Equipo ${
           isTeamA ? 'A' : 'B'
-        }, prioridad ${bestCandidate.priority}${isForced ? ' - FORZADO' : ''})`
+        } como ${position}${isForced ? ' (FORZADO)' : ''} (prioridad ${
+          bestCandidate.priority
+        })`
       );
+
+      return true;
     }
+
+    return false;
   }
 
   private distributeRemainingPlayers(
     playersByPosition: Record<
-      string,
+      PlayerRoleType,
       { primary: Member[]; secondary: Member[]; wildcard: Member[] }
     >
   ): void {
@@ -739,21 +957,62 @@ class UnifiedTeamBalancer {
     // Ordenar por criterios de balance
     const sortedPlayers = this.sortPlayersByBalanceCriteria(remainingPlayers);
 
-    // Distribuir alternando equipos, priorizando balance
-    sortedPlayers.forEach((player, index) => {
-      const isTeamA = this.shouldAssignToTeamA();
-      const bestPosition = this.determineBestPositionForPlayer(player, isTeamA);
+    // Obtener la formación objetivo
+    const formationConfig = FORMATIONS[this.formation];
 
-      // CORREGIDO: Solo marcar como forzado si NO tiene este rol entre sus preferencias
-      const isForced = !hasRole(player.playerRoles, bestPosition);
+    // Distribuir jugadores respetando la formación
+    sortedPlayers.forEach((player) => {
+      const isTeamA = this.shouldAssignToTeamA();
+      const team = isTeamA ? this.teamA : this.teamB;
+      const currentCounts = this.getPositionCount(team);
+
+      // Encontrar la posición que más necesita ser completada
+      let bestPosition: PlayerRoleType | null = null;
+      let maxDeficit = -1;
+
+      Object.entries(formationConfig).forEach(([position, required]) => {
+        if (position === 'total' || position === 'Comodín') return;
+
+        const positionType = position as PlayerRoleType;
+        const requiredPerTeam = Math.floor(required / 2);
+        const current = currentCounts[positionType] || 0;
+        const deficit = requiredPerTeam - current;
+
+        if (deficit > maxDeficit) {
+          maxDeficit = deficit;
+          bestPosition = positionType;
+        }
+      });
+
+      // Si no hay déficit en ninguna posición, usar la posición preferida del jugador
+      if (!bestPosition || maxDeficit <= 0) {
+        bestPosition = this.determineBestPositionForPlayer(player, isTeamA);
+      }
+
+      // Verificar si el jugador tiene el rol como primario o secundario
+      const primaryRole = getPrimaryRole(player.playerRoles);
+      const secondaryRole = getSecondaryRole(player.playerRoles);
+      const isForced =
+        bestPosition !== primaryRole &&
+        bestPosition !== secondaryRole &&
+        primaryRole !== TYPED_ROLES.WILDCARD;
 
       this.assignPlayerToTeam(player, bestPosition, isTeamA, isForced);
 
       console.log(
-        `   ✅ ${player.name} → ${bestPosition} (Equipo ${isTeamA ? 'A' : 'B'}${
-          isForced ? ' - FORZADO' : ''
-        })`
+        `   ✅ ${player.name} → Equipo ${
+          isTeamA ? 'A' : 'B'
+        } como ${bestPosition}${isForced ? ' (FORZADO)' : ''}`
       );
+    });
+
+    // Verificar y loggear el estado final de las posiciones
+    console.log('\n📊 Estado final de posiciones:');
+    ['Arquero', 'Defensor', 'Mediocampo', 'Delantero'].forEach((position) => {
+      const posType = position as PlayerRoleType;
+      const teamACount = this.getPositionCount(this.teamA)[posType];
+      const teamBCount = this.getPositionCount(this.teamB)[posType];
+      console.log(`   ${position}: A=${teamACount}, B=${teamBCount}`);
     });
   }
 
@@ -787,7 +1046,7 @@ class UnifiedTeamBalancer {
   private determineBestPositionForPlayer(
     player: Member,
     isTeamA: boolean
-  ): string {
+  ): PlayerRoleType {
     const team = isTeamA ? this.teamA : this.teamB;
     const currentCounts = this.getPositionCount(team);
     const targetFormation = FORMATIONS[this.formation];
@@ -796,25 +1055,27 @@ class UnifiedTeamBalancer {
     const primaryRole = getPrimaryRole(player.playerRoles);
     const secondaryRole = getSecondaryRole(player.playerRoles);
 
-    if (
-      primaryRole &&
-      currentCounts[primaryRole] < targetFormation[primaryRole]
-    ) {
-      return primaryRole;
+    if (primaryRole) {
+      const typedPrimaryRole = toPlayerRoleType(primaryRole);
+      if (currentCounts[typedPrimaryRole] < targetFormation[typedPrimaryRole]) {
+        return typedPrimaryRole;
+      }
     }
 
-    if (
-      secondaryRole &&
-      currentCounts[secondaryRole] < targetFormation[secondaryRole]
-    ) {
-      return secondaryRole;
+    if (secondaryRole) {
+      const typedSecondaryRole = toPlayerRoleType(secondaryRole);
+      if (
+        currentCounts[typedSecondaryRole] < targetFormation[typedSecondaryRole]
+      ) {
+        return typedSecondaryRole;
+      }
     }
 
     // Si no, buscar la posición que más necesite jugadores
     const positions = [
-      PLAYER_ROLES.DEFENDER,
-      PLAYER_ROLES.MIDFIELDER,
-      PLAYER_ROLES.FORWARD,
+      TYPED_ROLES.DEFENDER,
+      TYPED_ROLES.MIDFIELDER,
+      TYPED_ROLES.FORWARD,
     ];
     const neediest = positions.reduce((min, pos) => {
       const need = targetFormation[pos] - currentCounts[pos];
@@ -844,18 +1105,27 @@ class UnifiedTeamBalancer {
 
   private assignPlayerToTeam(
     player: Member,
-    position: string,
+    position: PlayerRoleType,
     isTeamA: boolean,
     isForced: boolean
   ): void {
-    if (this.assignedPlayerIds.has(player.id)) {
-      console.warn(`⚠️ Jugador ${player.name} ya estaba asignado, saltando...`);
-      return;
-    }
+    // Obtener el rol anterior del jugador si existe
+    const previousRole = player.assignedRole;
+
+    // Determinar los roles disponibles basados en las preferencias del jugador
+    const availableRoles = this.getAvailableRolesForPlayer(player);
+
+    // Usar la función mejorada de asignación flexible que tiene en cuenta el rol anterior
+    const assignedRole = assignFlexibleRole(
+      isTeamA ? this.teamA : this.teamB,
+      availableRoles,
+      player,
+      previousRole
+    );
 
     const assignedPlayer: AssignedPlayer = {
       ...player,
-      assignedRole: position,
+      assignedRole,
       positionForced: isForced,
     };
 
@@ -868,9 +1138,18 @@ class UnifiedTeamBalancer {
     this.assignedPlayerIds.add(player.id);
   }
 
+  private getAvailableRolesForPlayer(player: Member): PlayerRoleType[] {
+    if (!player.playerRoles || player.playerRoles.length === 0) {
+      return [TYPED_ROLES.WILDCARD];
+    }
+
+    // player.playerRoles ya es PlayerRoleType[] según la definición del tipo Member
+    return player.playerRoles;
+  }
+
   private getAllAvailablePlayers(
     playersByPosition: Record<
-      string,
+      PlayerRoleType,
       { primary: Member[]; secondary: Member[]; wildcard: Member[] }
     >
   ): Member[] {
@@ -894,21 +1173,24 @@ class UnifiedTeamBalancer {
     return available;
   }
 
-  private getPositionCount(team: AssignedPlayer[]): PositionCount {
-    return {
-      [PLAYER_ROLES.GOALKEEPER]: team.filter(
-        (p) => p.assignedRole === PLAYER_ROLES.GOALKEEPER
-      ).length,
-      [PLAYER_ROLES.DEFENDER]: team.filter(
-        (p) => p.assignedRole === PLAYER_ROLES.DEFENDER
-      ).length,
-      [PLAYER_ROLES.MIDFIELDER]: team.filter(
-        (p) => p.assignedRole === PLAYER_ROLES.MIDFIELDER
-      ).length,
-      [PLAYER_ROLES.FORWARD]: team.filter(
-        (p) => p.assignedRole === PLAYER_ROLES.FORWARD
-      ).length,
+  private getPositionCount(
+    team: AssignedPlayer[]
+  ): Record<PlayerRoleType, number> {
+    const counts: Record<PlayerRoleType, number> = {
+      Arquero: 0,
+      Defensor: 0,
+      Mediocampo: 0,
+      Delantero: 0,
+      Comodín: 0,
     };
+
+    team.forEach((player) => {
+      if (player.assignedRole) {
+        counts[player.assignedRole]++;
+      }
+    });
+
+    return counts;
   }
 
   private calculateAverageRating(team: AssignedPlayer[]): number {
@@ -950,10 +1232,23 @@ class UnifiedTeamBalancer {
     // Ordenar por criterios de balance
     const sortedPlayers = this.sortPlayersByBalanceCriteria(unassignedPlayers);
 
-    // Distribuir alternando equipos para mantener balance
-    sortedPlayers.forEach((player, index) => {
-      // Determinar a qué equipo asignar basado en el balance actual
-      const isTeamA = this.shouldAssignToTeamA();
+    // Distribuir jugadores para mantener diferencia máxima de 1
+    sortedPlayers.forEach((player) => {
+      // Calcular diferencia actual entre equipos
+      const teamDiff = this.teamA.length - this.teamB.length;
+
+      // Determinar a qué equipo asignar basado en la diferencia
+      let isTeamA;
+      if (teamDiff > 0) {
+        // Si A tiene más jugadores, forzar B
+        isTeamA = false;
+      } else if (teamDiff < -1) {
+        // Si B tiene más de 1 jugador extra, forzar A
+        isTeamA = true;
+      } else {
+        // Si la diferencia es 0 o -1, usar lógica normal
+        isTeamA = this.shouldAssignToTeamA();
+      }
 
       // Determinar la mejor posición para este jugador en el equipo seleccionado
       const bestPosition = this.determineBestPositionForPlayer(player, isTeamA);
@@ -973,45 +1268,17 @@ class UnifiedTeamBalancer {
     console.log(
       `✅ Todos los ${unassignedPlayers.length} jugadores restantes asignados`
     );
-  }
 
-  private convertPlayerToGoalkeeper(isTeamA: boolean): void {
-    const team = isTeamA ? this.teamA : this.teamB;
-
-    if (team.length === 0) {
-      console.log(
-        `❌ No hay jugadores en equipo ${
-          isTeamA ? 'A' : 'B'
-        } para convertir a arquero`
-      );
-      return;
-    }
-
-    // Buscar el jugador menos impactante para convertir
-    // Priorizar jugadores que ya tengan arquero como segunda opción
-    let targetPlayer = team.find((player) => {
-      const secondaryRole = getSecondaryRole(player.playerRoles);
-      return secondaryRole === PLAYER_ROLES.GOALKEEPER;
-    });
-
-    // Si no hay nadie con arquero secundario, tomar cualquiera
-    if (!targetPlayer) {
-      targetPlayer = team[0];
-    }
-
-    // Convertir el jugador a arquero
-    targetPlayer.assignedRole = PLAYER_ROLES.GOALKEEPER;
-    // CORREGIDO: Solo marcar como forzado si NO tiene arquero entre sus roles
-    targetPlayer.positionForced = !hasRole(
-      targetPlayer.playerRoles,
-      PLAYER_ROLES.GOALKEEPER
-    );
-
+    // Verificación final de balance
+    const finalDiff = Math.abs(this.teamA.length - this.teamB.length);
     console.log(
-      `   ✅ ${targetPlayer.name} convertido a arquero en equipo ${
-        isTeamA ? 'A' : 'B'
-      } ${targetPlayer.positionForced ? '(FORZADO)' : '(SECUNDARIO)'}`
+      `📊 Balance final: Equipo A=${this.teamA.length}, Equipo B=${this.teamB.length} (Diferencia: ${finalDiff})`
     );
+    if (finalDiff > 1) {
+      console.warn(
+        `⚠️ Advertencia: Diferencia de ${finalDiff} jugadores entre equipos`
+      );
+    }
   }
 
   private finalizeTeams(): void {
@@ -1044,27 +1311,19 @@ class UnifiedTeamBalancer {
 
     console.log('\n📊 Distribución final:');
     console.log(
-      `   Equipo A: GK=${teamACount[PLAYER_ROLES.GOALKEEPER]}, DEF=${
-        teamACount[PLAYER_ROLES.DEFENDER]
-      }, MID=${teamACount[PLAYER_ROLES.MIDFIELDER]}, FWD=${
-        teamACount[PLAYER_ROLES.FORWARD]
-      }`
+      `   Equipo A: GK=${teamACount['Arquero']}, DEF=${teamACount['Defensor']}, MID=${teamACount['Mediocampo']}, FWD=${teamACount['Delantero']}`
     );
     console.log(
-      `   Equipo B: GK=${teamBCount[PLAYER_ROLES.GOALKEEPER]}, DEF=${
-        teamBCount[PLAYER_ROLES.DEFENDER]
-      }, MID=${teamBCount[PLAYER_ROLES.MIDFIELDER]}, FWD=${
-        teamBCount[PLAYER_ROLES.FORWARD]
-      }`
+      `   Equipo B: GK=${teamBCount['Arquero']}, DEF=${teamBCount['Defensor']}, MID=${teamBCount['Mediocampo']}, FWD=${teamBCount['Delantero']}`
     );
 
     // Verificación de emergencia para arqueros
-    if (teamACount[PLAYER_ROLES.GOALKEEPER] === 0) {
+    if (teamACount['Arquero'] === 0) {
       console.log('🚨 EMERGENCIA: Equipo A sin arquero - Convirtiendo jugador');
       this.convertPlayerToGoalkeeper(true);
     }
 
-    if (teamBCount[PLAYER_ROLES.GOALKEEPER] === 0) {
+    if (teamBCount['Arquero'] === 0) {
       console.log('🚨 EMERGENCIA: Equipo B sin arquero - Convirtiendo jugador');
       this.convertPlayerToGoalkeeper(false);
     }
@@ -1090,6 +1349,108 @@ class UnifiedTeamBalancer {
     const forcedA = this.teamA.filter((p) => p.positionForced).length;
     const forcedB = this.teamB.filter((p) => p.positionForced).length;
     console.log(`   Posiciones forzadas: A=${forcedA}, B=${forcedB}`);
+  }
+
+  private convertPlayerToGoalkeeper(isTeamA: boolean): void {
+    const team = isTeamA ? this.teamA : this.teamB;
+
+    if (team.length === 0) {
+      console.log(
+        `❌ No hay jugadores en equipo ${
+          isTeamA ? 'A' : 'B'
+        } para convertir a arquero`
+      );
+      return;
+    }
+
+    // Buscar el jugador menos impactante para convertir
+    // Priorizar jugadores que ya tengan arquero como segunda opción
+    let targetPlayer = team.find((player) => {
+      const secondaryRole = getSecondaryRole(player.playerRoles);
+      return secondaryRole === TYPED_ROLES.GOALKEEPER;
+    });
+
+    // Si no hay nadie con arquero secundario, tomar cualquiera
+    if (!targetPlayer) {
+      targetPlayer = team[0];
+    }
+
+    // Convertir el jugador a arquero
+    targetPlayer.assignedRole = TYPED_ROLES.GOALKEEPER;
+    // CORREGIDO: Solo marcar como forzado si NO tiene arquero entre sus roles
+    targetPlayer.positionForced = !hasRole(
+      targetPlayer.playerRoles,
+      TYPED_ROLES.GOALKEEPER
+    );
+
+    console.log(
+      `   ✅ ${targetPlayer.name} convertido a arquero en equipo ${
+        isTeamA ? 'A' : 'B'
+      } ${targetPlayer.positionForced ? '(FORZADO)' : '(SECUNDARIO)'}`
+    );
+  }
+
+  private balanceTeams(): void {
+    const diff = this.teamA.length - this.teamB.length;
+    if (Math.abs(diff) <= 1) return; // Ya está balanceado
+
+    const sourceTeam = diff > 0 ? this.teamA : this.teamB;
+    const targetTeam = diff > 0 ? this.teamB : this.teamA;
+    const playersToMove = Math.floor(Math.abs(diff) / 2);
+
+    console.log(`\n🔄 Balanceando equipos (diferencia: ${Math.abs(diff)})`);
+    console.log(
+      `   Moviendo ${playersToMove} jugadores de Equipo ${
+        diff > 0 ? 'A' : 'B'
+      } a Equipo ${diff > 0 ? 'B' : 'A'}`
+    );
+
+    for (let i = 0; i < playersToMove; i++) {
+      // Buscar el jugador más adecuado para mover (priorizar comodines y roles duplicados)
+      const playerToMove = sourceTeam
+        .filter((p) => p.assignedRole !== TYPED_ROLES.GOALKEEPER) // No mover arqueros
+        .sort((a, b) => {
+          // Priorizar comodines
+          if (
+            a.assignedRole === TYPED_ROLES.WILDCARD &&
+            b.assignedRole !== TYPED_ROLES.WILDCARD
+          )
+            return -1;
+          if (
+            b.assignedRole === TYPED_ROLES.WILDCARD &&
+            a.assignedRole !== TYPED_ROLES.WILDCARD
+          )
+            return 1;
+
+          // Luego priorizar roles que tengan más jugadores en el equipo origen
+          const aCount = sourceTeam.filter(
+            (p) => p.assignedRole === a.assignedRole
+          ).length;
+          const bCount = sourceTeam.filter(
+            (p) => p.assignedRole === b.assignedRole
+          ).length;
+          return bCount - aCount;
+        })[0];
+
+      if (playerToMove) {
+        // Remover del equipo origen
+        const sourceIndex = sourceTeam.findIndex(
+          (p) => p.id === playerToMove.id
+        );
+        sourceTeam.splice(sourceIndex, 1);
+
+        // Agregar al equipo destino
+        targetTeam.push(playerToMove);
+
+        console.log(
+          `   ✅ Movido: ${playerToMove.name} (${playerToMove.assignedRole})`
+        );
+      }
+    }
+
+    console.log(
+      `   📊 Balance final: A=${this.teamA.length}, B=${this.teamB.length}`
+    );
   }
 }
 

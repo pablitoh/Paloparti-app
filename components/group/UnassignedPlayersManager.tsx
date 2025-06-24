@@ -8,6 +8,7 @@ interface Player {
   playerType?: string;
   age?: number | null;
   isTeamA?: boolean;
+  isAssigned?: boolean;
 }
 
 interface UnassignedPlayersManagerProps {
@@ -18,6 +19,7 @@ interface UnassignedPlayersManagerProps {
   currentUserIsAdmin: boolean;
   onRandomizeTeams: () => Promise<void>;
   isLoading: boolean;
+  unassignedCount?: number;
 }
 
 const UnassignedPlayersManager = ({
@@ -28,36 +30,37 @@ const UnassignedPlayersManager = ({
   currentUserIsAdmin,
   onRandomizeTeams,
   isLoading,
+  unassignedCount: propUnassignedCount,
 }: UnassignedPlayersManagerProps) => {
-  const [unassignedPlayers, setUnassignedPlayers] = useState<Player[]>([]);
-  const [unassignedCount, setUnassignedCount] = useState<number>(0);
+  const [calculatedUnassignedCount, setCalculatedUnassignedCount] =
+    useState<number>(0);
 
-  // Update unassigned players when confirmed players or team players change
   useEffect(() => {
-    // Get all players in teams A and B
-    const allTeamPlayerIds = [...playersA, ...playersB].map(
-      (player) => player.id
-    );
+    if (propUnassignedCount === undefined) {
+      const allTeamPlayerIds = [...playersA, ...playersB].map(
+        (player) => player.id
+      );
 
-    // Calculate unassigned players (confirmed players not in any team)
-    const unassignedPlayersArr = confirmedPlayers.filter(
-      (player) => !allTeamPlayerIds.includes(player.id)
-    );
+      const unassignedPlayersCount = confirmedPlayers.filter(
+        (player) => !allTeamPlayerIds.includes(player.id)
+      ).length;
 
-    setUnassignedPlayers(unassignedPlayersArr);
-    setUnassignedCount(unassignedPlayersArr.length);
-  }, [confirmedPlayers, playersA, playersB]);
+      setCalculatedUnassignedCount(unassignedPlayersCount);
+    }
+  }, [confirmedPlayers, playersA, playersB, propUnassignedCount]);
 
-  // Only render notification if needed
-  if (!teamsFormed || !currentUserIsAdmin || unassignedCount <= 0) {
+  const finalUnassignedCount = propUnassignedCount ?? calculatedUnassignedCount;
+
+  if (!currentUserIsAdmin || finalUnassignedCount <= 0) {
     return null;
   }
 
   return (
     <UnassignedPlayersNotification
-      unassignedCount={unassignedCount}
+      unassignedCount={finalUnassignedCount}
       onRandomizeTeams={onRandomizeTeams}
       isLoading={isLoading}
+      teamsFormed={teamsFormed}
     />
   );
 };

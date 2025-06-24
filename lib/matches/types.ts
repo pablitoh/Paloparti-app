@@ -1,4 +1,4 @@
-import { PlayerRole } from '../teambuilder';
+import { PlayerRole, PlayerRoleType } from '../teambuilder';
 
 // Interfaces tipo Member
 export type Member = {
@@ -6,9 +6,9 @@ export type Member = {
   name: string | null;
   birthdate: Date | null;
   age: number | null;
-  role: string;
+  role: PlayerRoleType;
   playerRoles?: PlayerRole[]; // Roles elegidos por el usuario con prioridades
-  assignedRole?: string; // Rol asignado para la formación
+  assignedRole?: PlayerRoleType; // Rol asignado para la formación
   positionForced?: boolean; // Indica si la posición fue forzada (no es preferida del jugador)
   starRating?: number; // Nivel de habilidad del jugador (0-5)
 };
@@ -19,7 +19,7 @@ export interface TbdPlayer {
   isTeamA: boolean;
   avatar?: string | null;
   playerType: 'TBD';
-  playerRoles?: string[]; // Roles del jugador
+  playerRoles?: PlayerRole[]; // Roles del jugador
 }
 
 // Interfaz para solicitud de crear equipos

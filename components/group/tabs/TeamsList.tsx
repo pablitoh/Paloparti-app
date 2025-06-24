@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Avatar } from '@mui/material';
 import {
   UserIcon,
@@ -6,14 +6,19 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
 } from '@heroicons/react/24/outline';
-import { PLAYER_ROLES, PlayerRole } from '../../../lib/teambuilder';
+import {
+  PLAYER_ROLES,
+  PlayerRole,
+  PlayerRoleType,
+} from '../../../lib/teambuilder';
+import type { Player, TbdPlayer } from '../../../types/match';
 
 // Mapeo de roles a iconos y prioridad (para ordenamiento)
 const ROLE_ICONS: Record<
-  string,
+  PlayerRoleType,
   { icon: React.ReactElement; priority: number }
 > = {
-  [PLAYER_ROLES.GOALKEEPER]: {
+  Arquero: {
     icon: (
       <div title='Arquero' className='text-sm'>
         🧤
@@ -21,7 +26,7 @@ const ROLE_ICONS: Record<
     ),
     priority: 0,
   },
-  [PLAYER_ROLES.DEFENDER]: {
+  Defensor: {
     icon: (
       <div title='Defensor' className='text-sm'>
         🛡️
@@ -29,7 +34,7 @@ const ROLE_ICONS: Record<
     ),
     priority: 1,
   },
-  [PLAYER_ROLES.MIDFIELDER]: {
+  Mediocampo: {
     icon: (
       <div title='Mediocampo' className='text-sm'>
         ⚽
@@ -37,7 +42,7 @@ const ROLE_ICONS: Record<
     ),
     priority: 2,
   },
-  [PLAYER_ROLES.FORWARD]: {
+  Delantero: {
     icon: (
       <div title='Delantero' className='text-sm'>
         👟
@@ -45,7 +50,7 @@ const ROLE_ICONS: Record<
     ),
     priority: 3,
   },
-  [PLAYER_ROLES.WILDCARD]: {
+  Comodín: {
     icon: (
       <div title='Comodín' className='text-sm'>
         🔄
@@ -55,45 +60,17 @@ const ROLE_ICONS: Record<
   },
 };
 
-interface Player {
-  id: string;
-  name: string | null;
-  avatar: string | null;
-  playerType?: string;
-  playerRoles?: PlayerRole[];
-  assignedRole?: string;
-  positionForced?: boolean;
-  age?: number;
-  starRating?: number;
-}
-
-interface TbdPlayer {
-  id: string;
-  name: string;
-  isTeamA: boolean;
-  avatar?: string | null;
-  playerType?: string;
-  playerRoles?: PlayerRole[];
-  assignedRole?: string;
-  positionForced?: boolean;
-  age?: number;
-  starRating?: number;
-}
-
 interface TeamsListProps {
   playersA: Player[];
   playersB: Player[];
-  tbdPlayers?: TbdPlayer[];
-  teamAName: string;
-  teamBName: string;
+  tbdPlayersTeamA?: TbdPlayer[];
+  tbdPlayersTeamB?: TbdPlayer[];
+  teamAName?: string;
+  teamBName?: string;
   currentUserIsAdmin: boolean;
-  onReplaceTbd?: (playerId: string) => void;
   onSwapPlayer?: (playerId: string, isTeamA: boolean) => void;
-  teamAAvgAge?: number;
-  teamBAvgAge?: number;
-  teamAAvgRating?: number;
-  teamBAvgRating?: number;
   sortCount?: number;
+  matchId?: string;
   isCompactView?: boolean;
 }
 
@@ -114,10 +91,20 @@ interface TeamCardProps {
 }
 
 // Función para obtener el rol principal de un jugador
-const getPrimaryRole = (playerRoles?: PlayerRole[]): string | undefined => {
+const getPrimaryRole = (
+  playerRoles?: PlayerRole[]
+): PlayerRoleType | undefined => {
   if (!playerRoles || playerRoles.length === 0) return undefined;
   const sortedRoles = [...playerRoles].sort((a, b) => a.priority - b.priority);
   return sortedRoles[0].role;
+};
+
+// Función para obtener roles del jugador
+const getPlayerRoles = (player: Player | TbdPlayer): PlayerRoleType[] => {
+  if (player.playerRoles && Array.isArray(player.playerRoles)) {
+    return player.playerRoles.map((pr) => pr.role);
+  }
+  return [];
 };
 
 // Función para ordenar jugadores por rol
@@ -132,84 +119,113 @@ const sortPlayersByRole = (
     if (!roleA) return 1;
     if (!roleB) return -1;
 
-    const priorityA = ROLE_ICONS[roleA]?.priority ?? 999;
-    const priorityB = ROLE_ICONS[roleB]?.priority ?? 999;
+    // Asegurarse que los roles sean válidos antes de usarlos como índices
+    const validRoleA = roleA as PlayerRoleType;
+    const validRoleB = roleB as PlayerRoleType;
+
+    const priorityA = ROLE_ICONS[validRoleA]?.priority ?? 999;
+    const priorityB = ROLE_ICONS[validRoleB]?.priority ?? 999;
 
     return priorityA - priorityB;
   });
 };
 
-// Función para obtener roles del jugador
-const getPlayerRoles = (player: Player | TbdPlayer): string[] => {
-  if (player.playerRoles && Array.isArray(player.playerRoles)) {
-    if (
-      player.playerRoles.length > 0 &&
-      typeof player.playerRoles[0] === 'object' &&
-      'role' in player.playerRoles[0]
-    ) {
-      return (player.playerRoles as PlayerRole[]).map((pr) => pr.role);
-    }
-    return player.playerRoles as unknown as string[];
-  }
-  return [];
-};
-
 const TeamsList: React.FC<TeamsListProps> = ({
   playersA,
   playersB,
-  tbdPlayers = [],
-  teamAName,
-  teamBName,
+  tbdPlayersTeamA = [],
+  tbdPlayersTeamB = [],
+  teamAName = 'Equipo A',
+  teamBName = 'Equipo B',
   currentUserIsAdmin,
-  onReplaceTbd,
   onSwapPlayer,
-  teamAAvgAge,
-  teamBAvgAge,
-  teamAAvgRating,
-  teamBAvgRating,
   sortCount = 0,
+  matchId,
   isCompactView = false,
 }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const sliderRef = useRef<HTMLDivElement>(null);
 
+  // Procesar jugadores con useMemo para evitar re-renders innecesarios
+  const processedTeams = useMemo(() => {
+    const processPlayers = (players: Player[]): Player[] => {
+      if (!Array.isArray(players)) return [];
+      return players.map((player) => ({
+        ...player,
+        assignedRole: player.assignedRole || getPrimaryRole(player.playerRoles),
+      }));
+    };
+
+    const teamA = processPlayers(playersA);
+    const teamB = processPlayers(playersB);
+
+    // Verificar que todos los jugadores tengan un rol asignado
+    const allPlayersHaveRoles = [...teamA, ...teamB].every(
+      (player) => player.assignedRole
+    );
+
+    // Verificar que los equipos estén balanceados (diferencia máxima de 1 jugador)
+    const isBalanced = Math.abs(teamA.length - teamB.length) <= 1;
+
+    console.log('🎯 TeamsList renderizado:', {
+      teamALength: teamA.length,
+      teamBLength: teamB.length,
+      teamAName,
+      teamBName,
+      sortCount,
+      allPlayersHaveRoles,
+      isBalanced,
+    });
+
+    return {
+      teamA,
+      teamB,
+      allPlayersHaveRoles,
+      isBalanced,
+    };
+  }, [playersA, playersB, sortCount]);
+
+  const { teamA, teamB, allPlayersHaveRoles, isBalanced } = processedTeams;
+
+  // Si hay un desbalance o jugadores sin rol, mostrar advertencia
+  if (!allPlayersHaveRoles || !isBalanced) {
+    console.warn(
+      '⚠️ Advertencia: Equipos no están correctamente balanceados o hay jugadores sin rol asignado'
+    );
+  }
+
   // Calcular promedios localmente si no vienen en props
-  const calculateLocalAvgAge = (players: any[]): number | undefined => {
-    if (!players || players.length === 0) return undefined;
+  const calculateLocalAvgAge = (players: Player[]): number | undefined => {
     const playersWithAge = players.filter(
-      (p) => p.age !== undefined && p.age !== null
+      (player): player is Player & { age: number } =>
+        player.age !== undefined && player.age !== null
     );
     if (playersWithAge.length === 0) return undefined;
-    const sum = playersWithAge.reduce(
-      (acc, player) => acc + (player.age || 0),
-      0
-    );
+    const sum = playersWithAge.reduce((acc, player) => acc + player.age, 0);
     return Math.round(sum / playersWithAge.length);
   };
 
-  const calculateLocalAvgRating = (players: any[]): number | undefined => {
-    if (!players || players.length === 0) return undefined;
+  const calculateLocalAvgRating = (players: Player[]): number | undefined => {
     const playersWithRating = players.filter(
-      (p) => p.starRating !== undefined && p.starRating !== null
+      (player): player is Player & { starRating: number } =>
+        player.starRating !== undefined && player.starRating !== null
     );
     if (playersWithRating.length === 0) return undefined;
     const sum = playersWithRating.reduce(
-      (acc, player) => acc + (player.starRating || 0),
+      (acc, player) => acc + player.starRating,
       0
     );
-    return parseFloat((sum / playersWithRating.length).toFixed(1));
+    return Number((sum / playersWithRating.length).toFixed(1));
   };
 
-  const effectiveTeamAAvgAge = teamAAvgAge ?? calculateLocalAvgAge(playersA);
-  const effectiveTeamBAvgAge = teamBAvgAge ?? calculateLocalAvgAge(playersB);
-  const effectiveTeamAAvgRating =
-    teamAAvgRating ?? calculateLocalAvgRating(playersA);
-  const effectiveTeamBAvgRating =
-    teamBAvgRating ?? calculateLocalAvgRating(playersB);
+  const teamAAvgAge = calculateLocalAvgAge(teamA);
+  const teamBAvgAge = calculateLocalAvgAge(teamB);
+  const teamAAvgRating = calculateLocalAvgRating(teamA);
+  const teamBAvgRating = calculateLocalAvgRating(teamB);
 
   // Filtrar TBD players por equipo
-  const teamATbdPlayers = tbdPlayers.filter((player) => player.isTeamA);
-  const teamBTbdPlayers = tbdPlayers.filter((player) => !player.isTeamA);
+  const teamATbdPlayers = tbdPlayersTeamA || [];
+  const teamBTbdPlayers = tbdPlayersTeamB || [];
 
   // Navigation functions for mobile slider
   const nextSlide = () => {
@@ -235,20 +251,24 @@ const TeamsList: React.FC<TeamsListProps> = ({
   // Handle scroll to update current slide
   useEffect(() => {
     const handleScroll = () => {
-      if (sliderRef.current) {
-        const scrollLeft = sliderRef.current.scrollLeft;
-        const width = sliderRef.current.offsetWidth;
-        const newSlide = Math.round(scrollLeft / width);
-        setCurrentSlide(newSlide);
-      }
+      if (!sliderRef.current) return;
+      const scrollLeft = sliderRef.current.scrollLeft;
+      const slideWidth = sliderRef.current.offsetWidth;
+      const newSlide = Math.round(scrollLeft / slideWidth);
+      setCurrentSlide(newSlide);
     };
 
-    const slider = sliderRef.current;
-    if (slider) {
-      slider.addEventListener('scroll', handleScroll);
-      return () => slider.removeEventListener('scroll', handleScroll);
+    const currentSlider = sliderRef.current;
+    if (currentSlider) {
+      currentSlider.addEventListener('scroll', handleScroll);
     }
-  }, []);
+
+    return () => {
+      if (currentSlider) {
+        currentSlider.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, [sortCount, teamA, teamB]);
 
   // Componente para un jugador individual
   const PlayerItem: React.FC<PlayerItemProps> = ({
@@ -283,33 +303,43 @@ const TeamsList: React.FC<TeamsListProps> = ({
     }, []);
 
     const getUserSelectedRoles = (): { role: string; priority: number }[] => {
-      if (player.playerRoles && Array.isArray(player.playerRoles)) {
-        if (
-          player.playerRoles.length > 0 &&
-          typeof player.playerRoles[0] === 'object' &&
-          'role' in player.playerRoles[0]
-        ) {
-          const sortedRoles = [...(player.playerRoles as PlayerRole[])].sort(
-            (a, b) => a.priority - b.priority
-          );
-          return sortedRoles.map((pr) => ({
-            role: pr.role,
-            priority: pr.priority,
-          }));
-        }
-        const stringRoles = player.playerRoles as unknown as string[];
-        return stringRoles.map((role, index) => ({
-          role,
-          priority: index + 1,
-        }));
+      if (!player.playerRoles || !Array.isArray(player.playerRoles)) {
+        return [];
       }
+
+      // Si el array está vacío, retornar array vacío
+      if (player.playerRoles.length === 0) {
+        return [];
+      }
+
+      // Si es un array de objetos PlayerRole
+      if (
+        typeof player.playerRoles[0] === 'object' &&
+        'role' in player.playerRoles[0]
+      ) {
+        return [...(player.playerRoles as PlayerRole[])].sort(
+          (a, b) => a.priority - b.priority
+        );
+      }
+
+      // Si es un array de strings (formato antiguo)
+      if (typeof player.playerRoles[0] === 'string') {
+        return (player.playerRoles as unknown as string[]).map(
+          (role, index) => ({
+            role,
+            priority: index + 1,
+          })
+        );
+      }
+
+      // Si no es ninguno de los formatos esperados, retornar array vacío
       return [];
     };
 
     const userSelectedRoles = getUserSelectedRoles();
 
     let displayRoles: {
-      role: string;
+      role: PlayerRoleType;
       priority: number;
       isAssigned: boolean;
       isForced: boolean;
@@ -319,7 +349,7 @@ const TeamsList: React.FC<TeamsListProps> = ({
       // Mostrar todas las posiciones preferidas del jugador
       userSelectedRoles.forEach((roleObj) => {
         displayRoles.push({
-          role: roleObj.role,
+          role: roleObj.role as PlayerRoleType,
           priority: roleObj.priority,
           isAssigned: player.assignedRole === roleObj.role,
           isForced:
@@ -355,8 +385,8 @@ const TeamsList: React.FC<TeamsListProps> = ({
     const roleDisplayData = displayRoles.map((roleData) => ({
       role: roleData.role,
       icon:
-        ROLE_ICONS[roleData.role]?.icon ||
-        ROLE_ICONS[PLAYER_ROLES.WILDCARD]?.icon,
+        ROLE_ICONS[roleData.role as keyof typeof ROLE_ICONS]?.icon ||
+        ROLE_ICONS['Comodín'].icon,
       isAssigned: roleData.isAssigned,
       isForced: roleData.isForced,
       priority: roleData.priority,
@@ -441,9 +471,9 @@ const TeamsList: React.FC<TeamsListProps> = ({
           </div>
 
           {/* Admin button */}
-          {currentUserIsAdmin && showReplaceButton && onReplaceTbd && (
+          {currentUserIsAdmin && showReplaceButton && onSwapPlayer && (
             <button
-              onClick={() => onReplaceTbd(player.id)}
+              onClick={() => onSwapPlayer(player.id, isTeamA)}
               className='p-2 rounded-lg bg-primary-50 text-primary-600 border border-primary-200 hover:bg-primary-100 hover:border-primary-300 transition-colors ml-3'
               title='Reemplazar jugador'
             >
@@ -573,20 +603,20 @@ const TeamsList: React.FC<TeamsListProps> = ({
   };
 
   // Función para obtener el nombre en español de la posición
-  const getPositionName = (position: string): string => {
+  const getPositionName = (position: PlayerRoleType): string => {
     switch (position) {
-      case PLAYER_ROLES.GOALKEEPER:
-        return 'Arqueros';
-      case PLAYER_ROLES.DEFENDER:
-        return 'Defensores';
-      case PLAYER_ROLES.MIDFIELDER:
-        return 'Mediocampistas';
-      case PLAYER_ROLES.FORWARD:
-        return 'Delanteros';
-      case PLAYER_ROLES.WILDCARD:
-        return 'Comodines';
+      case 'Arquero':
+        return 'Arquero';
+      case 'Defensor':
+        return 'Defensor';
+      case 'Mediocampo':
+        return 'Mediocampo';
+      case 'Delantero':
+        return 'Delantero';
+      case 'Comodín':
+        return 'Comodín';
       default:
-        return 'Sin posición';
+        return position;
     }
   };
 
@@ -599,74 +629,71 @@ const TeamsList: React.FC<TeamsListProps> = ({
     avgAge,
     avgRating,
   }) => {
-    const allPlayers = [...players, ...tbdPlayers];
-    const groupedPlayers = groupPlayersByPosition(allPlayers);
+    const sortedPlayers = useMemo(() => sortPlayersByRole(players), [players]);
+    const groupedPlayers = useMemo(
+      () => groupPlayersByPosition(sortedPlayers),
+      [sortedPlayers]
+    );
+
+    console.log('🎯 TeamCard renderizado:', {
+      teamName,
+      playersCount: players.length,
+      tbdPlayersCount: tbdPlayers.length,
+      avgAge,
+      avgRating,
+    });
 
     return (
-      <div className='rounded-3xl shadow-sm border border-gray-200 min-w-0 flex-shrink-0 w-full md:w-auto transition-all duration-200 hover:shadow-md hover:border-gray-300 bg-white overflow-visible'>
-        {/* Team Header - New design with gradient */}
-        <div
-          className={`p-3 pb-2 ${
-            isTeamA
-              ? 'bg-gradient-to-b from-primary-200 via-primary-100 via-gray-50 to-white'
-              : 'bg-gradient-to-b from-lime-200 via-lime-100 via-gray-50 to-white'
-          } rounded-t-3xl`}
-        >
-          {/* Top row with age and rating in corners */}
-          <div className='flex justify-between items-start mb-2'>
-            {/* Age on the left */}
-            <div className='text-xs font-medium text-gray-700'>
-              {avgAge !== undefined ? `${avgAge} 🎂` : ''}
-            </div>
-
-            {/* Rating on the right */}
-            <div className='text-xs font-medium text-gray-700'>
-              {avgRating !== undefined ? `${avgRating} ⭐` : ''}
-            </div>
-          </div>
-
-          {/* Team name centered */}
-          <div className='text-center'>
-            <h3
-              className={`text-lg font-bold ${
-                isTeamA ? 'text-primary-900' : 'text-lime-900'
-              }`}
-            >
-              {teamName}
-            </h3>
+      <div
+        className={`bg-white rounded-lg shadow-md p-4 w-full ${
+          isTeamA ? 'border-primary-200' : 'border-lime-200'
+        } border`}
+      >
+        <div className='flex justify-between items-center mb-4'>
+          <h3
+            className={`text-lg font-semibold ${
+              isTeamA ? 'text-primary-800' : 'text-lime-800'
+            }`}
+          >
+            {teamName}
+          </h3>
+          <div className='flex space-x-2 text-sm text-gray-600'>
+            {avgAge && (
+              <span title='Edad promedio'>👥 {avgAge.toFixed(1)}</span>
+            )}
+            {avgRating && (
+              <span title='Rating promedio'>⭐ {avgRating.toFixed(1)}</span>
+            )}
           </div>
         </div>
 
-        {/* Players List Grouped by Position */}
-        <div className='px-3 pb-3 space-y-0'>
-          {groupedPlayers.map((group, groupIndex) => (
+        {/* Lista de jugadores agrupados por posición */}
+        <div className='space-y-3'>
+          {groupedPlayers.map((group) => (
             <div key={group.position} className='relative'>
-              {/* Position Header - Centered in the space between players */}
-              <div className='flex items-center relative z-20 -my-1'>
-                <div className='flex-grow h-px bg-gray-300'></div>
+              {/* Encabezado de posición */}
+              <div className='flex items-center gap-2 mb-2'>
+                <div className='flex-grow h-px bg-gray-200'></div>
                 <span
-                  className={`px-3 text-xs font-medium rounded-full shadow-sm ${
+                  className={`px-2 py-0.5 text-xs font-medium rounded-full ${
                     isTeamA
-                      ? 'text-slate-700 bg-slate-50/50 border border-slate-200'
-                      : 'text-emerald-700 bg-emerald-50/50 border border-emerald-200'
+                      ? 'bg-primary-50 text-primary-700 border border-primary-200'
+                      : 'bg-lime-50 text-lime-700 border border-lime-200'
                   }`}
                 >
-                  {getPositionName(group.position)}
+                  {getPositionName(group.position as PlayerRoleType)}
                 </span>
-                <div className='flex-grow h-px bg-gray-300'></div>
+                <div className='flex-grow h-px bg-gray-200'></div>
               </div>
 
-              {/* Players in this position */}
+              {/* Jugadores en esta posición */}
               <div className='space-y-2'>
                 {group.players.map((player) => (
                   <PlayerItem
                     key={player.id}
                     player={player}
                     showReplaceButton={player.playerType === 'TBD'}
-                    isTbd={
-                      player.playerType === 'TBD' ||
-                      tbdPlayers.some((tbd) => tbd.id === player.id)
-                    }
+                    isTbd={tbdPlayers.some((tbd) => tbd.id === player.id)}
                     isTeamA={isTeamA}
                   />
                 ))}
@@ -738,8 +765,8 @@ const TeamsList: React.FC<TeamsListProps> = ({
 
   // Componente para vista compacta
   const CompactView = () => {
-    const allPlayersA = [...playersA, ...teamATbdPlayers];
-    const allPlayersB = [...playersB, ...teamBTbdPlayers];
+    const allPlayersA = [...teamA, ...teamATbdPlayers];
+    const allPlayersB = [...teamB, ...teamBTbdPlayers];
     const sortedPlayersA = sortPlayersByRole(allPlayersA);
     const sortedPlayersB = sortPlayersByRole(allPlayersB);
 
@@ -755,9 +782,9 @@ const TeamsList: React.FC<TeamsListProps> = ({
               {teamAName}
             </h3>
             <div className='text-sm text-gray-600'>
-              {effectiveTeamAAvgAge && `${effectiveTeamAAvgAge} 🎂`}
-              {effectiveTeamAAvgAge && effectiveTeamAAvgRating && ' • '}
-              {effectiveTeamAAvgRating && `${effectiveTeamAAvgRating} ⭐`}
+              {teamAAvgAge && `${teamAAvgAge} 🎂`}
+              {teamAAvgAge && teamAAvgRating && ' • '}
+              {teamAAvgRating && `${teamAAvgRating} ⭐`}
             </div>
           </div>
 
@@ -766,9 +793,9 @@ const TeamsList: React.FC<TeamsListProps> = ({
               {teamBName}
             </h3>
             <div className='text-sm text-gray-600'>
-              {effectiveTeamBAvgAge && `${effectiveTeamBAvgAge} 🎂`}
-              {effectiveTeamBAvgAge && effectiveTeamBAvgRating && ' • '}
-              {effectiveTeamBAvgRating && `${effectiveTeamBAvgRating} ⭐`}
+              {teamBAvgAge && `${teamBAvgAge} 🎂`}
+              {teamBAvgAge && teamBAvgRating && ' • '}
+              {teamBAvgRating && `${teamBAvgRating} ⭐`}
             </div>
           </div>
         </div>
@@ -827,24 +854,6 @@ const TeamsList: React.FC<TeamsListProps> = ({
     );
   };
 
-  // Agregar logging para debugging
-  console.log(`🎯 TeamsList renderizado con sortCount: ${sortCount}`, {
-    playersACount: playersA.length,
-    playersBCount: playersB.length,
-    teamsListKey: sortCount,
-    playersAData: playersA.map((p) => ({
-      id: p.id,
-      name: p.name,
-      assignedRole: p.assignedRole,
-    })),
-    playersBData: playersB.map((p) => ({
-      id: p.id,
-      name: p.name,
-      assignedRole: p.assignedRole,
-    })),
-    timestamp: new Date().toISOString(),
-  });
-
   return (
     <div
       id={`teams-list-container-${sortCount}`}
@@ -858,20 +867,20 @@ const TeamsList: React.FC<TeamsListProps> = ({
           {/* Desktop Layout with better spacing */}
           <div className='hidden md:flex gap-6 justify-center px-4'>
             <TeamCard
-              players={playersA}
+              players={teamA}
               tbdPlayers={teamATbdPlayers}
               teamName={teamAName || 'Equipo A'}
               isTeamA={true}
-              avgAge={effectiveTeamAAvgAge}
-              avgRating={effectiveTeamAAvgRating}
+              avgAge={teamAAvgAge}
+              avgRating={teamAAvgRating}
             />
             <TeamCard
-              players={playersB}
+              players={teamB}
               tbdPlayers={teamBTbdPlayers}
               teamName={teamBName || 'Equipo B'}
               isTeamA={false}
-              avgAge={effectiveTeamBAvgAge}
-              avgRating={effectiveTeamBAvgRating}
+              avgAge={teamBAvgAge}
+              avgRating={teamBAvgRating}
             />
           </div>
 
@@ -926,22 +935,22 @@ const TeamsList: React.FC<TeamsListProps> = ({
             >
               <div className='snap-center min-w-[300px] flex-shrink-0'>
                 <TeamCard
-                  players={playersA}
+                  players={teamA}
                   tbdPlayers={teamATbdPlayers}
                   teamName={teamAName || 'Equipo A'}
                   isTeamA={true}
-                  avgAge={effectiveTeamAAvgAge}
-                  avgRating={effectiveTeamAAvgRating}
+                  avgAge={teamAAvgAge}
+                  avgRating={teamAAvgRating}
                 />
               </div>
               <div className='snap-center min-w-[300px] flex-shrink-0'>
                 <TeamCard
-                  players={playersB}
+                  players={teamB}
                   tbdPlayers={teamBTbdPlayers}
                   teamName={teamBName || 'Equipo B'}
                   isTeamA={false}
-                  avgAge={effectiveTeamBAvgAge}
-                  avgRating={effectiveTeamBAvgRating}
+                  avgAge={teamBAvgAge}
+                  avgRating={teamBAvgRating}
                 />
               </div>
             </div>

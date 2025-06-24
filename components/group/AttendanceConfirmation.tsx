@@ -6,21 +6,16 @@ import {
 } from '@heroicons/react/24/outline';
 import type { ParticipantStatus } from '../../types/group';
 import { POSITION_CONFIG } from '../../lib/teambuilder';
+import { PlayerRole, PlayerRoleType } from '../../lib/teambuilder/types';
 
 // Constantes para roles de jugadores
 export const PLAYER_ROLES = {
-  GOALKEEPER: 'Arquero',
-  DEFENDER: 'Defensor',
-  MIDFIELDER: 'Mediocampo',
-  FORWARD: 'Delantero',
-  WILDCARD: 'Comodín',
+  GOALKEEPER: 'Arquero' as PlayerRoleType,
+  DEFENDER: 'Defensor' as PlayerRoleType,
+  MIDFIELDER: 'Mediocampo' as PlayerRoleType,
+  FORWARD: 'Delantero' as PlayerRoleType,
+  WILDCARD: 'Comodín' as PlayerRoleType,
 };
-
-// Nueva estructura para posiciones con prioridad
-export interface PlayerRole {
-  role: string;
-  priority: number;
-}
 
 interface AttendanceConfirmationProps {
   userAttendanceStatus: ParticipantStatus | undefined;
@@ -68,7 +63,7 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
       // Convertir formato antiguo - mantener orden original como prioridad
       const stringRoles = roles as string[];
       return stringRoles.map((role, index) => ({
-        role,
+        role: role as PlayerRoleType,
         priority: index + 1,
       }));
     },
@@ -130,7 +125,7 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
     requiredPlayers > 0 && confirmedCount >= requiredPlayers && !isConfirmed;
 
   // Nueva lógica para manejar clicks en roles
-  const handleRoleClick = (role: string) => {
+  const handleRoleClick = (role: PlayerRoleType) => {
     if (isConfirmed) return;
 
     const currentRoleIndex = selectedRoles.findIndex((r) => r.role === role);
@@ -154,13 +149,13 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
   };
 
   // Obtener la prioridad de un rol
-  const getRolePriority = (role: string): number | undefined => {
+  const getRolePriority = (role: PlayerRoleType): number | undefined => {
     const roleData = selectedRoles.find((r) => r.role === role);
     return roleData?.priority;
   };
 
   // Verificar si un rol está seleccionado
-  const isRoleSelected = (role: string): boolean => {
+  const isRoleSelected = (role: PlayerRoleType): boolean => {
     return selectedRoles.some((r) => r.role === role);
   };
 

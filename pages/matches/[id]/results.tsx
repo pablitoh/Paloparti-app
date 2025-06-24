@@ -465,11 +465,6 @@ export default function MatchResults() {
         status: 'COMPLETED',
       };
 
-      console.log('🚀 FRONTEND: Enviando datos al API...');
-      console.log('   - URL:', `/api/matches/${id}/result`);
-      console.log('   - Método: PATCH');
-      console.log('   - Datos:', JSON.stringify(requestData, null, 2));
-
       const response = await fetch(`/api/matches/${id}/result`, {
         method: 'PATCH',
         headers: {
@@ -477,10 +472,6 @@ export default function MatchResults() {
         },
         body: JSON.stringify(requestData),
       });
-
-      console.log('🔥 FRONTEND: Respuesta recibida del API:');
-      console.log('   - Status:', response.status);
-      console.log('   - OK:', response.ok);
 
       if (!response.ok) {
         // Try to parse as JSON first

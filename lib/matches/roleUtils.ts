@@ -1,140 +1,114 @@
-import { Member } from './types';
+import { Member, PlayerRoleType, PlayerRole } from '../teambuilder/types';
 import { PLAYER_ROLES, MAX_GOALKEEPERS_PER_TEAM } from './constants';
-import { PlayerRole } from '../teambuilder';
 
-// Función para asignar roles de manera flexible (de atrás hacia adelante)
+type FormationType = '4-4-2' | '4-3-3';
+type FormationConfig = {
+  [key in Exclude<PlayerRoleType, 'Comodín'>]: number;
+};
+
+const FORMATIONS: Record<FormationType, FormationConfig> = {
+  '4-4-2': {
+    Arquero: 1,
+    Defensor: 4,
+    Mediocampo: 4,
+    Delantero: 3,
+  },
+  '4-3-3': {
+    Arquero: 1,
+    Defensor: 4,
+    Mediocampo: 3,
+    Delantero: 3,
+  },
+};
+
+const isValidRole = (
+  role: PlayerRoleType
+): role is Exclude<PlayerRoleType, 'Comodín'> => {
+  return role !== 'Comodín';
+};
+
+// Función para asignar roles de manera flexible respetando formaciones
 export const assignFlexibleRole = (
   team: Member[],
-  availableRoles: string[]
-): string => {
+  availableRoles: PlayerRoleType[],
+  player?: Member,
+  previousRole?: PlayerRoleType,
+  formation: FormationType = '4-4-2'
+): PlayerRoleType => {
+  const formationConfig = FORMATIONS[formation];
+
   // Contar cuántos jugadores hay por posición en el equipo actual
   const roleCounts = {
-    [PLAYER_ROLES.GOALKEEPER]: team.filter(
-      (p) => p.assignedRole === PLAYER_ROLES.GOALKEEPER
-    ).length,
-    [PLAYER_ROLES.DEFENDER]: team.filter(
-      (p) => p.assignedRole === PLAYER_ROLES.DEFENDER
-    ).length,
-    [PLAYER_ROLES.MIDFIELDER]: team.filter(
-      (p) => p.assignedRole === PLAYER_ROLES.MIDFIELDER
-    ).length,
-    [PLAYER_ROLES.FORWARD]: team.filter(
-      (p) => p.assignedRole === PLAYER_ROLES.FORWARD
-    ).length,
+    Arquero: team.filter((p) => p.assignedRole === 'Arquero').length,
+    Defensor: team.filter((p) => p.assignedRole === 'Defensor').length,
+    Mediocampo: team.filter((p) => p.assignedRole === 'Mediocampo').length,
+    Delantero: team.filter((p) => p.assignedRole === 'Delantero').length,
   };
 
   // Si ya hay un arquero, no asignar más arqueros
-  if (roleCounts[PLAYER_ROLES.GOALKEEPER] >= MAX_GOALKEEPERS_PER_TEAM) {
-    availableRoles = availableRoles.filter(
-      (role) => role !== PLAYER_ROLES.GOALKEEPER
-    );
+  if (roleCounts.Arquero >= MAX_GOALKEEPERS_PER_TEAM) {
+    availableRoles = availableRoles.filter((role) => role !== 'Arquero');
   }
 
-  // Si no hay roles disponibles, usar WILDCARD
-  if (availableRoles.length === 0) {
-    return PLAYER_ROLES.WILDCARD;
-  }
+  // Posiciones de campo (no arquero)
+  const nonGkPositions = ['Defensor', 'Mediocampo', 'Delantero'] as const;
+  type FieldPosition = (typeof nonGkPositions)[number];
 
-  // Si solo hay un rol disponible, usarlo
-  if (availableRoles.length === 1) {
-    return availableRoles[0];
-  }
-
-  // NUEVA LÓGICA: Asegurar cobertura equilibrada de todas las posiciones
-  // Calcular el tamaño ideal por posición basado en el tamaño actual del equipo
-  const teamSize = team.length + 1; // +1 porque vamos a añadir este jugador
-  const nonGkPositions = [
-    PLAYER_ROLES.DEFENDER,
-    PLAYER_ROLES.MIDFIELDER,
-    PLAYER_ROLES.FORWARD,
-  ];
-
-  // Filtrar solo las posiciones disponibles (excluyendo arquero si ya hay uno)
-  const availableNonGkRoles = availableRoles.filter((role) =>
-    nonGkPositions.includes(role)
+  // Encontrar posiciones que necesitan ser cubiertas según la formación
+  const neededPositions = nonGkPositions.filter(
+    (role) => roleCounts[role] < formationConfig[role]
   );
 
-  if (availableNonGkRoles.length > 0) {
-    // Encontrar la posición con menos jugadores para equilibrar
-    let minRole = availableNonGkRoles[0];
-    let minCount = roleCounts[minRole] || 0;
+  // Si hay posiciones que necesitan ser cubiertas, intentar asignar una de ellas
+  if (neededPositions.length > 0) {
+    // Si el jugador tiene alguna de las posiciones necesitadas como preferencia, asignarla
+    if (player?.playerRoles) {
+      const playerPreferredRoles = player.playerRoles.map((pr) =>
+        typeof pr === 'string' ? pr : pr.role
+      ) as PlayerRoleType[];
 
-    for (const role of availableNonGkRoles) {
-      const count = roleCounts[role] || 0;
-      if (count < minCount) {
-        minCount = count;
-        minRole = role;
+      const preferredNeededRole = neededPositions.find((role) =>
+        playerPreferredRoles.includes(role)
+      );
+
+      if (preferredNeededRole) {
+        return preferredNeededRole;
       }
     }
 
-    // Verificar si hay posiciones completamente vacías
-    const emptyPositions = availableNonGkRoles.filter(
-      (role) => (roleCounts[role] || 0) === 0
-    );
+    // Si no tiene preferencia por ninguna posición necesitada,
+    // asignar la posición más necesitada según la formación
+    let mostNeededRole = neededPositions[0];
+    let maxDeficit =
+      formationConfig[mostNeededRole] - roleCounts[mostNeededRole];
 
-    // Si hay posiciones vacías, priorizar llenarlas primero
-    if (emptyPositions.length > 0) {
-      // Priorizar de atrás hacia adelante entre las posiciones vacías
-      const priorityOrder = [
-        PLAYER_ROLES.DEFENDER,
-        PLAYER_ROLES.MIDFIELDER,
-        PLAYER_ROLES.FORWARD,
-      ];
-
-      for (const role of priorityOrder) {
-        if (emptyPositions.includes(role)) {
-          return role;
-        }
-      }
-
-      // Si no encuentra en el orden de prioridad, usar la primera vacía
-      return emptyPositions[0];
-    }
-
-    // Si no hay posiciones vacías, verificar si hay desbalance significativo
-    const maxCount = Math.max(
-      ...availableNonGkRoles.map((role) => roleCounts[role] || 0)
-    );
-    const minCountActual = Math.min(
-      ...availableNonGkRoles.map((role) => roleCounts[role] || 0)
-    );
-
-    // Si hay una diferencia de 2 o más jugadores entre posiciones, equilibrar
-    if (maxCount - minCountActual >= 2) {
-      return minRole; // Asignar a la posición con menos jugadores
-    }
-
-    // Si el balance es aceptable, usar el orden de prioridad normal
-    const priorityOrder = [
-      PLAYER_ROLES.DEFENDER,
-      PLAYER_ROLES.MIDFIELDER,
-      PLAYER_ROLES.FORWARD,
-    ];
-
-    for (const role of priorityOrder) {
-      if (availableNonGkRoles.includes(role)) {
-        // Solo asignar si no va a crear un desbalance excesivo
-        const currentCount = roleCounts[role] || 0;
-        const otherRoleCounts = availableNonGkRoles
-          .filter((r) => r !== role)
-          .map((r) => roleCounts[r] || 0);
-
-        const maxOtherCount =
-          otherRoleCounts.length > 0 ? Math.max(...otherRoleCounts) : 0;
-
-        // Si asignar este rol no va a crear un desbalance de más de 1
-        if (currentCount <= maxOtherCount) {
-          return role;
-        }
+    for (const role of neededPositions) {
+      const deficit = formationConfig[role] - roleCounts[role];
+      if (deficit > maxDeficit) {
+        maxDeficit = deficit;
+        mostNeededRole = role;
       }
     }
 
-    // Si no se puede asignar ningún rol sin crear desbalance, usar el menos numeroso
-    return minRole;
+    return mostNeededRole;
   }
 
-  // Si no hay roles no-GK disponibles, usar WILDCARD
-  return PLAYER_ROLES.WILDCARD;
+  // Si no hay posiciones que necesiten ser cubiertas y el jugador tiene roles preferidos,
+  // intentar asignar uno de sus roles preferidos que mantenga el balance
+  if (player?.playerRoles) {
+    const playerPreferredRoles = player.playerRoles.map((pr) =>
+      typeof pr === 'string' ? pr : pr.role
+    ) as PlayerRoleType[];
+
+    for (const role of playerPreferredRoles) {
+      if (isValidRole(role) && roleCounts[role] <= formationConfig[role]) {
+        return role;
+      }
+    }
+  }
+
+  // Solo usar comodín si realmente no hay otra opción viable
+  return 'Comodín';
 };
 
 export const getPrimaryRole = (
@@ -248,7 +222,7 @@ export const sortPlayersByRole = (players: any[]) => {
     PLAYER_ROLES.WILDCARD,
   ];
 
-  return players.sort((a, b) => {
+  return [...players].sort((a, b) => {
     const aRole = a.assignedRole || a.role || PLAYER_ROLES.WILDCARD;
     const bRole = b.assignedRole || b.role || PLAYER_ROLES.WILDCARD;
 

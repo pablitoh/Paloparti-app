@@ -12,6 +12,15 @@ interface Player {
   id: string;
   name: string | null;
   avatar: string | null;
+  age?: number | null;
+  birthdate?: string | Date | null;
+  playerRoles?: Array<{
+    role: string;
+    priority: number;
+  }>;
+  starRating?: number | null;
+  assignedRole?: string | null;
+  positionForced?: boolean;
 }
 
 interface MatchInterface {
@@ -19,13 +28,11 @@ interface MatchInterface {
   date: string | Date;
   createdAt?: string | Date;
   location: string;
-  teamA: string;
-  teamB: string;
+  teamA: Player[]; // Ahora es un array de jugadores como en next-match
+  teamB: Player[]; // Ahora es un array de jugadores como en next-match
   scoreA: number;
   scoreB: number;
   status: string;
-  playersA?: Player[];
-  playersB?: Player[];
   goals?: Array<{
     id: string;
     isTeamA: boolean;
@@ -358,7 +365,7 @@ export default function HistoryTab({
                     {/* Team A */}
                     <div className='flex items-center justify-end flex-1'>
                       <span className='font-semibold text-primary-800 text-center'>
-                        {match.teamA}
+                        Equipo A
                       </span>
                     </div>
 
@@ -381,7 +388,7 @@ export default function HistoryTab({
                     {/* Team B */}
                     <div className='flex items-center justify-start flex-1'>
                       <span className='font-semibold text-primary-800 text-center'>
-                        {match.teamB}
+                        Equipo B
                       </span>
                     </div>
                   </div>
@@ -418,10 +425,10 @@ export default function HistoryTab({
                             👑
                           </span>
                         )}
-                        {match.teamA}
+                        Equipo A
                       </h4>
                       <ul className='space-y-2'>
-                        {match.playersA?.map((player: Player) => {
+                        {match.teamA?.map((player: Player) => {
                           const goals = getPlayerGoals(match, player.id);
                           const isWinner = match.scoreA > match.scoreB;
                           return (
@@ -484,10 +491,10 @@ export default function HistoryTab({
                             👑
                           </span>
                         )}
-                        {match.teamB}
+                        Equipo B
                       </h4>
                       <ul className='space-y-2'>
-                        {match.playersB?.map((player: Player) => {
+                        {match.teamB?.map((player: Player) => {
                           const goals = getPlayerGoals(match, player.id);
                           const isWinner = match.scoreB > match.scoreA;
                           return (

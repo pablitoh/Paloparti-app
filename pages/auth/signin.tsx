@@ -142,6 +142,7 @@ export default function SignIn({ error, callbackUrl }: SignInProps) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete='email'
             />
           </div>
 
@@ -153,6 +154,7 @@ export default function SignIn({ error, callbackUrl }: SignInProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete='current-password'
             />
           </div>
 
