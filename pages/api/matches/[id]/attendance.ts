@@ -2,18 +2,46 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]';
 import { prisma } from '../../../../lib/prisma';
-import { PLAYER_ROLES } from '../../../../components/group/AttendanceConfirmation';
-import { normalizePlayerRoles, PlayerRole } from '../../../../lib/teambuilder';
+import { PLAYER_ROLES } from '../../../../lib/matches/constants';
+import { PlayerRole, normalizePlayerRoles } from '../../../../lib/teambuilder';
+import { PlayerRoleType } from '../../../../lib/teambuilder/types';
+import { logGroupEvent } from '../../../../utils/serverLogEvents';
+import { LogAction } from '../../../../utils/logTypes';
+import { createUnifiedBalancedTeams } from '../../../../lib/matches/unifiedBalancer';
+import { Member } from '../../../../lib/teambuilder/types';
 
-// Type definition for TBD Player
+// Define types for TBD players
 interface TbdPlayer {
   id: string;
   name: string;
-  avatar: string | null;
-  age: number | null;
-  playerType: 'TBD';
   isTeamA: boolean;
+  playerType?: string;
+  avatar?: string | null;
+  age?: number | null;
 }
+
+// Type assertion to ensure PLAYER_ROLES values match PlayerRoleType
+const TYPED_ROLES = {
+  GOALKEEPER: 'Arquero' as PlayerRoleType,
+  DEFENDER: 'Defensor' as PlayerRoleType,
+  MIDFIELDER: 'Mediocampo' as PlayerRoleType,
+  FORWARD: 'Delantero' as PlayerRoleType,
+  WILDCARD: 'Comodín' as PlayerRoleType,
+};
+
+// Función para convertir jugadores a formato Member
+const convertToMembers = (players: any[]): Member[] => {
+  return players.map((player) => ({
+    id: player.id,
+    name: player.name || '',
+    age: player.age || null,
+    playerRoles: player.playerRoles || [],
+    starRating: player.starRating || 0,
+    avatar: player.avatar || null,
+    birthdate: player.birthdate || null,
+    role: player.role || null,
+  }));
+};
 
 export default async function handler(
   req: NextApiRequest,
@@ -51,7 +79,7 @@ export default async function handler(
         console.log('ROLES NORMALIZADOS:', validatedRoles);
       } else {
         // Si no se proporcionan roles, usar valor por defecto
-        validatedRoles = [{ role: PLAYER_ROLES.WILDCARD, priority: 1 }];
+        validatedRoles = [{ role: TYPED_ROLES.WILDCARD, priority: 1 }];
         console.log('USANDO VALOR DEFAULT:', validatedRoles);
       }
     }
@@ -108,38 +136,7 @@ export default async function handler(
 
     let attendanceResult;
 
-    // Actualizar TBD players para almacenar los roles con prioridades
-    if (status === 'CONFIRMED' && validatedRoles.length > 0) {
-      try {
-        // Obtener TBD players actuales o inicializar objeto vacío
-        let tbdPlayers = match.tbdPlayers
-          ? typeof match.tbdPlayers === 'string'
-            ? JSON.parse(match.tbdPlayers as string)
-            : match.tbdPlayers
-          : {};
-
-        // Asegurarnos de que tbdPlayers tenga la estructura correcta
-        if (!tbdPlayers.playerRoles) {
-          tbdPlayers.playerRoles = {};
-        }
-
-        // Guardar los roles del jugador con su prioridad usando su ID como clave
-        tbdPlayers.playerRoles[user.id] = validatedRoles;
-        console.log('Guardando roles en tbdPlayers:', tbdPlayers);
-
-        // Actualizar el campo tbdPlayers en la tabla Match
-        await prisma.match.update({
-          where: { id: String(id) },
-          data: {
-            tbdPlayers: tbdPlayers,
-          },
-        });
-
-        console.log('tbdPlayers actualizado correctamente');
-      } catch (error) {
-        console.error('Error al actualizar tbdPlayers:', error);
-      }
-    }
+    // Los roles se guardarán directamente en MatchAttendance más abajo
 
     if (existingAttendance) {
       // Update existing attendance record
@@ -147,6 +144,10 @@ export default async function handler(
         where: { id: existingAttendance.id },
         data: {
           status,
+          playerRoles:
+            status === 'CONFIRMED' && validatedRoles.length > 0
+              ? validatedRoles
+              : null,
           updatedAt: new Date(),
         },
       });
@@ -160,10 +161,26 @@ export default async function handler(
           groupId: match.groupId,
           matchDate: match.date,
           status,
+          playerRoles:
+            status === 'CONFIRMED' && validatedRoles.length > 0
+              ? validatedRoles
+              : null,
         },
       });
       console.log('Registro de asistencia CREADO:', attendanceResult);
     }
+
+    // Registrar en el log
+    await logGroupEvent(
+      match.groupId,
+      user.id,
+      LogAction.USER_ATTENDANCE_UPDATED,
+      {
+        matchId: String(id),
+        status,
+        playerRoles: validatedRoles.map((role) => role.role).join(', '),
+      }
+    );
 
     // Si el estado es DECLINED, manejar la remoción del usuario de los equipos
     let updatedMatchData = null;
@@ -381,6 +398,7 @@ export default async function handler(
       success: true,
       message: `Attendance ${status.toLowerCase()} successfully`,
       attendance: attendanceResult,
+      playerRoles: validatedRoles, // Agregar los roles del jugador a la respuesta
       matchData: finalMatch
         ? {
             id: finalMatch.id,

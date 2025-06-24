@@ -123,12 +123,13 @@ async function handleUpdateScore(
   const previousScoreA = match.scoreA;
   const previousScoreB = match.scoreB;
 
-  // Actualizar puntajes
+  // Actualizar puntajes y asegurar que el status sea COMPLETED
   const updatedMatch = await prisma.match.update({
     where: { id: matchId },
     data: {
       scoreA,
       scoreB,
+      status: 'COMPLETED', // Asegurar que el partido quede marcado como completado
     },
     include: {
       group: {
@@ -278,12 +279,13 @@ async function handleSwapPlayers(
     },
   });
 
-  // Actualizar los puntajes del partido
+  // Actualizar los puntajes del partido y asegurar que está marcado como completado
   await prisma.match.update({
     where: { id: matchId },
     data: {
       scoreA: goalsTeamA,
       scoreB: goalsTeamB,
+      status: 'COMPLETED', // Asegurar que el partido quede marcado como completado
     },
   });
 
@@ -383,6 +385,31 @@ async function handleUpdateGoals(
       data: goalData,
     });
   }
+
+  // Calcular puntajes basados en los goles actualizados
+  const goalsTeamA = await prisma.goal.count({
+    where: {
+      matchId: matchId,
+      isTeamA: true,
+    },
+  });
+
+  const goalsTeamB = await prisma.goal.count({
+    where: {
+      matchId: matchId,
+      isTeamA: false,
+    },
+  });
+
+  // Actualizar los puntajes del partido y asegurar que está marcado como completado
+  await prisma.match.update({
+    where: { id: matchId },
+    data: {
+      scoreA: goalsTeamA,
+      scoreB: goalsTeamB,
+      status: 'COMPLETED', // Asegurar que el partido quede marcado como completado
+    },
+  });
 
   // Obtener información de los goleadores para el log
   const goalScorers = await Promise.all(

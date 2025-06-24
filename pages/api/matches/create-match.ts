@@ -218,11 +218,7 @@ export default async function handler(
         },
       });
 
-      // Obtener el partido para extraer los roles
-      matchForRoles = await prisma.match.findUnique({
-        where: { id: group.nextMatchId },
-        select: { tbdPlayers: true },
-      });
+      // Los roles ahora están en MatchAttendance, no se necesita consulta extra
     }
 
     // Obtener los starRating de los miembros del grupo
@@ -254,49 +250,29 @@ export default async function handler(
       `👥 Jugadores con asistencia confirmada: ${confirmedAttendances.length}`
     );
 
-    // Los roles se guardan en tbdPlayers.playerRoles, no en matchAttendance
-    let playerRolesFromMatch: Record<string, any> = {};
-    if (matchForRoles?.tbdPlayers) {
-      try {
-        const tbdData =
-          typeof matchForRoles.tbdPlayers === 'string'
-            ? JSON.parse(matchForRoles.tbdPlayers)
-            : matchForRoles.tbdPlayers;
-
-        if (tbdData?.playerRoles) {
-          playerRolesFromMatch = tbdData.playerRoles;
-        }
-      } catch (error) {
-        console.error('Error parsing tbdPlayers:', error);
-      }
-    }
-
+    // Los roles ahora están directamente en MatchAttendance.playerRoles
     console.log(
-      `🎯 Roles obtenidos desde match tbdPlayers: ${
-        Object.keys(playerRolesFromMatch).length
-      }`
+      `🎯 Roles obtenidos desde MatchAttendance: ${
+        confirmedAttendances.filter((att: any) => att.playerRoles).length
+      } jugadores con roles`
     );
 
     // Convertir a formato Member
     const members: Member[] = confirmedAttendances.map((attendance: any) => {
       const userId = attendance.user.id;
 
-      // Obtener roles desde tbdPlayers del match
+      // Obtener roles directamente de la asistencia
       let userPlayerRoles = [];
-      const rolesFromMatch = playerRolesFromMatch[userId];
-
-      if (
-        rolesFromMatch &&
-        Array.isArray(rolesFromMatch) &&
-        rolesFromMatch.length > 0
-      ) {
+      if (attendance.playerRoles && Array.isArray(attendance.playerRoles)) {
         // Convertir a formato correcto si es necesario
-        userPlayerRoles = rolesFromMatch.map((role: any, index: number) => {
-          if (typeof role === 'string') {
-            return { role, priority: index + 1 };
+        userPlayerRoles = attendance.playerRoles.map(
+          (role: any, index: number) => {
+            if (typeof role === 'string') {
+              return { role, priority: index + 1 };
+            }
+            return role; // Ya está en formato { role, priority }
           }
-          return role; // Ya está en formato { role, priority }
-        });
+        );
       }
 
       // Calcular edad dinámicamente si hay fecha de nacimiento
@@ -385,15 +361,18 @@ export default async function handler(
 
     // Preparar datos de TBD players y roles
     const requiredPlayersPerTeam = 11;
-    const playerRolesMap: Record<string, string[]> = {};
+    const playerRolesMap: Record<string, any[]> = {};
     const assignedRolesMap: Record<string, string> = {};
 
     [...finalTeamA, ...finalTeamB].forEach((player) => {
       // Usar los roles del jugador si existen
       if (player.playerRoles && Array.isArray(player.playerRoles)) {
-        playerRolesMap[player.id] = player.playerRoles.map((role: any) =>
-          typeof role === 'string' ? role : role.role
-        );
+        playerRolesMap[player.id] = player.playerRoles.map((role: any) => {
+          if (typeof role === 'string') {
+            return { role, priority: 1 }; // Si es string, convertir a formato PlayerRole
+          }
+          return role; // Mantener el objeto PlayerRole completo
+        });
       } else {
         playerRolesMap[player.id] = [];
       }
@@ -436,6 +415,45 @@ export default async function handler(
     // Crear nombres de equipos
     const teamAName = `Equipo A`;
     const teamBName = `Equipo B`;
+
+    // Ordenar equipos por posición
+    const sortedTeamA = sortPlayersByRole(finalTeamA as any);
+    const sortedTeamB = sortPlayersByRole(finalTeamB as any);
+
+    // Mapear los equipos para asegurar que playerRoles se incluyan correctamente en la respuesta
+    const responseTeamA = sortedTeamA.map((player: any) => ({
+      id: player.id,
+      name: player.name,
+      avatar: null, // Se puede agregar si existe
+      age: player.age,
+      starRating: player.starRating,
+      playerRoles:
+        player.playerRoles?.map((role: string) => ({
+          role,
+          priority: 1,
+        })) || [], // Convertir a PlayerRole
+      assignedRole: player.assignedRole,
+      role: player.role,
+      positionForced: player.positionForced || false,
+      isTeamA: true,
+    }));
+
+    const responseTeamB = sortedTeamB.map((player: any) => ({
+      id: player.id,
+      name: player.name,
+      avatar: null, // Se puede agregar si existe
+      age: player.age,
+      starRating: player.starRating,
+      playerRoles:
+        player.playerRoles?.map((role: string) => ({
+          role,
+          priority: 1,
+        })) || [], // Convertir a PlayerRole
+      assignedRole: player.assignedRole,
+      role: player.role,
+      positionForced: player.positionForced || false,
+      isTeamA: false,
+    }));
 
     // Crear o actualizar partido
     let match;
@@ -497,27 +515,28 @@ export default async function handler(
         where: { matchId: existingMatch.id },
       });
 
-      // Actualizar partido existente
+      // Actualizar partido existente (preservar playerRoles)
       match = await prisma.match.update({
         where: { id: existingMatch.id },
         data: {
           teamA: teamAName,
           teamB: teamBName,
           tbdPlayers: JSON.stringify(tbdPlayers),
+
           sortCount: { increment: 1 },
         },
       });
 
       console.log('✅ Partido actualizado para re-sorteo');
     } else {
-      // Crear nuevo partido
+      // Crear nuevo partido (incluir playerRoles si vienen del partido original)
       match = await prisma.match.create({
         data: {
           date: matchDate,
           location: matchLocation,
           groupId,
-          teamA: teamAName,
-          teamB: teamBName,
+          teamA: JSON.stringify(responseTeamA), // Guardar el equipo completo
+          teamB: JSON.stringify(responseTeamB), // Guardar el equipo completo
           scoreA: 0,
           scoreB: 0,
           status: 'PENDING',
@@ -577,23 +596,6 @@ export default async function handler(
       }
     }
 
-    // Ordenar equipos por posición
-    const sortedTeamA = sortPlayersByRole(finalTeamA);
-    const sortedTeamB = sortPlayersByRole(finalTeamB);
-
-    // Preparar datos de los equipos para el log
-    const teamAPlayersForLog = sortedTeamA.map((player) => ({
-      id: player.id,
-      name: player.name,
-      role: player.assignedRole || player.playerRoles?.[0] || 'Wildcard',
-    }));
-
-    const teamBPlayersForLog = sortedTeamB.map((player) => ({
-      id: player.id,
-      name: player.name,
-      role: player.assignedRole || player.playerRoles?.[0] || 'Wildcard',
-    }));
-
     // Determinar si es realmente un re-sorteo (no el primer sorteo)
     const isActualResort =
       isResort && existingMatch && existingMatch.sortCount > 0;
@@ -610,8 +612,8 @@ export default async function handler(
         teamAName: teamAName,
         teamBName: teamBName,
         newTeams: {
-          teamA: teamAPlayersForLog,
-          teamB: teamBPlayersForLog,
+          teamA: responseTeamA,
+          teamB: responseTeamB,
         },
         totalPlayers: finalTeamA.length + finalTeamB.length,
         tbdPlayersCount: tbdPlayersTeamA.length + tbdPlayersTeamB.length,
@@ -630,16 +632,50 @@ export default async function handler(
       } de partido completado exitosamente`
     );
 
+    // Limpiar respuesta - eliminar playerRoles innecesarios
+    const cleanMatch = {
+      id: match.id,
+      date: match.date,
+      location: match.location,
+      groupId: match.groupId,
+      teamA: match.teamA,
+      teamB: match.teamB,
+      scoreA: match.scoreA,
+      scoreB: match.scoreB,
+      status: match.status,
+      createdAt: match.createdAt,
+      updatedAt: match.updatedAt,
+      sortCount: match.sortCount,
+    };
+
+    // Limpiar tbdPlayers - eliminar playerRoles de jugadores TBD y sección general
+    const cleanTbdPlayers = {
+      teamA: tbdPlayers.teamA.map((player: any) => ({
+        id: player.id,
+        name: player.name,
+        isTeamA: player.isTeamA,
+        avatar: player.avatar,
+        playerType: player.playerType,
+      })),
+      teamB: tbdPlayers.teamB.map((player: any) => ({
+        id: player.id,
+        name: player.name,
+        isTeamA: player.isTeamA,
+        avatar: player.avatar,
+        playerType: player.playerType,
+      })),
+    };
+
     return res.status(200).json({
       message: isResort
         ? 'Equipos reorganizados correctamente'
         : 'Partido creado correctamente',
-      teamA: sortedTeamA,
-      teamB: sortedTeamB,
+      teamA: responseTeamA,
+      teamB: responseTeamB,
       teamAAvgAge,
       teamBAvgAge,
-      match,
-      tbdPlayers,
+      match: cleanMatch,
+      tbdPlayers: cleanTbdPlayers,
     });
   } catch (error) {
     console.error('Error al crear partido:', error);

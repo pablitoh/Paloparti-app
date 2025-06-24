@@ -103,9 +103,71 @@ export default async function handler(
           member.userId === userId && member.role === 'ADMIN'
       );
 
-      // Solo devolver matchPlayers y no separar en playersA y playersB
+      // Parsear equipos desde JSON strings o usar matchPlayers como fallback
+      let teamAPlayers: any[] = [];
+      let teamBPlayers: any[] = [];
+
+      // Intentar parsear teamA y teamB como JSON
+      try {
+        if (match.teamA && typeof match.teamA === 'string') {
+          teamAPlayers = JSON.parse(match.teamA);
+        }
+      } catch (error) {
+        console.log(
+          'Could not parse teamA as JSON, using matchPlayers fallback'
+        );
+      }
+
+      try {
+        if (match.teamB && typeof match.teamB === 'string') {
+          teamBPlayers = JSON.parse(match.teamB);
+        }
+      } catch (error) {
+        console.log(
+          'Could not parse teamB as JSON, using matchPlayers fallback'
+        );
+      }
+
+      // Si no se pudieron parsear los equipos, usar matchPlayers como fallback
+      if (teamAPlayers.length === 0 || teamBPlayers.length === 0) {
+        teamAPlayers = match.matchPlayers
+          .filter((player) => player.isTeamA)
+          .map((player) => ({
+            id: player.user.id,
+            name: player.user.name,
+            avatar: player.user.image,
+            age: player.user.birthdate
+              ? calculateAge(player.user.birthdate)
+              : null,
+            birthdate: player.user.birthdate,
+            playerRoles: [], // No tenemos esta información en matchPlayers
+            starRating: null, // No tenemos esta información en matchPlayers
+            assignedRole: null,
+            positionForced: false,
+          }));
+
+        teamBPlayers = match.matchPlayers
+          .filter((player) => !player.isTeamA)
+          .map((player) => ({
+            id: player.user.id,
+            name: player.user.name,
+            avatar: player.user.image,
+            age: player.user.birthdate
+              ? calculateAge(player.user.birthdate)
+              : null,
+            birthdate: player.user.birthdate,
+            playerRoles: [], // No tenemos esta información en matchPlayers
+            starRating: null, // No tenemos esta información en matchPlayers
+            assignedRole: null,
+            positionForced: false,
+          }));
+      }
+
+      // Formato unificado como next-match
       const matchWithDetails = {
         ...match,
+        teamA: teamAPlayers, // Ahora es un array como en next-match
+        teamB: teamBPlayers, // Ahora es un array como en next-match
         isAdmin, // Add isAdmin flag for frontend use
       };
 

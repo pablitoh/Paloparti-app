@@ -33,12 +33,27 @@ interface Goal {
   minute?: number;
 }
 
+interface MatchPlayer {
+  id: string;
+  name: string | null;
+  avatar: string | null;
+  age?: number | null;
+  birthdate?: string | Date | null;
+  playerRoles?: Array<{
+    role: string;
+    priority: number;
+  }>;
+  starRating?: number | null;
+  assignedRole?: string | null;
+  positionForced?: boolean;
+}
+
 interface Match {
   id: string;
   date: string;
   location: string;
-  teamA: string;
-  teamB: string;
+  teamA: MatchPlayer[]; // Ahora es un array como en el nuevo formato
+  teamB: MatchPlayer[]; // Ahora es un array como en el nuevo formato
   scoreA: number;
   scoreB: number;
   status: string;
@@ -46,7 +61,7 @@ interface Match {
     id: string;
     name: string;
   };
-  matchPlayers: {
+  matchPlayers?: {
     userId: string;
     isTeamA: boolean;
     user: {
@@ -54,7 +69,7 @@ interface Match {
       name: string | null;
       image: string | null;
     };
-  }[];
+  }[]; // Mantenemos para compatibilidad
   goals: {
     id: string;
     scorerId: string;
@@ -78,8 +93,8 @@ export default function EditMatchHistory() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Estado para edición de puntajes
-  const [editingScore, setEditingScore] = useState(false);
+  // Estado único para modo de edición
+  const [editingMode, setEditingMode] = useState(false);
   const [scoreA, setScoreA] = useState(0);
   const [scoreB, setScoreB] = useState(0);
 
@@ -88,7 +103,6 @@ export default function EditMatchHistory() {
   const [selectedPlayers, setSelectedPlayers] = useState<Player[]>([]);
 
   // Estado para edición de goles
-  const [editingGoals, setEditingGoals] = useState(false);
   const [goals, setGoals] = useState<Goal[]>([]);
 
   // Estado para modal de confirmación de intercambio
@@ -219,7 +233,6 @@ export default function EditMatchHistory() {
         })) || [];
       setGoals(formattedGoals);
 
-      setEditingScore(false);
       showSuccessToast('Puntajes actualizados correctamente');
     } catch (error) {
       console.error('Error updating score:', error);
@@ -543,7 +556,6 @@ export default function EditMatchHistory() {
         })) || [];
       setGoals(formattedGoals);
 
-      setEditingGoals(false);
       showSuccessToast('Goles actualizados correctamente');
     } catch (error) {
       console.error('Error updating goals:', error);
@@ -564,15 +576,42 @@ export default function EditMatchHistory() {
   };
 
   const addGoal = (playerId: string, isTeamA: boolean) => {
-    const player = match?.matchPlayers?.find(
-      (mp) => mp.userId === playerId
-    )?.user;
-    if (!player) return;
+    // Buscar el jugador en teamA y teamB primero, luego en matchPlayers como fallback
+    let playerName = null;
+
+    if (Array.isArray(match?.teamA) && match.teamA.length > 0) {
+      const teamAPlayer = match.teamA.find((p) => p.id === playerId);
+      if (teamAPlayer) {
+        playerName = teamAPlayer.name;
+      }
+    }
+
+    if (!playerName && Array.isArray(match?.teamB) && match.teamB.length > 0) {
+      const teamBPlayer = match.teamB.find((p) => p.id === playerId);
+      if (teamBPlayer) {
+        playerName = teamBPlayer.name;
+      }
+    }
+
+    // Fallback a matchPlayers
+    if (!playerName && match?.matchPlayers) {
+      const matchPlayer = match.matchPlayers.find(
+        (mp) => mp.userId === playerId
+      );
+      if (matchPlayer) {
+        playerName = matchPlayer.user?.name || null;
+      }
+    }
+
+    if (!playerName) {
+      console.error('Jugador no encontrado:', playerId);
+      return;
+    }
 
     const newGoal: Goal = {
       id: `temp-${Date.now()}`,
       scorerId: playerId,
-      scorerName: player.name || null,
+      scorerName: playerName,
       isTeamA,
       minute: undefined,
     };
@@ -622,25 +661,40 @@ export default function EditMatchHistory() {
     );
   }
 
+  // Usar teamA y teamB directamente del nuevo formato, con fallback a matchPlayers
   const playersA =
-    match?.matchPlayers
-      ?.filter((mp) => mp.isTeamA)
-      ?.map((mp) => ({
-        id: mp.userId,
-        name: mp.user?.name || null,
-        image: mp.user?.image || null,
-        isTeamA: true,
-      })) || [];
+    Array.isArray(match?.teamA) && match.teamA.length > 0
+      ? match.teamA.map((player) => ({
+          id: player.id,
+          name: player.name,
+          image: player.avatar,
+          isTeamA: true,
+        }))
+      : match?.matchPlayers
+          ?.filter((mp) => mp.isTeamA)
+          ?.map((mp) => ({
+            id: mp.userId,
+            name: mp.user?.name || null,
+            image: mp.user?.image || null,
+            isTeamA: true,
+          })) || [];
 
   const playersB =
-    match?.matchPlayers
-      ?.filter((mp) => !mp.isTeamA)
-      ?.map((mp) => ({
-        id: mp.userId,
-        name: mp.user?.name || null,
-        image: mp.user?.image || null,
-        isTeamA: false,
-      })) || [];
+    Array.isArray(match?.teamB) && match.teamB.length > 0
+      ? match.teamB.map((player) => ({
+          id: player.id,
+          name: player.name,
+          image: player.avatar,
+          isTeamA: false,
+        }))
+      : match?.matchPlayers
+          ?.filter((mp) => !mp.isTeamA)
+          ?.map((mp) => ({
+            id: mp.userId,
+            name: mp.user?.name || null,
+            image: mp.user?.image || null,
+            isTeamA: false,
+          })) || [];
 
   const goalsA = goals.filter((g) => g.isTeamA);
   const goalsB = goals.filter((g) => !g.isTeamA);
@@ -682,21 +736,21 @@ export default function EditMatchHistory() {
               <span className='truncate'>Resultado del Partido</span>
             </h2>
             <Button
-              variant={editingScore ? 'danger' : 'outline'}
+              variant={editingMode ? 'danger' : 'outline'}
               onClick={() => {
-                if (editingScore) {
+                if (editingMode) {
                   setScoreA(match?.scoreA || 0);
                   setScoreB(match?.scoreB || 0);
                 }
-                setEditingScore(!editingScore);
+                setEditingMode(!editingMode);
               }}
               className={`flex items-center justify-center space-x-2 px-4 sm:px-6 py-2.5 sm:py-3 w-full sm:w-auto rounded-lg font-semibold text-sm sm:text-base transition-all duration-200 shadow-lg ${
-                editingScore
+                editingMode
                   ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white border-red-500 transform hover:scale-105'
                   : 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-indigo-500 transform hover:scale-105'
               }`}
             >
-              {editingScore ? (
+              {editingMode ? (
                 <>
                   <XMarkIcon className='h-4 w-4 sm:h-5 sm:w-5' />
                   <span>Cancelar Edición</span>
@@ -704,7 +758,7 @@ export default function EditMatchHistory() {
               ) : (
                 <>
                   <PencilIcon className='h-4 w-4 sm:h-5 sm:w-5' />
-                  <span>Editar Puntaje</span>
+                  <span>Editar Partido</span>
                 </>
               )}
             </Button>
@@ -715,10 +769,10 @@ export default function EditMatchHistory() {
             <div className='text-center flex-1 max-w-[120px]'>
               <div className='bg-gradient-to-r from-green-400 to-green-500 text-white px-2 sm:px-4 py-2 rounded-lg mb-3 sm:mb-4 shadow-md'>
                 <h3 className='text-sm sm:text-lg font-semibold truncate'>
-                  {match?.teamA || 'Equipo A'}
+                  Equipo A
                 </h3>
               </div>
-              {editingScore ? (
+              {editingMode ? (
                 <input
                   type='number'
                   min='0'
@@ -745,10 +799,10 @@ export default function EditMatchHistory() {
             <div className='text-center flex-1 max-w-[120px]'>
               <div className='bg-gradient-to-r from-blue-400 to-blue-500 text-white px-2 sm:px-4 py-2 rounded-lg mb-3 sm:mb-4 shadow-md'>
                 <h3 className='text-sm sm:text-lg font-semibold truncate'>
-                  {match?.teamB || 'Equipo B'}
+                  Equipo B
                 </h3>
               </div>
-              {editingScore ? (
+              {editingMode ? (
                 <input
                   type='number'
                   min='0'
@@ -767,7 +821,7 @@ export default function EditMatchHistory() {
             </div>
           </div>
 
-          {editingScore && (
+          {editingMode && (
             <div className='flex justify-center mt-6 sm:mt-8 px-4 sm:px-0'>
               <Button
                 variant='primary'
@@ -814,36 +868,6 @@ export default function EditMatchHistory() {
                 {swapMode ? 'Cancelar Intercambio' : 'Intercambiar Jugadores'}
               </span>
             </Button>
-
-            {/* Goals Edit Button */}
-            <Button
-              variant={editingGoals ? 'danger' : 'outline'}
-              onClick={() => {
-                if (editingGoals) {
-                  // Reset goals to original
-                  const originalGoals =
-                    match.goals?.map((goal: any) => ({
-                      id: goal.id,
-                      scorerId: goal.userId || goal.scorer?.id || null,
-                      scorerName: goal.scorer.name,
-                      isTeamA: goal.isTeamA,
-                      minute: goal.minute,
-                    })) || [];
-                  setGoals(originalGoals);
-                }
-                setEditingGoals(!editingGoals);
-              }}
-              className={`flex items-center justify-center space-x-2 px-6 py-3 w-full sm:w-48 shadow-md ${
-                editingGoals
-                  ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700'
-                  : 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white border-orange-500'
-              }`}
-            >
-              <PencilIcon className='h-5 w-5' />
-              <span className='font-semibold'>
-                {editingGoals ? 'Cancelar Edición' : 'Editar Goles'}
-              </span>
-            </Button>
           </div>
 
           {/* Confirmation Buttons */}
@@ -861,16 +885,28 @@ export default function EditMatchHistory() {
             </Button>
           )}
 
-          {editingGoals && (
+          {editingMode && (
             <Button
               variant='primary'
-              onClick={handleUpdateGoals}
+              onClick={async () => {
+                // Combinamos ambas actualizaciones
+                try {
+                  setSaving(true);
+                  await handleUpdateScore();
+                  await handleUpdateGoals();
+                  setEditingMode(false);
+                } catch (error) {
+                  console.error('Error saving changes:', error);
+                } finally {
+                  setSaving(false);
+                }
+              }}
               disabled={saving}
               className='flex items-center justify-center space-x-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-lg px-8 py-3'
             >
               <CheckIcon className='h-5 w-5' />
               <span className='font-semibold'>
-                {saving ? 'Guardando...' : 'Guardar Goles'}
+                {saving ? 'Guardando...' : 'Guardar Cambios'}
               </span>
             </Button>
           )}
@@ -885,7 +921,7 @@ export default function EditMatchHistory() {
                 <span className='w-8 h-8 bg-green-500 rounded-full flex items-center justify-center'>
                   <span className='text-white text-sm font-bold'>A</span>
                 </span>
-                <span>{match?.teamA || 'Equipo A'}</span>
+                <span>Equipo A</span>
               </h3>
               <div className='bg-green-100 px-3 py-1 rounded-full'>
                 <span className='text-green-800 font-semibold text-sm'>
@@ -921,7 +957,7 @@ export default function EditMatchHistory() {
                         <span className='font-semibold text-gray-900'>
                           {player.name}
                         </span>
-                        {!editingGoals && playerGoals > 0 && (
+                        {!editingMode && playerGoals > 0 && (
                           <span className='text-sm text-green-600'>
                             {playerGoals} {playerGoals === 1 ? 'gol' : 'goles'}{' '}
                             ⚽
@@ -929,7 +965,7 @@ export default function EditMatchHistory() {
                         )}
                       </div>
                     </div>
-                    {editingGoals && (
+                    {editingMode && (
                       <div className='flex items-center space-x-3'>
                         <span className='text-sm font-semibold text-green-700 bg-green-100 px-2 py-1 rounded'>
                           {playerGoals} ⚽
@@ -940,11 +976,15 @@ export default function EditMatchHistory() {
                             size='sm'
                             onClick={(e) => {
                               e.stopPropagation();
-                              const goals = goalsA.filter(
-                                (g) => g.scorerId === player.id
+                              const playerGoalsInTeamA = goals.filter(
+                                (g) => g.scorerId === player.id && g.isTeamA
                               );
-                              if (goals.length > 0) {
-                                removeGoal(goals[goals.length - 1].id);
+                              if (playerGoalsInTeamA.length > 0) {
+                                removeGoal(
+                                  playerGoalsInTeamA[
+                                    playerGoalsInTeamA.length - 1
+                                  ].id
+                                );
                               }
                             }}
                             disabled={playerGoals === 0}
@@ -980,7 +1020,7 @@ export default function EditMatchHistory() {
                 <span className='w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center'>
                   <span className='text-white text-sm font-bold'>B</span>
                 </span>
-                <span>{match?.teamB || 'Equipo B'}</span>
+                <span>Equipo B</span>
               </h3>
               <div className='bg-blue-100 px-3 py-1 rounded-full'>
                 <span className='text-blue-800 font-semibold text-sm'>
@@ -1016,7 +1056,7 @@ export default function EditMatchHistory() {
                         <span className='font-semibold text-gray-900'>
                           {player.name}
                         </span>
-                        {!editingGoals && playerGoals > 0 && (
+                        {!editingMode && playerGoals > 0 && (
                           <span className='text-sm text-blue-600'>
                             {playerGoals} {playerGoals === 1 ? 'gol' : 'goles'}{' '}
                             ⚽
@@ -1024,7 +1064,7 @@ export default function EditMatchHistory() {
                         )}
                       </div>
                     </div>
-                    {editingGoals && (
+                    {editingMode && (
                       <div className='flex items-center space-x-3'>
                         <span className='text-sm font-semibold text-blue-700 bg-blue-100 px-2 py-1 rounded'>
                           {playerGoals} ⚽
@@ -1035,11 +1075,15 @@ export default function EditMatchHistory() {
                             size='sm'
                             onClick={(e) => {
                               e.stopPropagation();
-                              const goals = goalsB.filter(
-                                (g) => g.scorerId === player.id
+                              const playerGoalsInTeamB = goals.filter(
+                                (g) => g.scorerId === player.id && !g.isTeamA
                               );
-                              if (goals.length > 0) {
-                                removeGoal(goals[goals.length - 1].id);
+                              if (playerGoalsInTeamB.length > 0) {
+                                removeGoal(
+                                  playerGoalsInTeamB[
+                                    playerGoalsInTeamB.length - 1
+                                  ].id
+                                );
                               }
                             }}
                             disabled={playerGoals === 0}
@@ -1070,7 +1114,7 @@ export default function EditMatchHistory() {
         </div>
 
         {/* Goals List (when editing) */}
-        {editingGoals && goals.length > 0 && (
+        {editingMode && goals.length > 0 && (
           <div className='mt-8 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl shadow-lg border border-yellow-200 p-6'>
             <h3 className='text-2xl font-bold text-yellow-800 mb-6 flex items-center space-x-2'>
               <span className='w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center'>
@@ -1085,7 +1129,7 @@ export default function EditMatchHistory() {
                   <span className='w-6 h-6 bg-green-500 rounded-full flex items-center justify-center'>
                     <span className='text-white text-xs font-bold'>A</span>
                   </span>
-                  <span>{match?.teamA || 'Equipo A'}</span>
+                  <span>Equipo A</span>
                 </h4>
                 <div className='space-y-2'>
                   {goalsA.map((goal, index) => (
@@ -1099,7 +1143,10 @@ export default function EditMatchHistory() {
                       <Button
                         variant='danger'
                         size='sm'
-                        onClick={() => removeGoal(goal.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeGoal(goal.id);
+                        }}
                         className='bg-red-50 hover:bg-red-100 text-red-600 border-red-200 w-8 h-8 p-0 flex items-center justify-center'
                       >
                         ×
@@ -1120,7 +1167,7 @@ export default function EditMatchHistory() {
                   <span className='w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center'>
                     <span className='text-white text-xs font-bold'>B</span>
                   </span>
-                  <span>{match?.teamB || 'Equipo B'}</span>
+                  <span>Equipo B</span>
                 </h4>
                 <div className='space-y-2'>
                   {goalsB.map((goal, index) => (
@@ -1134,7 +1181,10 @@ export default function EditMatchHistory() {
                       <Button
                         variant='danger'
                         size='sm'
-                        onClick={() => removeGoal(goal.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeGoal(goal.id);
+                        }}
                         className='bg-red-50 hover:bg-red-100 text-red-600 border-red-200 w-8 h-8 p-0 flex items-center justify-center'
                       >
                         ×
@@ -1238,7 +1288,7 @@ export default function EditMatchHistory() {
                     {swapImpact.affectedGoals.map((goal, index) => (
                       <li key={goal.id}>
                         {goal.scorerName} (
-                        {goal.isTeamA ? match?.teamA : match?.teamB})
+                        {goal.isTeamA ? 'Equipo A' : 'Equipo B'})
                       </li>
                     ))}
                   </ul>

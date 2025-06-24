@@ -1,6 +1,22 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../../../lib/prisma';
 import { getCurrentUser } from '../../../../../lib/auth';
+import { logGroupEvent } from '../../../../../utils/serverLogEvents';
+import { LogAction } from '../../../../../utils/logTypes';
+import {
+  PlayerRole,
+  normalizePlayerRoles,
+} from '../../../../../lib/teambuilder';
+import { PLAYER_ROLES } from '../../../../../lib/matches/constants';
+
+// Type assertion to ensure PLAYER_ROLES values match PlayerRoleType
+const TYPED_ROLES = {
+  GOALKEEPER: 'Arquero' as const,
+  DEFENDER: 'Defensor' as const,
+  MIDFIELDER: 'Mediocampo' as const,
+  FORWARD: 'Delantero' as const,
+  WILDCARD: 'Comodín' as const,
+};
 
 export default async function handler(
   req: NextApiRequest,
@@ -37,12 +53,35 @@ export default async function handler(
       return res.status(400).json({ error: 'Invalid parameters' });
     }
 
-    // Obtener el estado de la asistencia del cuerpo de la solicitud
-    const { status } = req.body;
+    // Obtener el estado de la asistencia y roles del cuerpo de la solicitud
+    const { status, playerRoles: rawPlayerRoles } = req.body;
     if (!status || (status !== 'CONFIRMED' && status !== 'DECLINED')) {
       console.error(`API ERROR: Estado inválido: status=${status}`);
       return res.status(400).json({ error: 'Invalid status' });
     }
+
+    console.log('======= ADMIN ATTENDANCE UPDATE =======');
+    console.log('ADMIN USER ID:', user.id);
+    console.log('TARGET USER ID:', targetUserId);
+    console.log('MATCH ID:', matchId);
+    console.log('STATUS:', status);
+    console.log('RAW PLAYER ROLES:', rawPlayerRoles);
+
+    // Validar y procesar playerRoles
+    let validatedRoles: PlayerRole[] = [];
+    if (status === 'CONFIRMED') {
+      if (rawPlayerRoles && rawPlayerRoles.length > 0) {
+        // Normalizar roles (convierte formato antiguo si es necesario)
+        validatedRoles = normalizePlayerRoles(rawPlayerRoles);
+        console.log('ROLES NORMALIZADOS:', validatedRoles);
+      } else {
+        // Si no se proporcionan roles, usar valor por defecto
+        validatedRoles = [{ role: TYPED_ROLES.WILDCARD, priority: 1 }];
+        console.log('USANDO VALOR DEFAULT:', validatedRoles);
+      }
+    }
+
+    console.log('ROLES VALIDADOS FINAL:', validatedRoles);
 
     // Verificar si el match existe con más detalles
     console.log(`API: Buscando partido con ID: ${matchId}`);
@@ -73,7 +112,7 @@ export default async function handler(
     // Buscar el partido para encontrar el grupo y la fecha
     const match = await prisma.match.findUnique({
       where: { id: matchId },
-      select: { groupId: true, date: true, id: true },
+      select: { groupId: true, date: true, id: true, playerRoles: true },
     });
 
     if (!match) {
@@ -121,6 +160,8 @@ export default async function handler(
         .json({ error: 'Target user is not a member of this group' });
     }
 
+    // Los roles se guardarán directamente en MatchAttendance más abajo
+
     // Verificar si ya existe un registro de asistencia para el usuario y partido objetivo
     console.log(`API: Buscando registro de asistencia existente`);
     const existingAttendance = await prisma.$queryRaw<Array<{ id: string }>>`
@@ -135,25 +176,37 @@ export default async function handler(
 
     let attendanceResult;
 
+    // Preparar playerRoles para guardar
+    const playerRolesToSave =
+      status === 'CONFIRMED' && validatedRoles.length > 0
+        ? validatedRoles
+        : null;
+
     if (existingAttendance && existingAttendance.length > 0) {
       // Actualizar registro de asistencia existente
       console.log(`API: Actualizando registro existente`);
-      attendanceResult = await prisma.$executeRaw`
-        UPDATE "MatchAttendance"
-        SET status = ${status}, "updatedAt" = NOW()
-        WHERE id = ${existingAttendance[0].id}
-      `;
+      attendanceResult = await prisma.matchAttendance.update({
+        where: { id: existingAttendance[0].id },
+        data: {
+          status,
+          playerRoles: playerRolesToSave,
+          updatedAt: new Date(),
+        },
+      });
     } else {
       // Crear nuevo registro de asistencia
       console.log(`API: Creando nuevo registro`);
       try {
-        attendanceResult = await prisma.$executeRaw`
-          INSERT INTO "MatchAttendance" (
-            id, "userId", "matchId", "groupId", "matchDate", status, "createdAt", "updatedAt"
-          ) VALUES (
-            gen_random_uuid(), ${targetUserId}, ${matchId}, ${match.groupId}, ${match.date}, ${status}, NOW(), NOW()
-          )
-        `;
+        attendanceResult = await prisma.matchAttendance.create({
+          data: {
+            userId: targetUserId,
+            matchId: matchId,
+            groupId: match.groupId,
+            matchDate: match.date,
+            status,
+            playerRoles: playerRolesToSave,
+          },
+        });
       } catch (insertError) {
         console.error(`API ERROR: Error insertando asistencia: ${insertError}`);
         return res.status(500).json({
@@ -165,6 +218,32 @@ export default async function handler(
 
     console.log(
       `Admin ${user.id} updated match attendance for user ${targetUserId} to ${status}`
+    );
+
+    // Obtener el usuario objetivo para el log
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { name: true },
+    });
+
+    // Registrar en el log para cualquier cambio de asistencia (CONFIRMED o DECLINED)
+    await logGroupEvent(
+      match.groupId,
+      user.id,
+      LogAction.ADMIN_CONFIRMED_ATTENDANCE,
+      {
+        matchId,
+        userId: targetUserId,
+        userName: targetUser?.name,
+        status,
+        // Incluir roles solo si se proporcionaron y el estado es CONFIRMED
+        ...(status === 'CONFIRMED' &&
+          validatedRoles.length > 0 && {
+            playerRoles: validatedRoles
+              .map((role: any) => role.role)
+              .join(', '),
+          }),
+      }
     );
 
     // If the player is declining, we need to remove them from the teams
