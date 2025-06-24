@@ -31,11 +31,19 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  console.log('🎯 ENDPOINT RESULT: Iniciando handler...');
+  console.log('   - Método:', req.method);
+  console.log('   - URL params:', req.query);
+  console.log('   - Body:', JSON.stringify(req.body, null, 2));
+
   // Verificar autenticación
   const user = await getCurrentUser(req);
   if (!user) {
+    console.log('❌ ENDPOINT RESULT: Usuario no autenticado');
     return res.status(401).json({ message: 'No autenticado' });
   }
+
+  console.log('✅ ENDPOINT RESULT: Usuario autenticado:', user.id);
 
   // Solo permitir PATCH
   if (req.method !== 'PATCH') {

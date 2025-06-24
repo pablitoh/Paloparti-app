@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { useSession, getSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import Layout from '../../../components/Layout';
 import { Match } from '@prisma/client';
 import { toast } from 'react-hot-toast';
-import { GetServerSideProps } from 'next';
 
 interface Goal {
   id: string;
@@ -25,11 +24,21 @@ interface Player {
   id: string;
   name: string | null;
   avatar: string | null;
-  age: number | null;
+  age?: number | null;
+  birthdate?: string | Date | null;
+  playerRoles?: Array<{
+    role: string;
+    priority: number;
+  }>;
+  starRating?: number | null;
+  assignedRole?: string | null;
+  positionForced?: boolean;
 }
 
-interface MatchWithPlayers extends Match {
-  matchPlayers: {
+interface MatchWithPlayers extends Omit<Match, 'teamA' | 'teamB'> {
+  teamA: Player[]; // Ahora es un array de jugadores como en next-match
+  teamB: Player[]; // Ahora es un array de jugadores como en next-match
+  matchPlayers?: {
     user: {
       id: string;
       name: string | null;
@@ -37,7 +46,7 @@ interface MatchWithPlayers extends Match {
       age: number | null;
     };
     isTeamA: boolean;
-  }[];
+  }[]; // Mantenemos para compatibilidad
   group?: {
     id: string;
     name: string;
@@ -52,96 +61,67 @@ interface MatchWithPlayers extends Match {
   }[];
 }
 
-export const getServerSideProps: GetServerSideProps = async (context) => {
-  const { id } = context.query;
+interface ResultsProps {}
 
-  if (!id || typeof id !== 'string') {
-    return {
-      notFound: true,
-    };
-  }
-
-  try {
-    // Get the session server-side
-    const session = await getSession(context);
-
-    if (!session) {
-      return {
-        redirect: {
-          destination: '/auth/signin',
-          permanent: false,
-        },
-      };
-    }
-
-    // En getServerSideProps, usamos el objeto req para obtener el host actual
-    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    const host = context.req.headers.host || 'localhost:3000';
-
-    const response = await fetch(`${protocol}://${host}/api/matches/${id}`, {
-      headers: {
-        Cookie: context.req.headers.cookie || '',
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Error al cargar el partido');
-    }
-
-    const match = await response.json();
-
-    // Check if current user is admin
-    const isAdmin = match.isAdmin || false;
-
-    return {
-      props: {
-        match,
-        id,
-        isAdmin,
-      },
-    };
-  } catch (error) {
-    console.error('Error fetching match:', error);
-    return {
-      props: {
-        id,
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Error al cargar los datos del partido',
-      },
-    };
-  }
-};
-
-interface ResultsProps {
-  match?: MatchWithPlayers;
-  id: string;
-  error?: string;
-  isAdmin?: boolean;
-}
-
-export default function MatchResults({
-  match: initialMatch,
-  id,
-  error: initialError,
-  isAdmin = false,
-}: ResultsProps) {
+export default function MatchResults() {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const [match, setMatch] = useState<MatchWithPlayers | null>(
-    initialMatch || null
-  );
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(initialError || null);
+  const { id } = router.query;
+
+  const [match, setMatch] = useState<MatchWithPlayers | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
-  const [scoreA, setScoreA] = useState(initialMatch?.scoreA || 0);
-  const [scoreB, setScoreB] = useState(initialMatch?.scoreB || 0);
+  const [scoreA, setScoreA] = useState(0);
+  const [scoreB, setScoreB] = useState(0);
   const [goalsA, setGoalsA] = useState<Goal[]>([]);
   const [goalsB, setGoalsB] = useState<Goal[]>([]);
   const [saving, setSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.replace('/auth/signin');
+    }
+  }, [status, router]);
+
+  // Fetch match data
+  useEffect(() => {
+    const fetchMatch = async () => {
+      if (!id || !session?.user) return;
+
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/matches/${id}`);
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Error al cargar el partido');
+        }
+
+        const matchData = await response.json();
+        setMatch(matchData);
+        setIsAdmin(matchData.isAdmin || false);
+        setScoreA(matchData.scoreA || 0);
+        setScoreB(matchData.scoreB || 0);
+      } catch (error) {
+        console.error('Error fetching match:', error);
+        setError(
+          error instanceof Error
+            ? error.message
+            : 'Error al cargar los datos del partido'
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (session?.user && id) {
+      fetchMatch();
+    }
+  }, [id, session]);
 
   // Set edit mode on mount if edit=true in the query
   useEffect(() => {
@@ -155,13 +135,6 @@ export default function MatchResults({
       toast.error(error);
     }
   }, [error]);
-
-  // Solo redirigir si definitivamente no hay sesión
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.replace('/auth/signin');
-    }
-  }, [status, router]);
 
   // Initialize goals from match data
   useEffect(() => {
@@ -227,54 +200,54 @@ export default function MatchResults({
       });
 
       // Process Team A goals by player
-      if (match.matchPlayers && match.matchPlayers.length > 0) {
+      if (Array.isArray(match.teamA) && match.teamA.length > 0) {
         // Process Team A players
-        match.matchPlayers
-          .filter((p) => p.isTeamA)
-          .forEach((player) => {
-            const goalCount = teamAGoalsByPlayer[player.user.id] || 0;
-            console.log(
-              `Team A Player ${player.user.name} has ${goalCount} goals`
-            );
+        match.teamA.forEach((player) => {
+          const goalCount = teamAGoalsByPlayer[player.id] || 0;
+          console.log(`Team A Player ${player.name} has ${goalCount} goals`);
 
-            // For each goal scored by this player, create a goal object
-            for (let i = 0; i < goalCount; i++) {
-              processedGoalsA.push({
-                id: `temp-a-${player.user.id}-${i}`,
-                userId: player.user.id,
-                scorerId: player.user.id,
-                isTeamA: true,
-                minute: null,
-                scorerName: player.user.name,
-                scorerAvatar: player.user.image,
-                scorer: player.user,
-              });
-            }
-          });
+          // For each goal scored by this player, create a goal object
+          for (let i = 0; i < goalCount; i++) {
+            processedGoalsA.push({
+              id: `temp-a-${player.id}-${i}`,
+              userId: player.id,
+              scorerId: player.id,
+              isTeamA: true,
+              minute: null,
+              scorerName: player.name,
+              scorerAvatar: player.avatar,
+              scorer: {
+                id: player.id,
+                name: player.name,
+                image: player.avatar,
+              },
+            });
+          }
+        });
 
         // Process Team B players
-        match.matchPlayers
-          .filter((p) => !p.isTeamA)
-          .forEach((player) => {
-            const goalCount = teamBGoalsByPlayer[player.user.id] || 0;
-            console.log(
-              `Team B Player ${player.user.name} has ${goalCount} goals`
-            );
+        match.teamB.forEach((player) => {
+          const goalCount = teamBGoalsByPlayer[player.id] || 0;
+          console.log(`Team B Player ${player.name} has ${goalCount} goals`);
 
-            // For each goal scored by this player, create a goal object
-            for (let i = 0; i < goalCount; i++) {
-              processedGoalsB.push({
-                id: `temp-b-${player.user.id}-${i}`,
-                userId: player.user.id,
-                scorerId: player.user.id,
-                isTeamA: false,
-                minute: null,
-                scorerName: player.user.name,
-                scorerAvatar: player.user.image,
-                scorer: player.user,
-              });
-            }
-          });
+          // For each goal scored by this player, create a goal object
+          for (let i = 0; i < goalCount; i++) {
+            processedGoalsB.push({
+              id: `temp-b-${player.id}-${i}`,
+              userId: player.id,
+              scorerId: player.id,
+              isTeamA: false,
+              minute: null,
+              scorerName: player.name,
+              scorerAvatar: player.avatar,
+              scorer: {
+                id: player.id,
+                name: player.name,
+                image: player.avatar,
+              },
+            });
+          }
+        });
       }
 
       // If we have no processed goals but have original goals, use them
@@ -305,34 +278,7 @@ export default function MatchResults({
     }
   }, [match]);
 
-  useEffect(() => {
-    const fetchMatch = async () => {
-      if (!initialMatch && !loading && !error) {
-        setLoading(true);
-        try {
-          const response = await fetch(`/api/matches/${id}`);
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Error al cargar el partido');
-          }
-          const data = await response.json();
-          setMatch(data);
-          setError(null);
-        } catch (err) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : 'Error al cargar los datos del partido'
-          );
-          setMatch(null);
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchMatch();
-  }, [id, initialMatch, loading, error]);
+  // This useEffect is no longer needed as we handle fetch in the main useEffect above
 
   // Add goal for Team A
   const addGoalA = (playerId: string) => {
@@ -346,7 +292,13 @@ export default function MatchResults({
       return;
     }
 
-    const player = match.matchPlayers.find((p) => p.user.id === playerId)?.user;
+    const player =
+      (Array.isArray(match.teamA)
+        ? match.teamA.find((p) => p.id === playerId)
+        : null) ||
+      (Array.isArray(match.teamB)
+        ? match.teamB.find((p) => p.id === playerId)
+        : null);
 
     if (player) {
       console.log(`Found player for Team A: ${player.name}`);
@@ -358,8 +310,12 @@ export default function MatchResults({
         isTeamA: true,
         minute: null,
         scorerName: player.name || null,
-        scorerAvatar: player.image || null,
-        scorer: player,
+        scorerAvatar: player.avatar || null,
+        scorer: {
+          id: player.id,
+          name: player.name,
+          image: player.avatar,
+        },
       };
 
       const updatedGoals = [...goalsA, newGoal];
@@ -385,9 +341,9 @@ export default function MatchResults({
       return;
     }
 
-    const player = match.matchPlayers.find(
-      (p) => p.user.id === playerId && !p.isTeamA
-    )?.user;
+    const player = Array.isArray(match.teamB)
+      ? match.teamB.find((p) => p.id === playerId)
+      : null;
 
     if (player) {
       console.log(`Found player for Team B: ${player.name}`);
@@ -399,8 +355,12 @@ export default function MatchResults({
         isTeamA: false,
         minute: null,
         scorerName: player.name || null,
-        scorerAvatar: player.image || null,
-        scorer: player,
+        scorerAvatar: player.avatar || null,
+        scorer: {
+          id: player.id,
+          name: player.name,
+          image: player.avatar,
+        },
       };
 
       const updatedGoals = [...goalsB, newGoal];
@@ -470,9 +430,7 @@ export default function MatchResults({
       // Verificar que todos los goles estén asignados
       if (goalsA.length < scoreA) {
         toast.error(
-          `Faltan ${scoreA - goalsA.length} goles por asignar al equipo ${
-            match.teamA
-          }`
+          `Faltan ${scoreA - goalsA.length} goles por asignar al Equipo A`
         );
         setSaving(false);
         return;
@@ -480,9 +438,7 @@ export default function MatchResults({
 
       if (goalsB.length < scoreB) {
         toast.error(
-          `Faltan ${scoreB - goalsB.length} goles por asignar al equipo ${
-            match.teamB
-          }`
+          `Faltan ${scoreB - goalsB.length} goles por asignar al Equipo B`
         );
         setSaving(false);
         return;
@@ -509,7 +465,10 @@ export default function MatchResults({
         status: 'COMPLETED',
       };
 
-      console.log('Sending data to API:', JSON.stringify(requestData, null, 2));
+      console.log('🚀 FRONTEND: Enviando datos al API...');
+      console.log('   - URL:', `/api/matches/${id}/result`);
+      console.log('   - Método: PATCH');
+      console.log('   - Datos:', JSON.stringify(requestData, null, 2));
 
       const response = await fetch(`/api/matches/${id}/result`, {
         method: 'PATCH',
@@ -518,6 +477,10 @@ export default function MatchResults({
         },
         body: JSON.stringify(requestData),
       });
+
+      console.log('🔥 FRONTEND: Respuesta recibida del API:');
+      console.log('   - Status:', response.status);
+      console.log('   - OK:', response.ok);
 
       if (!response.ok) {
         // Try to parse as JSON first
@@ -613,6 +576,60 @@ export default function MatchResults({
     return count;
   };
 
+  // Show loading state
+  if (loading) {
+    return (
+      <Layout>
+        <div className='container mx-auto px-4 py-8'>
+          <div className='flex justify-center items-center min-h-screen'>
+            <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500'></div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <Layout>
+        <div className='container mx-auto px-4 py-8'>
+          <div className='text-center'>
+            <h1 className='text-2xl font-bold text-red-600 mb-4'>Error</h1>
+            <p className='text-gray-600 mb-4'>{error}</p>
+            <button
+              onClick={() => router.back()}
+              className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded'
+            >
+              Volver
+            </button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Show not found state
+  if (!match) {
+    return (
+      <Layout>
+        <div className='container mx-auto px-4 py-8'>
+          <div className='text-center'>
+            <h1 className='text-2xl font-bold text-gray-600 mb-4'>
+              Partido no encontrado
+            </h1>
+            <button
+              onClick={() => router.back()}
+              className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded'
+            >
+              Volver
+            </button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className='container mx-auto px-4 py-8'>
@@ -638,7 +655,7 @@ export default function MatchResults({
               {/* Equipo A */}
               <div className='text-center'>
                 <div className='font-bold text-xl sm:text-2xl mb-3'>
-                  {match.teamA}
+                  Equipo A
                 </div>
                 {editMode ? (
                   <div className='flex justify-center items-center gap-1'>
@@ -683,7 +700,7 @@ export default function MatchResults({
               {/* Equipo B */}
               <div className='text-center'>
                 <div className='font-bold text-xl sm:text-2xl mb-3'>
-                  {match.teamB}
+                  Equipo B
                 </div>
                 {editMode ? (
                   <div className='flex justify-center items-center gap-1'>
@@ -738,38 +755,37 @@ export default function MatchResults({
             {/* Team A players and goals */}
             <div className='border-r-0 sm:border-r border-gray-200 pr-0 sm:pr-4'>
               <h3 className='text-lg font-semibold mb-4 text-center'>
-                {match.teamA}
+                Equipo A
               </h3>
               <ul className='space-y-2'>
-                {match.matchPlayers
-                  .filter((p) => p.isTeamA)
-                  .map((player) => {
-                    const playerGoalCount = getPlayerGoalsA(player.user.id);
+                {Array.isArray(match.teamA) ? (
+                  match.teamA.map((player) => {
+                    const playerGoalCount = getPlayerGoalsA(player.id);
                     console.log(
-                      `Rendering Team A Player ${player.user.name} with ${playerGoalCount} goals`
+                      `Rendering Team A Player ${player.name} with ${playerGoalCount} goals`
                     );
 
                     return (
                       <li
-                        key={player.user.id}
+                        key={player.id}
                         className='flex justify-between items-center space-x-2 border-b border-gray-100 pb-2'
                       >
                         <div className='flex items-center space-x-2 min-w-0'>
-                          {player.user.image && (
+                          {player.avatar && (
                             <img
-                              src={player.user.image}
-                              alt={player.user.name || ''}
+                              src={player.avatar}
+                              alt={player.name || ''}
                               className='w-8 h-8 rounded-full flex-shrink-0'
                             />
                           )}
-                          <span className='truncate'>{player.user.name}</span>
+                          <span className='truncate'>{player.name}</span>
                         </div>
 
                         {/* Goals display or controls */}
                         {editMode ? (
                           <div className='flex items-center gap-2'>
                             <button
-                              onClick={() => removeGoalA(player.user.id)}
+                              onClick={() => removeGoalA(player.id)}
                               className='w-8 h-8 flex items-center justify-center bg-red-100 hover:bg-red-200 text-red-600 rounded'
                               disabled={playerGoalCount <= 0}
                             >
@@ -779,7 +795,7 @@ export default function MatchResults({
                               {playerGoalCount}
                             </span>
                             <button
-                              onClick={() => addGoalA(player.user.id)}
+                              onClick={() => addGoalA(player.id)}
                               className='w-8 h-8 flex items-center justify-center bg-green-100 hover:bg-green-200 text-green-600 rounded'
                               disabled={goalsA.length >= scoreA}
                             >
@@ -799,7 +815,12 @@ export default function MatchResults({
                         )}
                       </li>
                     );
-                  })}
+                  })
+                ) : (
+                  <li className='text-gray-500 text-center'>
+                    No hay jugadores en el Equipo A
+                  </li>
+                )}
               </ul>
 
               {/* Goals for Team A */}
@@ -823,38 +844,37 @@ export default function MatchResults({
             {/* Team B players and goals */}
             <div className='pl-0 sm:pl-4'>
               <h3 className='text-lg font-semibold mb-4 text-center'>
-                {match.teamB}
+                Equipo B
               </h3>
               <ul className='space-y-2'>
-                {match.matchPlayers
-                  .filter((p) => !p.isTeamA)
-                  .map((player) => {
-                    const playerGoalCount = getPlayerGoalsB(player.user.id);
+                {Array.isArray(match.teamB) ? (
+                  match.teamB.map((player) => {
+                    const playerGoalCount = getPlayerGoalsB(player.id);
                     console.log(
-                      `Rendering Team B Player ${player.user.name} with ${playerGoalCount} goals`
+                      `Rendering Team B Player ${player.name} with ${playerGoalCount} goals`
                     );
 
                     return (
                       <li
-                        key={player.user.id}
+                        key={player.id}
                         className='flex justify-between items-center space-x-2 border-b border-gray-100 pb-2'
                       >
                         <div className='flex items-center space-x-2 min-w-0'>
-                          {player.user.image && (
+                          {player.avatar && (
                             <img
-                              src={player.user.image}
-                              alt={player.user.name || ''}
+                              src={player.avatar}
+                              alt={player.name || ''}
                               className='w-8 h-8 rounded-full flex-shrink-0'
                             />
                           )}
-                          <span className='truncate'>{player.user.name}</span>
+                          <span className='truncate'>{player.name}</span>
                         </div>
 
                         {/* Goals display or controls */}
                         {editMode ? (
                           <div className='flex items-center gap-2'>
                             <button
-                              onClick={() => removeGoalB(player.user.id)}
+                              onClick={() => removeGoalB(player.id)}
                               className='w-8 h-8 flex items-center justify-center bg-red-100 hover:bg-red-200 text-red-600 rounded'
                               disabled={playerGoalCount <= 0}
                             >
@@ -864,7 +884,7 @@ export default function MatchResults({
                               {playerGoalCount}
                             </span>
                             <button
-                              onClick={() => addGoalB(player.user.id)}
+                              onClick={() => addGoalB(player.id)}
                               className='w-8 h-8 flex items-center justify-center bg-green-100 hover:bg-green-200 text-green-600 rounded'
                               disabled={goalsB.length >= scoreB}
                             >
@@ -884,7 +904,12 @@ export default function MatchResults({
                         )}
                       </li>
                     );
-                  })}
+                  })
+                ) : (
+                  <li className='text-gray-500 text-center'>
+                    No hay jugadores en el Equipo B
+                  </li>
+                )}
               </ul>
 
               {/* Goals for Team B */}
