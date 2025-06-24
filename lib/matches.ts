@@ -127,69 +127,25 @@ export async function createNextMatch(groupId: string) {
         WHERE "id" = ${groupId}
       `;
 
-      // NO LIMPIAR las asistencias confirmadas - Las preservamos para el nuevo partido
-      // await tx.matchAttendance.updateMany({
-      //   where: {
-      //     groupId: groupId,
-      //     status: 'CONFIRMED',
-      //   },
-      //   data: {
-      //     status: 'PENDING',
-      //     updatedAt: new Date(),
-      //   },
-      // });
-
-      // MANTENER las asistencias existentes del partido anterior
-      // Buscar las últimas asistencias del grupo
-      const previousAttendances = await tx.matchAttendance.findMany({
+      // CREAR ASISTENCIAS PARA TODOS LOS MIEMBROS DEL GRUPO EN ESTADO PENDING
+      // Obtener todos los miembros confirmados del grupo
+      const allGroupMembers = await tx.groupMember.findMany({
         where: {
           groupId: groupId,
-        },
-        orderBy: {
-          updatedAt: 'desc',
-        },
-        distinct: ['userId'], // Obtener solo la asistencia más reciente por usuario
-        select: {
-          userId: true,
-          status: true,
-        },
-      });
-
-      // Para cada asistencia anterior, crear una nueva para el nuevo partido manteniendo el estado
-      for (const attendance of previousAttendances) {
-        await tx.matchAttendance.create({
-          data: {
-            userId: attendance.userId,
-            matchId: newMatch.id,
-            groupId: groupId,
-            matchDate: nextMatchDate,
-            status: attendance.status, // Mantener el estado anterior (CONFIRMED, PENDING, DECLINED)
-          },
-        });
-      }
-
-      // Para miembros que no tenían asistencia previa, crear con estado PENDING
-      const membersWithAttendance = previousAttendances.map((a) => a.userId);
-      const allActiveMembers = await tx.groupMember.findMany({
-        where: {
-          groupId: groupId,
-          status: 'CONFIRMED', // Los miembros confirmados del grupo
+          status: 'CONFIRMED', // Solo miembros confirmados del grupo
         },
         select: { userId: true },
       });
 
-      const membersWithoutAttendance = allActiveMembers.filter(
-        (member) => !membersWithAttendance.includes(member.userId)
-      );
-
-      for (const member of membersWithoutAttendance) {
+      // Crear asistencias para todos los miembros del grupo con estado PENDING
+      for (const member of allGroupMembers) {
         await tx.matchAttendance.create({
           data: {
             userId: member.userId,
             matchId: newMatch.id,
             groupId: groupId,
             matchDate: nextMatchDate,
-            status: 'PENDING',
+            status: 'PENDING', // TODOS empiezan como PENDING
           },
         });
       }
@@ -198,7 +154,7 @@ export async function createNextMatch(groupId: string) {
         `✅ Nuevo partido creado automáticamente con ID: ${newMatch.id}`
       );
       console.log(
-        `✅ Asistencias preservadas: ${previousAttendances.length} existentes, ${membersWithoutAttendance.length} nuevas como PENDING`
+        `✅ Asistencias creadas: ${allGroupMembers.length} miembros con estado PENDING`
       );
       console.log(
         `✅ Grupo actualizado con nextMatchId: ${newMatch.id} y nextMatch: ${nextMatchDate}`
