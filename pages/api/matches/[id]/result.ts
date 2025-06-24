@@ -233,10 +233,11 @@ export default async function handler(
         `;
 
         // Crear un nuevo partido automáticamente que reemplazará al actual
+        console.log(`🚀 Intentando crear nuevo partido para grupo: ${groupId}`);
         const newMatch = await createNextMatch(groupId);
         if (newMatch) {
           console.log(
-            `Nuevo partido creado automáticamente después de completar el partido anterior: ${newMatch.id}`
+            `✅ Nuevo partido creado automáticamente después de completar el partido anterior: ${newMatch.id}`
           );
 
           // Asegurar que el nuevo partido tenga 0 jugadores confirmados
@@ -253,7 +254,11 @@ export default async function handler(
           });
 
           console.log(
-            `Asistencias para el nuevo partido inicializadas a PENDING`
+            `✅ Asistencias para el nuevo partido inicializadas a PENDING`
+          );
+        } else {
+          console.error(
+            `❌ ERROR: No se pudo crear el nuevo partido para el grupo ${groupId}`
           );
         }
 

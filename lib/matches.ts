@@ -9,6 +9,8 @@ const prisma = new PrismaClient();
  */
 export async function createNextMatch(groupId: string) {
   try {
+    console.log(`🔍 Buscando grupo ${groupId} para crear próximo partido...`);
+
     // Obtener información del grupo para crear un nuevo partido
     const group = await prisma.group.findUnique({
       where: { id: groupId },
@@ -23,9 +25,18 @@ export async function createNextMatch(groupId: string) {
     });
 
     if (!group) {
-      console.error(`Grupo con ID ${groupId} no encontrado`);
+      console.error(`❌ Grupo con ID ${groupId} no encontrado`);
       return null;
     }
+
+    console.log(`✅ Grupo encontrado:`, {
+      location: group.location,
+      teamAName: group.teamAName,
+      teamBName: group.teamBName,
+      recurrenceType: group.recurrenceType,
+      recurrenceDays: group.recurrenceDays,
+      recurrenceTime: group.recurrenceTime,
+    });
 
     // Calcular la fecha del próximo partido
     let nextMatchDate = new Date();
@@ -162,7 +173,7 @@ export async function createNextMatch(groupId: string) {
       const allActiveMembers = await tx.groupMember.findMany({
         where: {
           groupId: groupId,
-          status: 'ACTIVE',
+          status: 'CONFIRMED', // Los miembros confirmados del grupo
         },
         select: { userId: true },
       });
@@ -184,10 +195,13 @@ export async function createNextMatch(groupId: string) {
       }
 
       console.log(
-        `Nuevo partido creado automáticamente con ID: ${newMatch.id}`
+        `✅ Nuevo partido creado automáticamente con ID: ${newMatch.id}`
       );
       console.log(
-        `Asistencias preservadas: ${previousAttendances.length} existentes, ${membersWithoutAttendance.length} nuevas como PENDING`
+        `✅ Asistencias preservadas: ${previousAttendances.length} existentes, ${membersWithoutAttendance.length} nuevas como PENDING`
+      );
+      console.log(
+        `✅ Grupo actualizado con nextMatchId: ${newMatch.id} y nextMatch: ${nextMatchDate}`
       );
 
       return newMatch;
