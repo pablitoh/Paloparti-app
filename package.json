@@ -20,7 +20,8 @@
     "android:build": "cd android && ./gradlew assembleDebug",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "postinstall": "prisma generate && prisma migrate deploy"
   },
   "dependencies": {
     "@ant-design/icons": "5.2.6",
