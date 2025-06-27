@@ -735,34 +735,36 @@ const TeamsList = React.memo(
       const maxPlayers = Math.max(sortedPlayersA.length, sortedPlayersB.length);
 
       return (
-        <div className='bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mx-auto max-w-5xl'>
+        <div className='bg-white rounded-2xl shadow-sm border border-gray-200 p-4 mx-auto max-w-5xl'>
           {/* Header con nombres de equipos y promedios */}
-          <div className='flex justify-between items-center mb-6'>
+          <div className='flex justify-between items-center mb-1'>
             <div className='text-center flex-1'>
-              <h3 className='text-xl font-bold text-primary-900 mb-1'>
-                {teamAName}
-              </h3>
-              <div className='text-sm text-gray-600'>
-                {teamAAvgAge && `${teamAAvgAge} 🎂`}
-                {teamAAvgAge && teamAAvgRating && ' • '}
-                {teamAAvgRating && `${teamAAvgRating} ⭐`}
+              <div className='flex items-center justify-center gap-2'>
+                <h3 className='text-lg font-bold text-primary-900'>
+                  {teamAName}
+                </h3>
+                <div className='text-xs text-gray-600'>
+                  {teamAAvgAge && `${teamAAvgAge}🎂`}
+                  {teamAAvgAge && teamAAvgRating && '•'}
+                  {teamAAvgRating && `${teamAAvgRating}⭐`}
+                </div>
               </div>
             </div>
 
             <div className='text-center flex-1'>
-              <h3 className='text-xl font-bold text-lime-900 mb-1'>
-                {teamBName}
-              </h3>
-              <div className='text-sm text-gray-600'>
-                {teamBAvgAge && `${teamBAvgAge} 🎂`}
-                {teamBAvgAge && teamBAvgRating && ' • '}
-                {teamBAvgRating && `${teamBAvgRating} ⭐`}
+              <div className='flex items-center justify-center gap-2'>
+                <h3 className='text-lg font-bold text-lime-900'>{teamBName}</h3>
+                <div className='text-xs text-gray-600'>
+                  {teamBAvgAge && `${teamBAvgAge}🎂`}
+                  {teamBAvgAge && teamBAvgRating && '•'}
+                  {teamBAvgRating && `${teamBAvgRating}⭐`}
+                </div>
               </div>
             </div>
           </div>
 
           {/* Lista de jugadores emparejados */}
-          <div className='space-y-2'>
+          <div className='space-y-1'>
             {Array.from({ length: maxPlayers }, (_, index) => {
               const playerA = sortedPlayersA[index];
               const playerB = sortedPlayersB[index];
@@ -785,25 +787,23 @@ const TeamsList = React.memo(
               return (
                 <div
                   key={index}
-                  className='grid grid-cols-12 items-center gap-2 min-h-[1.5rem]'
+                  className='grid grid-cols-12 items-center gap-2 min-h-[1.25rem]'
                 >
                   {/* Jugador Equipo A - ocupa 5 columnas */}
                   <div className='col-span-5 text-right'>
-                    <span className='text-gray-800 font-medium text-xs sm:text-sm md:text-base lg:text-lg truncate block'>
+                    <span className='text-gray-800 font-medium text-xs truncate block'>
                       {textA}
                     </span>
                   </div>
 
                   {/* Separador fijo - ocupa 2 columnas */}
                   <div className='col-span-2 flex justify-center'>
-                    <div className='text-gray-400 text-sm sm:text-base md:text-lg font-light'>
-                      |
-                    </div>
+                    <div className='text-gray-400 text-xs font-light'>|</div>
                   </div>
 
                   {/* Jugador Equipo B - ocupa 5 columnas */}
                   <div className='col-span-5 text-left'>
-                    <span className='text-gray-800 font-medium text-xs sm:text-sm md:text-base lg:text-lg truncate block'>
+                    <span className='text-gray-800 font-medium text-xs truncate block'>
                       {textB}
                     </span>
                   </div>
