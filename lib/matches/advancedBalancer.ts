@@ -1,5 +1,6 @@
 import { Member } from './types';
 import { PLAYER_ROLES } from './constants';
+import { PlayerRoleType } from '../teambuilder/types';
 import { calculateAge } from '../utils';
 import {
   assignFlexibleRole,
@@ -59,10 +60,10 @@ export const createRatingBalancedTeams = (
       (teamB.length || 1);
 
     const assignedRole =
-      getPrimaryRole(player.playerRoles) ||
+      (getPrimaryRole(player.playerRoles) as PlayerRoleType) ||
       assignFlexibleRole(
         index % 2 === 0 ? teamA : teamB,
-        Object.values(PLAYER_ROLES)
+        Object.values(PLAYER_ROLES) as PlayerRoleType[]
       );
 
     // CORREGIDO: Solo marcar como forzado si NO tiene este rol entre sus preferencias
@@ -145,7 +146,8 @@ export const createRandomTeams = (members: Member[]): [Member[], Member[]] => {
   // Distribuir jugadores alternadamente
   shuffledMembers.forEach((player, index) => {
     const assignedRole =
-      getPrimaryRole(player.playerRoles) || PLAYER_ROLES.WILDCARD;
+      (getPrimaryRole(player.playerRoles) as PlayerRoleType) ||
+      PLAYER_ROLES.WILDCARD;
 
     // CORREGIDO: Solo marcar como forzado si NO tiene este rol entre sus preferencias
     const hasThisRole =
@@ -175,53 +177,4 @@ export const createRandomTeams = (members: Member[]): [Member[], Member[]] => {
   console.log(`   Equipo B: ${teamB.length} jugadores`);
 
   return [teamA, teamB];
-};
-
-export const createRoleAndAgeBalancedTeams = (
-  members: Member[]
-): [Member[], Member[]] => {
-  console.log('\n🎯 === CREANDO EQUIPOS BALANCEADOS POR ROL Y EDAD ===');
-
-  if (members.length === 0) {
-    return [[], []];
-  }
-
-  // Calcular edad promedio usando la función auxiliar
-  const totalAge = members.reduce(
-    (sum, member) => sum + getPlayerAge(member),
-    0
-  );
-  const averageAge = totalAge / members.length;
-
-  console.log(`📊 Edad promedio: ${averageAge.toFixed(1)} años`);
-
-  // Clasificar jugadores por edad
-  const youngerPlayers = members.filter(
-    (member) => getPlayerAge(member) <= averageAge
-  );
-  const olderPlayers = members.filter(
-    (member) => getPlayerAge(member) > averageAge
-  );
-
-  console.log(`👶 Jugadores jóvenes: ${youngerPlayers.length}`);
-  console.log(`👴 Jugadores mayores: ${olderPlayers.length}`);
-
-  // Para simplicidad, usar el algoritmo de rating con consideración de edad
-  return createRatingBalancedTeams(members);
-};
-
-export const createCombinedBalancedTeams = (
-  members: Member[]
-): [Member[], Member[]] => {
-  console.log(
-    '\n🎯 === CREANDO EQUIPOS BALANCEADOS POR MÚLTIPLES CRITERIOS ==='
-  );
-
-  if (members.length === 0) {
-    return [[], []];
-  }
-
-  // Para ahora, usar el algoritmo inteligente como base
-  // En el futuro se puede implementar un algoritmo más sofisticado
-  return createRatingBalancedTeams(members);
 };

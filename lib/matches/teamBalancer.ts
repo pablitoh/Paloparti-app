@@ -1,5 +1,6 @@
 import { Member } from './types';
 import { PLAYER_ROLES } from './constants';
+import { PlayerRoleType } from '../teambuilder/types';
 import {
   assignFlexibleRole,
   getPrimaryRole,
@@ -17,7 +18,7 @@ export const balanceTeamPositions = (team: Member[]): Member[] => {
         return { ...player, assignedRole: primaryRole };
       } else {
         // Si no tiene roles preferidos, asignar un rol flexible
-        const availableRoles = Object.values(PLAYER_ROLES);
+        const availableRoles = Object.values(PLAYER_ROLES) as PlayerRoleType[];
         const assignedRole = assignFlexibleRole(team, availableRoles);
         return { ...player, assignedRole: assignedRole };
       }
@@ -57,7 +58,7 @@ export const assignPlayersToPosition = (
 
       assigned.push({
         ...player,
-        assignedRole: targetRole,
+        assignedRole: targetRole as PlayerRoleType,
         positionForced: categoryName === 'wildcard',
       });
       assignedPlayers.add(player.id);
@@ -103,7 +104,7 @@ export const assignPlayersToPosition = (
 
       assigned.push({
         ...player,
-        assignedRole: targetRole,
+        assignedRole: targetRole as PlayerRoleType,
         positionForced: true, // Marca como forzado porque no es su rol preferido
       });
       assignedPlayers.add(player.id);
@@ -224,7 +225,7 @@ export const createIntelligentRoleBalancedTeams = (
     remainingPlayers.forEach((player, index) => {
       const assignedRole = assignFlexibleRole(
         index % 2 === 0 ? teamA : teamB,
-        Object.values(PLAYER_ROLES)
+        Object.values(PLAYER_ROLES) as PlayerRoleType[]
       );
 
       const playerWithRole = {
@@ -271,6 +272,6 @@ export const determineSmartRole = (player: Member, team: Member[]): string => {
   }
 
   // Si no tiene roles preferidos, asignar un rol flexible basado en el equipo actual
-  const availableRoles = Object.values(PLAYER_ROLES);
+  const availableRoles = Object.values(PLAYER_ROLES) as PlayerRoleType[];
   return assignFlexibleRole(team, availableRoles);
 };

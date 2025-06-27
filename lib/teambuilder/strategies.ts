@@ -310,7 +310,7 @@ export class CombinedBalanceStrategy implements TeamBalanceStrategy {
     const goalkeepers = players.filter(
       (p) =>
         p.role === PLAYER_ROLES.GOALKEEPER ||
-        p.playerRoles?.includes(PLAYER_ROLES.GOALKEEPER)
+        p.playerRoles?.some((r) => r.role === PLAYER_ROLES.GOALKEEPER)
     );
 
     if (goalkeepers.length >= 2) {

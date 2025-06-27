@@ -245,7 +245,7 @@ export default function NextMatchTab({
   useEffect(() => {
     if (user?.image) {
       // Invalidar la query del next-match para refrescar los datos cuando cambie el avatar
-      queryClient.invalidateQueries(['group', 'nextMatch', id]);
+      queryClient.invalidateQueries({ queryKey: ['group', 'nextMatch', id] });
     }
   }, [user?.image, id, queryClient]);
 

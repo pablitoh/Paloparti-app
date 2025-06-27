@@ -12,7 +12,8 @@ import {
   ChevronUpIcon,
   UserPlusIcon,
 } from '@heroicons/react/24/outline';
-import RoleSelectionModal, { PlayerRole } from '../modals/RoleSelectionModal';
+import RoleSelectionModal from '../modals/RoleSelectionModal';
+import { PlayerRole } from '../../../lib/teambuilder/types';
 import LeaveGroupModal from '../modals/LeaveGroupModal';
 import AddGhostPlayerModal from '../modals/AddGhostPlayerModal';
 import StarRating from '../../StarRating';

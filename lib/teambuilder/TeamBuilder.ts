@@ -3,6 +3,7 @@ import {
   BalanceStrategy,
   TeamBuilderOptions,
   PlayerRole,
+  PlayerRoleType,
 } from './types';
 import {
   RoleBalanceStrategy,
@@ -126,13 +127,15 @@ export class TeamBuilder {
 
   private findBestPlayerForRole(
     players: Member[],
-    role: PlayerRole,
+    role: PlayerRoleType,
     team: Member[]
   ): Member | null {
     const shuffledPlayers = this.shufflePlayers(players);
     return (
       shuffledPlayers.find((p) => p.role === role) ||
-      shuffledPlayers.find((p) => p.playerRoles?.includes(role)) ||
+      shuffledPlayers.find((p) =>
+        p.playerRoles?.some((r) => r.role === role)
+      ) ||
       null
     );
   }
@@ -179,7 +182,8 @@ export class TeamBuilder {
     teamB: Member[]
   ): void {
     const goalkeepers = players.filter(
-      (p) => p.role === 'Arquero' || p.playerRoles?.includes('Arquero')
+      (p) =>
+        p.role === 'Arquero' || p.playerRoles?.some((r) => r.role === 'Arquero')
     );
 
     if (goalkeepers.length >= 2) {
@@ -211,7 +215,7 @@ export class TeamBuilder {
 
   private findGoalkeeperCandidate(players: Member[]): Member | null {
     // Buscar en este orden: Defensor -> Mediocampista -> Delantero -> Comodín
-    const roles: PlayerRole[] = [
+    const roles: PlayerRoleType[] = [
       'Defensor',
       'Mediocampo',
       'Delantero',
@@ -246,7 +250,7 @@ export class TeamBuilder {
           };
 
     // Clasificar jugadores por rol
-    const playersByRole: Record<PlayerRole, Member[]> = {
+    const playersByRole: Record<PlayerRoleType, Member[]> = {
       Arquero: [],
       Defensor: [],
       Mediocampo: [],
@@ -255,12 +259,12 @@ export class TeamBuilder {
     };
 
     players.forEach((player) => {
-      const role = (player.role as PlayerRole) || 'Comodín';
+      const role = (player.role as PlayerRoleType) || 'Comodín';
       playersByRole[role].push(player);
     });
 
     // Distribuir por rol
-    const roles: PlayerRole[] = ['Defensor', 'Mediocampo', 'Delantero'];
+    const roles: PlayerRoleType[] = ['Defensor', 'Mediocampo', 'Delantero'];
 
     roles.forEach((role) => {
       const playersInRole = playersByRole[role] || [];

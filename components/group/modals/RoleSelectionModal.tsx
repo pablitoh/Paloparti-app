@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { POSITION_CONFIG } from '../../../lib/teambuilder';
+import { PlayerRole, PlayerRoleType } from '../../../lib/teambuilder/types';
 
 // Constantes para roles de jugadores
 export const PLAYER_ROLES = {
@@ -10,12 +11,6 @@ export const PLAYER_ROLES = {
   FORWARD: 'Delantero',
   WILDCARD: 'Comodín',
 };
-
-// Nueva estructura para posiciones con prioridad
-export interface PlayerRole {
-  role: string;
-  priority: number;
-}
 
 interface RoleSelectionModalProps {
   isOpen: boolean;
@@ -37,7 +32,7 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Nueva lógica para manejar clicks en roles con prioridades
-  const handleRoleClick = (role: string) => {
+  const handleRoleClick = (role: PlayerRoleType) => {
     const currentRoleIndex = selectedRoles.findIndex((r) => r.role === role);
 
     if (currentRoleIndex === -1) {
@@ -59,13 +54,13 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
   };
 
   // Obtener la prioridad de un rol
-  const getRolePriority = (role: string): number | undefined => {
+  const getRolePriority = (role: PlayerRoleType): number | undefined => {
     const roleData = selectedRoles.find((r) => r.role === role);
     return roleData?.priority;
   };
 
   // Verificar si un rol está seleccionado
-  const isRoleSelected = (role: string): boolean => {
+  const isRoleSelected = (role: PlayerRoleType): boolean => {
     return selectedRoles.some((r) => r.role === role);
   };
 
@@ -76,7 +71,7 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
     const rolesToSubmit =
       selectedRoles.length > 0
         ? selectedRoles
-        : [{ role: PLAYER_ROLES.WILDCARD, priority: 1 }];
+        : [{ role: PLAYER_ROLES.WILDCARD as PlayerRoleType, priority: 1 }];
 
     onConfirm(rolesToSubmit);
     setIsSubmitting(false);
@@ -141,17 +136,17 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
                   key !== 'WILDCARD' && (
                     <button
                       key={role}
-                      onClick={() => handleRoleClick(role)}
+                      onClick={() => handleRoleClick(role as PlayerRoleType)}
                       className={`relative px-3 py-3 text-sm rounded-xl transition-all duration-200 flex items-center justify-center font-medium border-2 ${
-                        isRoleSelected(role)
+                        isRoleSelected(role as PlayerRoleType)
                           ? 'bg-gradient-green-light text-primary-800 border-primary-300 shadow-green-sm'
                           : 'bg-white text-primary-700 hover:bg-primary-25 border-primary-200 hover:border-primary-300'
                       }`}
                     >
                       {/* Número de prioridad */}
-                      {isRoleSelected(role) && (
+                      {isRoleSelected(role as PlayerRoleType) && (
                         <span className='absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-sm'>
-                          {getRolePriority(role)}
+                          {getRolePriority(role as PlayerRoleType)}
                         </span>
                       )}
 

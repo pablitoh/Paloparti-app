@@ -113,20 +113,28 @@ export const assignFlexibleRole = (
 
 export const getPrimaryRole = (
   playerRoles?: PlayerRole[] | string[]
-): string | undefined => {
+): PlayerRoleType | undefined => {
   if (!playerRoles || playerRoles.length === 0) {
-    return PLAYER_ROLES.WILDCARD; // Usar comodín como default
+    return PLAYER_ROLES.WILDCARD as PlayerRoleType;
   }
 
-  // Si es un array de strings, devolver el primero
+  // Si es un array de strings, devolver el primero casteado solo si es válido
   if (typeof playerRoles[0] === 'string') {
-    return playerRoles[0] as string;
+    const role = playerRoles[0] as string;
+    if (Object.values(PLAYER_ROLES).includes(role as PlayerRoleType)) {
+      return role as PlayerRoleType;
+    }
+    return undefined;
   }
 
   // Si es un array de PlayerRole, devolver el de mayor prioridad
   const roleObjects = playerRoles as PlayerRole[];
   const sortedRoles = roleObjects.sort((a, b) => a.priority - b.priority);
-  return sortedRoles[0]?.role;
+  const role = sortedRoles[0]?.role;
+  if (role && Object.values(PLAYER_ROLES).includes(role as PlayerRoleType)) {
+    return role as PlayerRoleType;
+  }
+  return undefined;
 };
 
 export const playerHasRole = (player: Member, targetRole: string): boolean => {
@@ -172,13 +180,14 @@ export const getAvailablePlayersByRole = (players: Member[]) => {
         });
       } else {
         // Primer rol como primario, resto como secundario
-        const primaryRole = roles[0];
+        const primaryRole = roles[0] as PlayerRoleType;
         if (availableByRole[primaryRole]) {
           availableByRole[primaryRole].primary.push(player);
         }
         roles.slice(1).forEach((role) => {
-          if (availableByRole[role]) {
-            availableByRole[role].secondary.push(player);
+          const castedRole = role as PlayerRoleType;
+          if (availableByRole[castedRole]) {
+            availableByRole[castedRole].secondary.push(player);
           }
         });
       }
@@ -197,13 +206,14 @@ export const getAvailablePlayersByRole = (players: Member[]) => {
         });
       } else {
         // Primer rol como primario, resto como secundario
-        const primaryRole = sortedRoles[0].role;
+        const primaryRole = sortedRoles[0].role as PlayerRoleType;
         if (availableByRole[primaryRole]) {
           availableByRole[primaryRole].primary.push(player);
         }
         sortedRoles.slice(1).forEach((roleObj) => {
-          if (availableByRole[roleObj.role]) {
-            availableByRole[roleObj.role].secondary.push(player);
+          const castedRole = roleObj.role as PlayerRoleType;
+          if (availableByRole[castedRole]) {
+            availableByRole[castedRole].secondary.push(player);
           }
         });
       }

@@ -5,7 +5,10 @@ export interface Player {
   name: string | null;
   avatar: string | null;
   playerType?: string;
-  playerRoles?: string[];
+  playerRoles?: Array<{
+    role: string;
+    priority: number;
+  }>;
   age?: number | null;
   isTeamA?: boolean;
 }
@@ -33,8 +36,8 @@ export interface MatchInterface {
   id: string;
   date: string | Date;
   location: string;
-  teamA: string;
-  teamB: string;
+  teamA: Player[];
+  teamB: Player[];
   scoreA: number;
   scoreB: number;
   status: string;

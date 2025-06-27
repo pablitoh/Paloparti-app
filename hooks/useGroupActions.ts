@@ -14,6 +14,7 @@ import {
   useReplaceTbdPlayerMutation,
   useResetAttendanceMutation,
 } from '../services/reactQueryHooks';
+import { useState } from 'react';
 
 export interface UseGroupActionsProps {
   groupId: string;
@@ -22,6 +23,38 @@ export interface UseGroupActionsProps {
   group?: any;
   allowFillIn?: boolean;
 }
+
+// Función para convertir formato antiguo a nuevo
+const convertLegacyRoles = (roles: string[] | PlayerRole[]): PlayerRole[] => {
+  if (!roles || roles.length === 0) return [];
+
+  // Si ya está en formato nuevo (PlayerRole[])
+  if (
+    Array.isArray(roles) &&
+    roles.length > 0 &&
+    typeof roles[0] === 'object' &&
+    'priority' in roles[0] &&
+    'role' in roles[0] &&
+    typeof roles[0].role === 'string'
+  ) {
+    return roles as PlayerRole[];
+  }
+
+  // Si es array de strings (formato antiguo)
+  if (
+    Array.isArray(roles) &&
+    roles.length > 0 &&
+    typeof roles[0] === 'string'
+  ) {
+    const stringRoles = roles as string[];
+    return stringRoles.map((role, index) => ({
+      role: role as any,
+      priority: index + 1,
+    }));
+  }
+
+  return [];
+};
 
 export const useGroupActions = ({
   groupId,
@@ -167,7 +200,8 @@ export const useGroupActions = ({
       if (status === 'CONFIRMED') {
         if (playerRoles && playerRoles.length > 0) {
           // Normalizar roles (convierte formato antiguo si es necesario)
-          effectiveRoles = normalizePlayerRoles(playerRoles);
+          const convertedRoles = convertLegacyRoles(playerRoles);
+          effectiveRoles = normalizePlayerRoles(convertedRoles);
           console.log('NORMALIZED ROLES:', effectiveRoles);
         } else {
           // Si no se proporcionan roles, usar recuperar del localStorage
@@ -175,7 +209,8 @@ export const useGroupActions = ({
           if (savedRoles) {
             try {
               const parsedRoles = JSON.parse(savedRoles);
-              effectiveRoles = normalizePlayerRoles(parsedRoles);
+              const convertedRoles = convertLegacyRoles(parsedRoles);
+              effectiveRoles = normalizePlayerRoles(convertedRoles);
               console.log('ROLES FROM LOCALSTORAGE:', effectiveRoles);
             } catch (e) {
               console.error('Error parsing localStorage roles:', e);
@@ -295,7 +330,8 @@ export const useGroupActions = ({
       // Normalizar roles si se proporcionan
       let effectiveRoles: PlayerRole[] = [];
       if (status === 'CONFIRMED' && playerRoles && playerRoles.length > 0) {
-        effectiveRoles = normalizePlayerRoles(playerRoles);
+        const convertedRoles = convertLegacyRoles(playerRoles);
+        effectiveRoles = normalizePlayerRoles(convertedRoles);
       }
 
       await adminAttendanceMutation.mutateAsync({
