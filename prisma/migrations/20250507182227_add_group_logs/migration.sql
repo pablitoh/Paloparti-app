@@ -6,8 +6,8 @@
 
 */
 -- AlterTable
-ALTER TABLE "Match" DROP COLUMN "playersA",
-DROP COLUMN "playersB";
+ALTER TABLE "Match" DROP COLUMN IF EXISTS "playersA",
+DROP COLUMN IF EXISTS "playersB";
 
 -- CreateTable
 CREATE TABLE "GroupLog" (
