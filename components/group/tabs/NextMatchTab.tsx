@@ -1236,6 +1236,22 @@ _Generado con Paloparti_ 🚀`;
     }
   }, [teamA, teamB, teamsFormed, matchDetails?.sortCount]);
 
+  // Suscribirse a cambios en los datos básicos del grupo
+  useEffect(() => {
+    // Invalidar el caché cuando cambie el grupo para forzar una actualización
+    queryClient.invalidateQueries({
+      queryKey: ['group', 'basic', id],
+      exact: true,
+      refetchType: 'active',
+    });
+  }, [
+    group.teamAName,
+    group.teamBName,
+    group.teamAColor,
+    group.teamBColor,
+    id,
+  ]);
+
   // Log de debugging para verificar userRoles
   console.log(
     '🐛 NextMatchTab - userRoles antes de pasar a AttendanceConfirmation:',

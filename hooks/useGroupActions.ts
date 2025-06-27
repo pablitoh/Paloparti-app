@@ -80,8 +80,26 @@ export const useGroupActions = ({
   const invalidateRelevantQueries = async (
     scope: 'all' | 'nextMatch' | 'members' = 'all'
   ) => {
-    // Use a sequence of invalidations to prevent race conditions
-    const invalidationPromises = [];
+    const invalidationPromises = [
+      // Siempre invalidar el caché del próximo partido
+      queryClient.invalidateQueries({
+        queryKey: ['group', 'nextMatch', groupId],
+        exact: true,
+        refetchType: 'active',
+      }),
+      // Siempre invalidar el caché de miembros
+      queryClient.invalidateQueries({
+        queryKey: ['group', 'members', groupId],
+        exact: true,
+        refetchType: 'active',
+      }),
+      // Siempre invalidar el caché básico del grupo para reflejar cambios en colores/nombres
+      queryClient.invalidateQueries({
+        queryKey: ['group', 'basic', groupId],
+        exact: true,
+        refetchType: 'active',
+      }),
+    ];
 
     if (scope === 'all' || scope === 'nextMatch') {
       // Solo invalidar si no hay datos en caché
@@ -123,15 +141,6 @@ export const useGroupActions = ({
     if (scope === 'all') {
       // Wait for previous invalidations before proceeding
       await Promise.all(invalidationPromises);
-
-      const basicData = queryClient.getQueryData(['group', 'basic', groupId]);
-      if (!basicData) {
-        await queryClient.invalidateQueries({
-          queryKey: ['group', 'basic', groupId],
-          exact: true,
-          refetchType: 'active',
-        });
-      }
 
       const historyData = queryClient.getQueryData([
         'group',
