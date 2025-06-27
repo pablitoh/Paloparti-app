@@ -1,0 +1,2 @@
+-- Migration to sync with database state
+-- This migration represents changes that were already applied to the database 
