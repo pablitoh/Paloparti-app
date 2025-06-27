@@ -97,14 +97,82 @@ export default async function handler(
     // Procesar el objeto tbdPlayers usando la utilidad normalizada
     const tbdPlayers = normalizeTbdPlayers(match.tbdPlayers);
 
+    // Debug logs para ver qué datos tenemos disponibles
+    console.log('🔍 DEBUG - Swap-players data:', {
+      matchId: id,
+      matchPlayersCount: match.matchPlayers.length,
+      teamA: match.teamA ? 'exists' : 'null',
+      teamB: match.teamB ? 'exists' : 'null',
+      player1Id,
+      player2Id,
+      player1IsTeamA,
+      player2IsTeamA,
+    });
+
+    // Intentar parsear teamA y teamB si existen
+    let parsedTeamA = [];
+    let parsedTeamB = [];
+
+    try {
+      if (match.teamA) {
+        parsedTeamA =
+          typeof match.teamA === 'string'
+            ? JSON.parse(match.teamA)
+            : match.teamA;
+      }
+      if (match.teamB) {
+        parsedTeamB =
+          typeof match.teamB === 'string'
+            ? JSON.parse(match.teamB)
+            : match.teamB;
+      }
+
+      console.log('🔍 DEBUG - Parsed teams:', {
+        teamACount: parsedTeamA.length,
+        teamBCount: parsedTeamB.length,
+        teamAPlayerIds: parsedTeamA.map((p: any) => p.id),
+        teamBPlayerIds: parsedTeamB.map((p: any) => p.id),
+      });
+    } catch (error) {
+      console.error('Error parsing teams:', error);
+    }
+
     // Encontrar los jugadores en los equipos
     const findPlayer = (playerId: string, isTeamA: boolean) => {
-      // Buscar en jugadores reales
+      // Buscar primero en los campos JSON teamA/teamB
+      const targetTeam = isTeamA ? parsedTeamA : parsedTeamB;
+      const jsonPlayer = targetTeam.find((p: any) => p.id === playerId);
+
+      if (jsonPlayer) {
+        console.log('🔍 DEBUG - Found player in JSON teams:', {
+          playerId,
+          playerName: jsonPlayer.name,
+          isTeamA,
+          playerType: 'REAL',
+        });
+
+        return {
+          id: jsonPlayer.id,
+          name: jsonPlayer.name,
+          avatar: jsonPlayer.avatar,
+          isTeamA: isTeamA,
+          playerType: 'REAL',
+        };
+      }
+
+      // Buscar en jugadores reales (fallback)
       const realPlayer = match.matchPlayers.find(
         (mp: any) => mp.userId === playerId && mp.isTeamA === isTeamA
       );
 
       if (realPlayer) {
+        console.log('🔍 DEBUG - Found player in matchPlayers:', {
+          playerId,
+          playerName: realPlayer.user.name,
+          isTeamA,
+          playerType: 'REAL',
+        });
+
         return {
           id: realPlayer.userId,
           name: realPlayer.user.name,
@@ -118,11 +186,26 @@ export default async function handler(
       const tbdPlayer = findTbdPlayer(tbdPlayers, playerId, isTeamA);
 
       if (tbdPlayer) {
+        console.log('🔍 DEBUG - Found TBD player:', {
+          playerId,
+          playerName: tbdPlayer.name,
+          isTeamA,
+          playerType: 'TBD',
+        });
+
         return {
           ...tbdPlayer,
           playerType: 'TBD',
         };
       }
+
+      console.log('🔍 DEBUG - Player NOT found:', {
+        playerId,
+        isTeamA,
+        searchedInJsonTeams: true,
+        searchedInMatchPlayers: true,
+        searchedInTbdPlayers: true,
+      });
 
       return null;
     };
@@ -171,6 +254,66 @@ export default async function handler(
 
     // Ejecutar actualizaciones de jugadores reales
     await Promise.all(swapPromises);
+
+    // ACTUALIZAR LOS CAMPOS JSON teamA y teamB
+    const updatedTeamA = [...parsedTeamA];
+    const updatedTeamB = [...parsedTeamB];
+
+    // Intercambiar player1 en los campos JSON
+    if (player1.playerType === 'REAL') {
+      // Remover del equipo actual
+      if (player1IsTeamA) {
+        const index = updatedTeamA.findIndex((p: any) => p.id === player1Id);
+        if (index !== -1) {
+          const player = updatedTeamA.splice(index, 1)[0];
+          player.isTeamA = false;
+          updatedTeamB.push(player);
+        }
+      } else {
+        const index = updatedTeamB.findIndex((p: any) => p.id === player1Id);
+        if (index !== -1) {
+          const player = updatedTeamB.splice(index, 1)[0];
+          player.isTeamA = true;
+          updatedTeamA.push(player);
+        }
+      }
+    }
+
+    // Intercambiar player2 en los campos JSON
+    if (player2.playerType === 'REAL') {
+      // Remover del equipo actual
+      if (player2IsTeamA) {
+        const index = updatedTeamA.findIndex((p: any) => p.id === player2Id);
+        if (index !== -1) {
+          const player = updatedTeamA.splice(index, 1)[0];
+          player.isTeamA = false;
+          updatedTeamB.push(player);
+        }
+      } else {
+        const index = updatedTeamB.findIndex((p: any) => p.id === player2Id);
+        if (index !== -1) {
+          const player = updatedTeamB.splice(index, 1)[0];
+          player.isTeamA = true;
+          updatedTeamA.push(player);
+        }
+      }
+    }
+
+    console.log('🔍 DEBUG - Updated teams after swap:', {
+      originalTeamACount: parsedTeamA.length,
+      originalTeamBCount: parsedTeamB.length,
+      updatedTeamACount: updatedTeamA.length,
+      updatedTeamBCount: updatedTeamB.length,
+    });
+
+    // Actualizar los campos JSON en la base de datos
+    await prisma.match.update({
+      where: { id },
+      data: {
+        teamA: JSON.stringify(updatedTeamA),
+        teamB: JSON.stringify(updatedTeamB),
+      },
+    });
 
     // Actualizar TBD players si alguno es TBD
     if (player1.playerType === 'TBD' || player2.playerType === 'TBD') {

@@ -42,8 +42,17 @@ const SwapPlayersModal = ({
   const allPlayers = useMemo(() => {
     if (!group?.nextMatchDetails) return { teamA: [], teamB: [] };
 
-    const playersA = group.nextMatchDetails.playersA || [];
-    const playersB = group.nextMatchDetails.playersB || [];
+    const playersA = group.nextMatchDetails.teamA || [];
+    const playersB = group.nextMatchDetails.teamB || [];
+
+    // Debug log para verificar datos
+    console.log('🔍 DEBUG - SwapPlayersModal data:', {
+      hasNextMatchDetails: !!group?.nextMatchDetails,
+      teamACount: playersA.length,
+      teamBCount: playersB.length,
+      teamAPlayers: playersA.map((p: any) => ({ id: p.id, name: p.name })),
+      teamBPlayers: playersB.map((p: any) => ({ id: p.id, name: p.name })),
+    });
 
     // Normalize TBD players from the match details using the utility
     const normalizedTbdPlayers = normalizeTbdPlayers(

@@ -1,4 +1,5 @@
 import { Member, TbdPlayer } from './types';
+import { PlayerRole } from '../teambuilder/types';
 import { calculateAge } from '../utils';
 
 export const calculateAverageAge = (team: Member[]): number => {
@@ -18,7 +19,7 @@ export const generateTbdPlayer = (
   id: string,
   name: string,
   isTeamA: boolean,
-  playerRoles?: string[]
+  playerRoles?: PlayerRole[]
 ): TbdPlayer => {
   return {
     id,
@@ -200,6 +201,88 @@ export const ensureEvenRealPlayerDistribution = (
 
   console.log(
     `✅ Nueva distribución - Equipo A: ${finalRealA.length}, Equipo B: ${finalRealB.length}`
+  );
+
+  return [newTeamA, newTeamB];
+};
+
+// Nueva función que redistribuye jugadores de manera aleatoria para preservar variabilidad
+export const ensureEvenRealPlayerDistributionRandom = (
+  teamA: Member[],
+  teamB: Member[]
+): [Member[], Member[]] => {
+  console.log('\n🎲 === ASEGURANDO DISTRIBUCIÓN PAREJA CON VARIABILIDAD ===');
+
+  // Filtrar solo jugadores reales (no TBD)
+  const realPlayersA = teamA.filter(
+    (p) => p && typeof p.id === 'string' && !p.id.startsWith('tbd-')
+  );
+  const realPlayersB = teamB.filter(
+    (p) => p && typeof p.id === 'string' && !p.id.startsWith('tbd-')
+  );
+
+  console.log(
+    `👥 Jugadores reales - Equipo A: ${realPlayersA.length}, Equipo B: ${realPlayersB.length}`
+  );
+
+  // Si la diferencia es mayor a 1, redistribuir
+  const difference = Math.abs(realPlayersA.length - realPlayersB.length);
+
+  if (difference <= 1) {
+    console.log('✅ Distribución ya está equilibrada');
+    return [teamA, teamB];
+  }
+
+  console.log(
+    `🎲 Redistribuyendo ${Math.floor(
+      difference / 2
+    )} jugadores de manera aleatoria`
+  );
+
+  let newTeamA = [...teamA];
+  let newTeamB = [...teamB];
+
+  // Determinar qué equipo tiene más jugadores reales
+  const teamWithMore = realPlayersA.length > realPlayersB.length ? 'A' : 'B';
+  const playersToMove = Math.floor(difference / 2);
+
+  if (teamWithMore === 'A') {
+    // Mezclar aleatoriamente los jugadores del equipo A y tomar los primeros que necesitamos
+    const shuffledPlayersA = [...realPlayersA].sort(() => Math.random() - 0.5);
+    const playersToMoveFromA = shuffledPlayersA.slice(0, playersToMove);
+
+    newTeamA = newTeamA.filter(
+      (p) => !playersToMoveFromA.some((pm) => pm.id === p.id)
+    );
+    newTeamB = [...newTeamB, ...playersToMoveFromA];
+
+    console.log(
+      `🎲 Movidos ${playersToMove} jugadores aleatorios de Equipo A a Equipo B`
+    );
+  } else {
+    // Mezclar aleatoriamente los jugadores del equipo B y tomar los primeros que necesitamos
+    const shuffledPlayersB = [...realPlayersB].sort(() => Math.random() - 0.5);
+    const playersToMoveFromB = shuffledPlayersB.slice(0, playersToMove);
+
+    newTeamB = newTeamB.filter(
+      (p) => !playersToMoveFromB.some((pm) => pm.id === p.id)
+    );
+    newTeamA = [...newTeamA, ...playersToMoveFromB];
+
+    console.log(
+      `🎲 Movidos ${playersToMove} jugadores aleatorios de Equipo B a Equipo A`
+    );
+  }
+
+  const finalRealA = newTeamA.filter(
+    (p) => p && typeof p.id === 'string' && !p.id.startsWith('tbd-')
+  );
+  const finalRealB = newTeamB.filter(
+    (p) => p && typeof p.id === 'string' && !p.id.startsWith('tbd-')
+  );
+
+  console.log(
+    `✅ Nueva distribución aleatoria - Equipo A: ${finalRealA.length}, Equipo B: ${finalRealB.length}`
   );
 
   return [newTeamA, newTeamB];

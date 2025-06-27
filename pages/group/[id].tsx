@@ -40,7 +40,7 @@ import type { MatchInterface } from '../../types/match';
 import ManualTeamFormationModal from '../../components/group/modals/ManualTeamFormationModal';
 import SwapPlayersModal from '../../components/group/modals/SwapPlayersModal';
 import Link from 'next/link';
-import { PlayerRole, normalizePlayerRoles } from '../../lib/teambuilder';
+import { PlayerRole, PlayerRoleType } from '../../lib/teambuilder/types';
 
 // Add AuthUser interface
 interface AuthUser {
@@ -156,6 +156,7 @@ interface ApiResponse {
   nextMatchDetails?: MatchInterface;
   userAttendance?: ParticipantStatus;
   userRoles?: string[];
+  isAdmin?: boolean;
 }
 
 // Components for each tab that handle their own data loading
@@ -191,6 +192,7 @@ const LazyNextMatchTab = ({
     nextMatchDetails: apiData?.nextMatchDetails,
     userAttendanceStatus: apiData?.userAttendance,
     nextMatchId: apiData?.nextMatchDetails?.id || basicData?.nextMatchId,
+    isAdmin: apiData?.isAdmin || basicData?.isAdmin,
   };
 
   // Only refetch once on initial mount to ensure we have the latest data
@@ -260,7 +262,7 @@ const LazyNextMatchTab = ({
         group={group}
         user={user}
         id={groupId}
-        currentUserIsAdmin={currentUserIsAdmin}
+        currentUserIsAdmin={apiData?.isAdmin ?? currentUserIsAdmin}
         isUserInGroup={isUserInGroup}
         setShowReplaceTbdModal={setShowReplaceTbdModal}
         setShowSwapPlayersModal={setShowSwapPlayersModal}
@@ -271,8 +273,21 @@ const LazyNextMatchTab = ({
           router.push(`/matches/${group?.nextMatchId}/results?edit=true`)
         }
         handleDeleteMatch={handleMatchDeletion}
-        userAttendanceStatus={(data as ApiResponse)?.userAttendance}
-        userRoles={normalizePlayerRoles((data as ApiResponse)?.userRoles || [])}
+        userAttendanceStatus={apiData?.userAttendance}
+        userRoles={
+          apiData?.userRoles
+            ? Array.isArray(apiData.userRoles) && apiData.userRoles.length > 0
+              ? typeof apiData.userRoles[0] === 'string'
+                ? (apiData.userRoles as unknown as string[]).map(
+                    (role, index) => ({
+                      role: role as PlayerRoleType,
+                      priority: index + 1,
+                    })
+                  )
+                : (apiData.userRoles as unknown as PlayerRole[])
+              : []
+            : []
+        }
         allowFillIn={allowFillIn}
         setAllowFillIn={setAllowFillIn}
         setShowManualTeamFormationModal={setShowManualTeamFormationModal}
@@ -499,6 +514,16 @@ export default function GroupDetails() {
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
+
+  // Asegurarnos de que el estado de admin se mantenga consistente
+  useEffect(() => {
+    if (groupBasicData?.isAdmin) {
+      // Si el usuario es admin, invalidar la caché del próximo partido para obtener datos frescos
+      queryClient.invalidateQueries({
+        queryKey: ['group', 'nextMatch', groupId],
+      });
+    }
+  }, [groupBasicData?.isAdmin, groupId, queryClient]);
 
   return (
     <Layout>

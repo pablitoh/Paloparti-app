@@ -70,14 +70,10 @@ export default function Groups() {
 
     const fetchGroups = async () => {
       try {
-        // Añadir timestamp para evitar caché
-        const timestamp = new Date().getTime();
-        const response = await fetch(`/api/groups?_t=${timestamp}`, {
+        // Eliminamos timestamp y headers agresivos para permitir caching
+        const response = await fetch(`/api/groups`, {
           headers: {
             'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            Pragma: 'no-cache',
-            Expires: '0',
           },
         });
 

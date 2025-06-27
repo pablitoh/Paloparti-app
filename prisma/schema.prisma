@@ -67,6 +67,8 @@ model Group {
   requiredPlayers     Int               @default(10)
   teamAName           String?           @default("Equipo A")
   teamBName           String?           @default("Equipo B")
+  teamAColor          String?           @default("#3B82F6") // Azul por defecto
+  teamBColor          String?           @default("#EF4444") // Rojo por defecto
   inviteToken         String?
   lastSortingCriteria Json?
   nextMatchId         String?           @unique

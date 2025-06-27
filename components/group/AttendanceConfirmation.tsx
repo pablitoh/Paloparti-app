@@ -48,39 +48,68 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
   // Función para convertir formato antiguo a nuevo
   const convertLegacyRoles = useCallback(
     (roles: string[] | PlayerRole[]): PlayerRole[] => {
+      console.log('🐛 convertLegacyRoles entrada:', roles);
+
       if (!roles || roles.length === 0) return [];
 
-      // Si ya está en formato nuevo
+      // Si ya está en formato nuevo (PlayerRole[])
       if (
         Array.isArray(roles) &&
         roles.length > 0 &&
         typeof roles[0] === 'object' &&
-        'priority' in roles[0]
+        'priority' in roles[0] &&
+        'role' in roles[0] &&
+        typeof roles[0].role === 'string'
       ) {
+        console.log(
+          '🐛 Detectado formato correcto PlayerRole[], retornando tal como está'
+        );
         return roles as PlayerRole[];
       }
 
-      // Convertir formato antiguo - mantener orden original como prioridad
-      const stringRoles = roles as string[];
-      return stringRoles.map((role, index) => ({
-        role: role as PlayerRoleType,
-        priority: index + 1,
-      }));
+      // Si es array de strings (formato antiguo)
+      if (
+        Array.isArray(roles) &&
+        roles.length > 0 &&
+        typeof roles[0] === 'string'
+      ) {
+        console.log('🐛 Detectado formato string[], convirtiendo');
+        const stringRoles = roles as string[];
+        const converted = stringRoles.map((role, index) => ({
+          role: role as PlayerRoleType,
+          priority: index + 1,
+        }));
+        console.log('🐛 Convertido desde string[]:', converted);
+        return converted;
+      }
+
+      console.log('🐛 Formato no reconocido, retornando array vacío');
+      return [];
     },
     []
   );
 
   // Update local state when props change or match ID changes
   useEffect(() => {
+    console.log('🐛 AttendanceConfirmation useEffect ejecutado:', {
+      matchId,
+      userAttendanceStatus,
+      initialPlayerRoles,
+      initialPlayerRolesLength: initialPlayerRoles?.length,
+    });
+
     if (matchId) {
       setLocalAttendanceStatus(userAttendanceStatus);
 
       // Primero intentar usar los roles iniciales pasados como prop
       if (initialPlayerRoles && initialPlayerRoles.length > 0) {
-        console.log('Cargando roles iniciales:', initialPlayerRoles);
+        console.log('🐛 Cargando roles iniciales:', initialPlayerRoles);
         const convertedRoles = convertLegacyRoles(initialPlayerRoles);
+        console.log('🐛 Roles convertidos:', convertedRoles);
         setSelectedRoles(convertedRoles);
+        console.log('🐛 selectedRoles actualizados');
       } else {
+        console.log('🐛 No hay roles iniciales, intentando localStorage');
         // Si no hay roles iniciales, intentar recuperar del localStorage
         const savedRoles = localStorage.getItem('paloparti_selected_roles');
         if (savedRoles) {
@@ -88,14 +117,21 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
             const parsedRoles = JSON.parse(savedRoles);
             const convertedRoles = convertLegacyRoles(parsedRoles);
             if (convertedRoles.length > 0) {
-              console.log('Cargando roles desde localStorage:', convertedRoles);
+              console.log(
+                '🐛 Cargando roles desde localStorage:',
+                convertedRoles
+              );
               setSelectedRoles(convertedRoles);
             }
           } catch (e) {
             console.error('Error parsing saved roles:', e);
           }
+        } else {
+          console.log('🐛 No hay roles en localStorage');
         }
       }
+    } else {
+      console.log('🐛 No hay matchId');
     }
   }, [userAttendanceStatus, matchId, initialPlayerRoles, convertLegacyRoles]);
 
@@ -204,6 +240,13 @@ const AttendanceConfirmation: React.FC<AttendanceConfirmationProps> = ({
       setIsLoading(false);
     }
   };
+
+  // Log de debugging para verificar selectedRoles en render
+  console.log('🐛 Renderizando AttendanceConfirmation:', {
+    selectedRoles,
+    isConfirmed,
+    localAttendanceStatus,
+  });
 
   return (
     <div className='w-full'>

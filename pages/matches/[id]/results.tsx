@@ -2,8 +2,15 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import Layout from '../../../components/Layout';
+import Button from '../../../components/Button';
 import { Match } from '@prisma/client';
 import { toast } from 'react-hot-toast';
+import {
+  ArrowLeftIcon,
+  CalendarIcon,
+  MapPinIcon,
+  PencilIcon,
+} from '@heroicons/react/24/outline';
 
 interface Goal {
   id: string;
@@ -50,6 +57,8 @@ interface MatchWithPlayers extends Omit<Match, 'teamA' | 'teamB'> {
   group?: {
     id: string;
     name: string;
+    teamAName?: string;
+    teamBName?: string;
   };
   goals?: {
     id: string;
@@ -517,8 +526,12 @@ export default function MatchResults() {
   if (status === 'loading' || loading) {
     return (
       <Layout>
-        <div className='flex justify-center items-center min-h-screen'>
-          <div className='animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-gray-900'></div>
+        <div className='min-h-screen bg-gradient-to-br from-primary-50 to-accent-50'>
+          <div className='container mx-auto px-4 py-8'>
+            <div className='flex justify-center items-center min-h-[400px]'>
+              <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500'></div>
+            </div>
+          </div>
         </div>
       </Layout>
     );
@@ -527,16 +540,22 @@ export default function MatchResults() {
   if (error || !match) {
     return (
       <Layout>
-        <div className='flex flex-col items-center justify-center min-h-screen'>
-          <h1 className='text-2xl font-bold mb-4'>
-            {error || 'Partido no encontrado'}
-          </h1>
-          <button
-            onClick={() => router.back()}
-            className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded'
-          >
-            Volver
-          </button>
+        <div className='min-h-screen bg-gradient-to-br from-primary-50 to-accent-50'>
+          <div className='container mx-auto px-4 py-8'>
+            <div className='bg-white rounded-xl shadow-lg p-8 text-center'>
+              <div className='w-16 h-16 bg-error-100 rounded-full flex items-center justify-center mx-auto mb-4'>
+                <span className='text-error-500 text-2xl'>⚠️</span>
+              </div>
+              <h1 className='text-2xl font-heading text-error-600 mb-4'>
+                Error
+              </h1>
+              <p className='text-gray-600 mb-6'>{error}</p>
+              <Button onClick={() => router.back()} variant='primary'>
+                <ArrowLeftIcon className='w-5 h-5 mr-2' />
+                Volver
+              </Button>
+            </div>
+          </div>
         </div>
       </Layout>
     );
@@ -571,9 +590,11 @@ export default function MatchResults() {
   if (loading) {
     return (
       <Layout>
-        <div className='container mx-auto px-4 py-8'>
-          <div className='flex justify-center items-center min-h-screen'>
-            <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500'></div>
+        <div className='min-h-screen bg-gradient-to-br from-primary-50 to-accent-50'>
+          <div className='container mx-auto px-4 py-8'>
+            <div className='flex justify-center items-center min-h-[400px]'>
+              <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500'></div>
+            </div>
           </div>
         </div>
       </Layout>
@@ -584,16 +605,21 @@ export default function MatchResults() {
   if (error) {
     return (
       <Layout>
-        <div className='container mx-auto px-4 py-8'>
-          <div className='text-center'>
-            <h1 className='text-2xl font-bold text-red-600 mb-4'>Error</h1>
-            <p className='text-gray-600 mb-4'>{error}</p>
-            <button
-              onClick={() => router.back()}
-              className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded'
-            >
-              Volver
-            </button>
+        <div className='min-h-screen bg-gradient-to-br from-primary-50 to-accent-50'>
+          <div className='container mx-auto px-4 py-8'>
+            <div className='bg-white rounded-xl shadow-lg p-8 text-center'>
+              <div className='w-16 h-16 bg-error-100 rounded-full flex items-center justify-center mx-auto mb-4'>
+                <span className='text-error-500 text-2xl'>⚠️</span>
+              </div>
+              <h1 className='text-2xl font-heading text-error-600 mb-4'>
+                Error
+              </h1>
+              <p className='text-gray-600 mb-6'>{error}</p>
+              <Button onClick={() => router.back()} variant='primary'>
+                <ArrowLeftIcon className='w-5 h-5 mr-2' />
+                Volver
+              </Button>
+            </div>
           </div>
         </div>
       </Layout>
@@ -604,17 +630,20 @@ export default function MatchResults() {
   if (!match) {
     return (
       <Layout>
-        <div className='container mx-auto px-4 py-8'>
-          <div className='text-center'>
-            <h1 className='text-2xl font-bold text-gray-600 mb-4'>
-              Partido no encontrado
-            </h1>
-            <button
-              onClick={() => router.back()}
-              className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded'
-            >
-              Volver
-            </button>
+        <div className='min-h-screen bg-gradient-to-br from-primary-50 to-accent-50'>
+          <div className='container mx-auto px-4 py-8'>
+            <div className='bg-white rounded-xl shadow-lg p-8 text-center'>
+              <div className='w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4'>
+                <span className='text-gray-400 text-2xl'>🔍</span>
+              </div>
+              <h1 className='text-2xl font-heading text-gray-600 mb-4'>
+                Partido no encontrado
+              </h1>
+              <Button onClick={() => router.back()} variant='primary'>
+                <ArrowLeftIcon className='w-5 h-5 mr-2' />
+                Volver
+              </Button>
+            </div>
           </div>
         </div>
       </Layout>
@@ -623,329 +652,387 @@ export default function MatchResults() {
 
   return (
     <Layout>
-      <div className='container mx-auto px-4 py-8'>
-        <h1 className='text-3xl font-bold mb-6'>Resultados del Partido</h1>
-
-        <div className='bg-white shadow-lg rounded-lg p-4 sm:p-6 mb-6'>
-          {/* Match info */}
-          <div className='text-center mb-6'>
-            <p className='text-gray-600'>{match.group?.name || 'Grupo'}</p>
-            <p className='text-sm text-gray-500'>
-              {new Date(match.date).toLocaleDateString('es-ES', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })}
-            </p>
-            <p className='text-sm text-gray-600 mt-1'>{match.location}</p>
-          </div>
-
-          {/* Marcador de TV style */}
-          <div className='bg-green-800 text-white p-4 rounded-lg mb-6'>
-            <div className='grid grid-cols-2 gap-8 items-center'>
-              {/* Equipo A */}
-              <div className='text-center'>
-                <div className='font-bold text-xl sm:text-2xl mb-3'>
-                  Equipo A
-                </div>
-                {editMode ? (
-                  <div className='flex justify-center items-center gap-1'>
-                    <button
-                      onClick={() => {
-                        if (scoreA > 0) {
-                          // No permitir reducir el marcador por debajo del número de goles ya asignados
-                          if (goalsA.length >= scoreA) {
-                            toast.error(
-                              'Primero debes quitar los goles asignados a los jugadores'
-                            );
-                            return;
-                          }
-                          setScoreA(scoreA - 1);
-                        }
-                      }}
-                      className='w-10 h-10 flex items-center justify-center bg-green-700 hover:bg-green-600 rounded text-xl'
-                      disabled={scoreA <= 0 || goalsA.length >= scoreA}
-                    >
-                      -
-                    </button>
-                    <div className='bg-white text-black text-3xl sm:text-5xl font-bold px-4 py-2 rounded mx-2 min-w-16 text-center'>
-                      {scoreA}
-                    </div>
-                    <button
-                      onClick={() => setScoreA(scoreA + 1)}
-                      className='w-10 h-10 flex items-center justify-center bg-green-700 hover:bg-green-600 rounded text-xl'
-                      disabled={scoreA >= 99}
-                    >
-                      +
-                    </button>
-                  </div>
-                ) : (
-                  <div className='flex justify-center items-center'>
-                    <div className='bg-white text-black text-3xl sm:text-5xl font-bold px-4 py-2 rounded'>
-                      {match.scoreA}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Equipo B */}
-              <div className='text-center'>
-                <div className='font-bold text-xl sm:text-2xl mb-3'>
-                  Equipo B
-                </div>
-                {editMode ? (
-                  <div className='flex justify-center items-center gap-1'>
-                    <button
-                      onClick={() => {
-                        if (scoreB > 0) {
-                          // No permitir reducir el marcador por debajo del número de goles ya asignados
-                          if (goalsB.length >= scoreB) {
-                            toast.error(
-                              'Primero debes quitar los goles asignados a los jugadores'
-                            );
-                            return;
-                          }
-                          setScoreB(scoreB - 1);
-                        }
-                      }}
-                      className='w-10 h-10 flex items-center justify-center bg-green-700 hover:bg-green-600 rounded text-xl'
-                      disabled={scoreB <= 0 || goalsB.length >= scoreB}
-                    >
-                      -
-                    </button>
-                    <div className='bg-white text-black text-3xl sm:text-5xl font-bold px-4 py-2 rounded mx-2 min-w-16 text-center'>
-                      {scoreB}
-                    </div>
-                    <button
-                      onClick={() => setScoreB(scoreB + 1)}
-                      className='w-10 h-10 flex items-center justify-center bg-green-700 hover:bg-green-600 rounded text-xl'
-                      disabled={scoreB >= 99}
-                    >
-                      +
-                    </button>
-                  </div>
-                ) : (
-                  <div className='flex justify-center items-center'>
-                    <div className='bg-white text-black text-3xl sm:text-5xl font-bold px-4 py-2 rounded'>
-                      {match.scoreB}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {!editMode && (
-              <div className='flex justify-center items-center mt-4'>
-                <div className='text-xl sm:text-2xl'>-</div>
-              </div>
-            )}
-          </div>
-
-          {/* Grid for teams and goals */}
-          <div className='grid grid-cols-1 sm:grid-cols-2 gap-8 mb-6'>
-            {/* Team A players and goals */}
-            <div className='border-r-0 sm:border-r border-gray-200 pr-0 sm:pr-4'>
-              <h3 className='text-lg font-semibold mb-4 text-center'>
-                Equipo A
-              </h3>
-              <ul className='space-y-2'>
-                {Array.isArray(match.teamA) ? (
-                  match.teamA.map((player) => {
-                    const playerGoalCount = getPlayerGoalsA(player.id);
-                    console.log(
-                      `Rendering Team A Player ${player.name} with ${playerGoalCount} goals`
-                    );
-
-                    return (
-                      <li
-                        key={player.id}
-                        className='flex justify-between items-center space-x-2 border-b border-gray-100 pb-2'
-                      >
-                        <div className='flex items-center space-x-2 min-w-0'>
-                          {player.avatar && (
-                            <img
-                              src={player.avatar}
-                              alt={player.name || ''}
-                              className='w-8 h-8 rounded-full flex-shrink-0'
-                            />
-                          )}
-                          <span className='truncate'>{player.name}</span>
-                        </div>
-
-                        {/* Goals display or controls */}
-                        {editMode ? (
-                          <div className='flex items-center gap-2'>
-                            <button
-                              onClick={() => removeGoalA(player.id)}
-                              className='w-8 h-8 flex items-center justify-center bg-red-100 hover:bg-red-200 text-red-600 rounded'
-                              disabled={playerGoalCount <= 0}
-                            >
-                              -
-                            </button>
-                            <span className='w-6 text-center'>
-                              {playerGoalCount}
-                            </span>
-                            <button
-                              onClick={() => addGoalA(player.id)}
-                              className='w-8 h-8 flex items-center justify-center bg-green-100 hover:bg-green-200 text-green-600 rounded'
-                              disabled={goalsA.length >= scoreA}
-                            >
-                              +
-                            </button>
-                          </div>
-                        ) : (
-                          <div className='flex items-center'>
-                            {playerGoalCount > 0 && (
-                              <div className='flex items-center gap-1'>
-                                <span className='text-yellow-500'>
-                                  {'⚽'.repeat(playerGoalCount)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })
-                ) : (
-                  <li className='text-gray-500 text-center'>
-                    No hay jugadores en el Equipo A
-                  </li>
-                )}
-              </ul>
-
-              {/* Goals for Team A */}
-              {!editMode && goalsA.length > 0 && (
-                <div className='mt-4'>
-                  <h3 className='text-md font-medium mb-2'>Goles</h3>
-                  <ul className='space-y-1 text-sm'>
-                    {goalsA.map((goal) => (
-                      <li key={goal.id} className='flex items-center space-x-2'>
-                        <span className='text-gray-500'>
-                          {goal.minute ? `${goal.minute}'` : ''}
-                        </span>
-                        <span>{goal.scorerName || 'Goleador'}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-
-            {/* Team B players and goals */}
-            <div className='pl-0 sm:pl-4'>
-              <h3 className='text-lg font-semibold mb-4 text-center'>
-                Equipo B
-              </h3>
-              <ul className='space-y-2'>
-                {Array.isArray(match.teamB) ? (
-                  match.teamB.map((player) => {
-                    const playerGoalCount = getPlayerGoalsB(player.id);
-                    console.log(
-                      `Rendering Team B Player ${player.name} with ${playerGoalCount} goals`
-                    );
-
-                    return (
-                      <li
-                        key={player.id}
-                        className='flex justify-between items-center space-x-2 border-b border-gray-100 pb-2'
-                      >
-                        <div className='flex items-center space-x-2 min-w-0'>
-                          {player.avatar && (
-                            <img
-                              src={player.avatar}
-                              alt={player.name || ''}
-                              className='w-8 h-8 rounded-full flex-shrink-0'
-                            />
-                          )}
-                          <span className='truncate'>{player.name}</span>
-                        </div>
-
-                        {/* Goals display or controls */}
-                        {editMode ? (
-                          <div className='flex items-center gap-2'>
-                            <button
-                              onClick={() => removeGoalB(player.id)}
-                              className='w-8 h-8 flex items-center justify-center bg-red-100 hover:bg-red-200 text-red-600 rounded'
-                              disabled={playerGoalCount <= 0}
-                            >
-                              -
-                            </button>
-                            <span className='w-6 text-center'>
-                              {playerGoalCount}
-                            </span>
-                            <button
-                              onClick={() => addGoalB(player.id)}
-                              className='w-8 h-8 flex items-center justify-center bg-green-100 hover:bg-green-200 text-green-600 rounded'
-                              disabled={goalsB.length >= scoreB}
-                            >
-                              +
-                            </button>
-                          </div>
-                        ) : (
-                          <div className='flex items-center'>
-                            {playerGoalCount > 0 && (
-                              <div className='flex items-center gap-1'>
-                                <span className='text-yellow-500'>
-                                  {'⚽'.repeat(playerGoalCount)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })
-                ) : (
-                  <li className='text-gray-500 text-center'>
-                    No hay jugadores en el Equipo B
-                  </li>
-                )}
-              </ul>
-
-              {/* Goals for Team B */}
-              {!editMode && goalsB.length > 0 && (
-                <div className='mt-4'>
-                  <h3 className='text-md font-medium mb-2'>Goles</h3>
-                  <ul className='space-y-1 text-sm'>
-                    {goalsB.map((goal) => (
-                      <li key={goal.id} className='flex items-center space-x-2'>
-                        <span className='text-gray-500'>
-                          {goal.minute ? `${goal.minute}'` : ''}
-                        </span>
-                        <span>{goal.scorerName || 'Goleador'}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className='mt-6 flex flex-col sm:flex-row justify-between gap-4'>
-            <button
+      <div className='min-h-screen bg-gradient-to-br from-primary-50 to-accent-50'>
+        <div className='w-full px-2 sm:px-4 py-4 sm:py-8'>
+          {/* Header with back button */}
+          <div className='flex items-center mb-4 sm:mb-6'>
+            <Button
               onClick={() => router.back()}
-              className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full sm:w-auto'
+              variant='outline'
+              size='sm'
+              className='mr-3 sm:mr-4 flex items-center justify-center'
             >
-              {editMode ? 'Cancelar' : 'Volver al Grupo'}
-            </button>
-            {isAdmin && editMode && (
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className='bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded w-full sm:w-auto'
-              >
-                {saving ? 'Guardando...' : 'Guardar Resultado'}
-              </button>
+              <ArrowLeftIcon className='w-4 h-4 mr-1 flex-shrink-0' />
+              Volver
+            </Button>
+            <h1 className='text-xl sm:text-3xl font-heading text-gray-800 flex-1'>
+              Resultados del Partido
+            </h1>
+            {editMode && (
+              <PencilIcon className='w-5 h-5 sm:w-6 sm:h-6 text-primary-500 ml-2' />
             )}
-            {isAdmin && !editMode && (
-              <button
-                onClick={() => setEditMode(true)}
-                className='bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded w-full sm:w-auto'
-              >
-                Editar Resultado
-              </button>
-            )}
+          </div>
+
+          <div className='bg-white shadow-xl rounded-xl sm:rounded-2xl overflow-hidden'>
+            {/* Match info header */}
+            <div className='bg-gradient-green text-white p-4 sm:p-6'>
+              <div className='text-center'>
+                <h2 className='text-lg sm:text-xl font-heading text-white mb-2'>
+                  {match.group?.name || 'Grupo'}
+                </h2>
+                <div className='flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-xs sm:text-sm text-green-100'>
+                  <div className='flex items-center gap-1'>
+                    <CalendarIcon className='w-3 h-3 sm:w-4 sm:h-4' />
+                    <span>
+                      {new Date(match.date).toLocaleDateString('es-ES', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                  <div className='flex items-center gap-1'>
+                    <MapPinIcon className='w-3 h-3 sm:w-4 sm:h-4' />
+                    <span>{match.location}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Marcador moderno */}
+            <div className='bg-gradient-to-r from-primary-500 to-accent-500 text-white p-4 sm:p-8 relative'>
+              <div className='grid grid-cols-2 gap-4 sm:gap-8 items-center'>
+                {/* Equipo A */}
+                <div className='text-center'>
+                  <div className='font-heading text-lg sm:text-xl lg:text-2xl mb-3 sm:mb-4 text-white'>
+                    {match.group?.teamAName || 'Equipo A'}
+                  </div>
+                  {editMode ? (
+                    <div className='flex justify-center items-center gap-1 sm:gap-2'>
+                      <button
+                        onClick={() => {
+                          if (scoreA > 0) {
+                            if (goalsA.length >= scoreA) {
+                              toast.error(
+                                'Primero debes quitar los goles asignados a los jugadores'
+                              );
+                              return;
+                            }
+                            setScoreA(scoreA - 1);
+                          }
+                        }}
+                        className='w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg sm:rounded-xl text-lg sm:text-xl font-bold transition-all'
+                        disabled={scoreA <= 0 || goalsA.length >= scoreA}
+                      >
+                        -
+                      </button>
+                      <div className='bg-white text-primary-600 text-2xl sm:text-4xl lg:text-6xl font-bold px-3 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl mx-2 sm:mx-3 min-w-12 sm:min-w-20 text-center shadow-lg'>
+                        {scoreA}
+                      </div>
+                      <button
+                        onClick={() => setScoreA(scoreA + 1)}
+                        className='w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg sm:rounded-xl text-lg sm:text-xl font-bold transition-all'
+                        disabled={scoreA >= 99}
+                      >
+                        +
+                      </button>
+                    </div>
+                  ) : (
+                    <div className='flex justify-center items-center'>
+                      <div className='bg-white text-primary-600 text-2xl sm:text-4xl lg:text-6xl font-bold px-3 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl shadow-lg'>
+                        {match.scoreA}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Equipo B */}
+                <div className='text-center'>
+                  <div className='font-heading text-lg sm:text-xl lg:text-2xl mb-3 sm:mb-4 text-white'>
+                    {match.group?.teamBName || 'Equipo B'}
+                  </div>
+                  {editMode ? (
+                    <div className='flex justify-center items-center gap-1 sm:gap-2'>
+                      <button
+                        onClick={() => {
+                          if (scoreB > 0) {
+                            if (goalsB.length >= scoreB) {
+                              toast.error(
+                                'Primero debes quitar los goles asignados a los jugadores'
+                              );
+                              return;
+                            }
+                            setScoreB(scoreB - 1);
+                          }
+                        }}
+                        className='w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg sm:rounded-xl text-lg sm:text-xl font-bold transition-all'
+                        disabled={scoreB <= 0 || goalsB.length >= scoreB}
+                      >
+                        -
+                      </button>
+                      <div className='bg-white text-primary-600 text-2xl sm:text-4xl lg:text-6xl font-bold px-3 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl mx-2 sm:mx-3 min-w-12 sm:min-w-20 text-center shadow-lg'>
+                        {scoreB}
+                      </div>
+                      <button
+                        onClick={() => setScoreB(scoreB + 1)}
+                        className='w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg sm:rounded-xl text-lg sm:text-xl font-bold transition-all'
+                        disabled={scoreB >= 99}
+                      >
+                        +
+                      </button>
+                    </div>
+                  ) : (
+                    <div className='flex justify-center items-center'>
+                      <div className='bg-white text-primary-600 text-2xl sm:text-4xl lg:text-6xl font-bold px-3 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl shadow-lg'>
+                        {match.scoreB}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* VS divider centrado */}
+              <div className='absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 hidden sm:block'>
+                <div className='bg-white/20 rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center'>
+                  <span className='text-white font-bold text-sm sm:text-lg'>
+                    VS
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Grid for teams and goals */}
+            <div className='p-3 sm:p-6 lg:p-8'>
+              <div className='grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8'>
+                {/* Team A players and goals */}
+                <div className='bg-gradient-to-br from-primary-50 to-primary-100 rounded-lg sm:rounded-xl p-3 sm:p-6'>
+                  <h3 className='text-lg sm:text-xl font-heading text-primary-800 mb-3 sm:mb-6 text-center'>
+                    {match.group?.teamAName || 'Equipo A'}
+                  </h3>
+                  <div className='space-y-2 sm:space-y-3'>
+                    {Array.isArray(match.teamA) ? (
+                      match.teamA.map((player) => {
+                        const playerGoalCount = getPlayerGoalsA(player.id);
+
+                        return (
+                          <div
+                            key={player.id}
+                            className='flex justify-between items-center bg-white rounded-lg p-2 sm:p-4 shadow-sm hover:shadow-md transition-shadow'
+                          >
+                            <div className='flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1'>
+                              {player.avatar && (
+                                <img
+                                  src={player.avatar}
+                                  alt={player.name || ''}
+                                  className='w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-primary-200 flex-shrink-0'
+                                />
+                              )}
+                              <span className='font-medium text-gray-800 truncate text-sm sm:text-base'>
+                                {player.name}
+                              </span>
+                            </div>
+
+                            {/* Goals display or controls */}
+                            {editMode ? (
+                              <div className='flex items-center gap-2 sm:gap-3 flex-shrink-0'>
+                                <button
+                                  onClick={() => removeGoalA(player.id)}
+                                  className='w-8 h-8 sm:w-8 sm:h-8 flex items-center justify-center bg-error-100 hover:bg-error-200 text-error-600 rounded-lg transition-colors'
+                                  disabled={playerGoalCount <= 0}
+                                >
+                                  -
+                                </button>
+                                <span className='w-6 sm:w-8 text-center font-bold text-base sm:text-lg'>
+                                  {playerGoalCount}
+                                </span>
+                                <button
+                                  onClick={() => addGoalA(player.id)}
+                                  className='w-8 h-8 sm:w-8 sm:h-8 flex items-center justify-center bg-success-100 hover:bg-success-200 text-success-600 rounded-lg transition-colors'
+                                  disabled={goalsA.length >= scoreA}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            ) : (
+                              <div className='flex items-center flex-shrink-0'>
+                                {playerGoalCount > 0 && (
+                                  <div className='flex items-center gap-1'>
+                                    <span className='text-lg sm:text-2xl'>
+                                      {'⚽'.repeat(playerGoalCount)}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className='text-gray-500 text-center py-6 sm:py-8 bg-white rounded-lg text-sm sm:text-base'>
+                        No hay jugadores en el{' '}
+                        {match.group?.teamAName || 'Equipo A'}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Goals for Team A */}
+                  {!editMode && goalsA.length > 0 && (
+                    <div className='mt-4 sm:mt-6'>
+                      <h4 className='text-sm sm:text-md font-medium mb-2 sm:mb-3 text-primary-700'>
+                        Goles
+                      </h4>
+                      <div className='space-y-1 sm:space-y-2'>
+                        {goalsA.map((goal) => (
+                          <div
+                            key={goal.id}
+                            className='flex items-center space-x-2 text-xs sm:text-sm bg-white/50 rounded-lg p-2'
+                          >
+                            <span className='text-primary-600 font-medium'>
+                              {goal.minute ? `${goal.minute}'` : ''}
+                            </span>
+                            <span className='text-gray-700'>
+                              {goal.scorerName || 'Goleador'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Team B players and goals */}
+                <div className='bg-gradient-to-br from-accent-50 to-accent-100 rounded-lg sm:rounded-xl p-3 sm:p-6'>
+                  <h3 className='text-lg sm:text-xl font-heading text-accent-800 mb-3 sm:mb-6 text-center'>
+                    {match.group?.teamBName || 'Equipo B'}
+                  </h3>
+                  <div className='space-y-2 sm:space-y-3'>
+                    {Array.isArray(match.teamB) ? (
+                      match.teamB.map((player) => {
+                        const playerGoalCount = getPlayerGoalsB(player.id);
+
+                        return (
+                          <div
+                            key={player.id}
+                            className='flex justify-between items-center bg-white rounded-lg p-2 sm:p-4 shadow-sm hover:shadow-md transition-shadow'
+                          >
+                            <div className='flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1'>
+                              {player.avatar && (
+                                <img
+                                  src={player.avatar}
+                                  alt={player.name || ''}
+                                  className='w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-accent-200 flex-shrink-0'
+                                />
+                              )}
+                              <span className='font-medium text-gray-800 truncate text-sm sm:text-base'>
+                                {player.name}
+                              </span>
+                            </div>
+
+                            {/* Goals display or controls */}
+                            {editMode ? (
+                              <div className='flex items-center gap-2 sm:gap-3 flex-shrink-0'>
+                                <button
+                                  onClick={() => removeGoalB(player.id)}
+                                  className='w-8 h-8 sm:w-8 sm:h-8 flex items-center justify-center bg-error-100 hover:bg-error-200 text-error-600 rounded-lg transition-colors'
+                                  disabled={playerGoalCount <= 0}
+                                >
+                                  -
+                                </button>
+                                <span className='w-6 sm:w-8 text-center font-bold text-base sm:text-lg'>
+                                  {playerGoalCount}
+                                </span>
+                                <button
+                                  onClick={() => addGoalB(player.id)}
+                                  className='w-8 h-8 sm:w-8 sm:h-8 flex items-center justify-center bg-success-100 hover:bg-success-200 text-success-600 rounded-lg transition-colors'
+                                  disabled={goalsB.length >= scoreB}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            ) : (
+                              <div className='flex items-center flex-shrink-0'>
+                                {playerGoalCount > 0 && (
+                                  <div className='flex items-center gap-1'>
+                                    <span className='text-lg sm:text-2xl'>
+                                      {'⚽'.repeat(playerGoalCount)}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className='text-gray-500 text-center py-6 sm:py-8 bg-white rounded-lg text-sm sm:text-base'>
+                        No hay jugadores en el{' '}
+                        {match.group?.teamBName || 'Equipo B'}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Goals for Team B */}
+                  {!editMode && goalsB.length > 0 && (
+                    <div className='mt-4 sm:mt-6'>
+                      <h4 className='text-sm sm:text-md font-medium mb-2 sm:mb-3 text-accent-700'>
+                        Goles
+                      </h4>
+                      <div className='space-y-1 sm:space-y-2'>
+                        {goalsB.map((goal) => (
+                          <div
+                            key={goal.id}
+                            className='flex items-center space-x-2 text-xs sm:text-sm bg-white/50 rounded-lg p-2'
+                          >
+                            <span className='text-accent-600 font-medium'>
+                              {goal.minute ? `${goal.minute}'` : ''}
+                            </span>
+                            <span className='text-gray-700'>
+                              {goal.scorerName || 'Goleador'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className='mt-6 sm:mt-8 flex flex-col sm:flex-row justify-between gap-3 sm:gap-4'>
+                <Button
+                  onClick={() => router.back()}
+                  variant='outline'
+                  className='w-full sm:w-auto flex items-center justify-center'
+                >
+                  <ArrowLeftIcon className='w-4 h-4 sm:w-5 sm:h-5 mr-2 flex-shrink-0' />
+                  Volver al Grupo
+                </Button>
+
+                <div className='flex flex-col sm:flex-row gap-3 w-full sm:w-auto'>
+                  {isAdmin && editMode && (
+                    <Button
+                      onClick={handleSave}
+                      disabled={saving}
+                      variant='success'
+                      className='w-full sm:w-auto'
+                    >
+                      {saving ? 'Guardando...' : 'Guardar Resultado'}
+                    </Button>
+                  )}
+
+                  {isAdmin && !editMode && (
+                    <Button
+                      onClick={() => setEditMode(true)}
+                      variant='primary'
+                      className='w-full sm:w-auto flex items-center justify-center'
+                    >
+                      <PencilIcon className='w-4 h-4 sm:w-5 sm:h-5 mr-2 flex-shrink-0' />
+                      Editar Resultado
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Button from '../components/Button';
 import Layout from '../components/Layout';
+import ColorPicker from '../components/ColorPicker';
 import { useAuth } from '../contexts/AuthContext';
 import { RecurrenceType } from '../types/match';
 import Link from 'next/link';
@@ -19,6 +20,8 @@ export default function CreateGroup() {
     sport: 'Fútbol',
     teamAName: 'Equipo A',
     teamBName: 'Equipo B',
+    teamAColor: '#3B82F6', // Azul por defecto
+    teamBColor: '#EF4444', // Rojo por defecto
     recurrenceType: 'NONE',
     recurrenceDays: [] as number[],
     recurrenceTime: '18:00',
@@ -280,6 +283,24 @@ export default function CreateGroup() {
                     className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-200 focus:border-primary-500 transition-all duration-200'
                   />
                 </div>
+              </div>
+
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+                <ColorPicker
+                  label='Color del Equipo A'
+                  value={formData.teamAColor}
+                  onChange={(color) =>
+                    setFormData((prev) => ({ ...prev, teamAColor: color }))
+                  }
+                />
+
+                <ColorPicker
+                  label='Color del Equipo B'
+                  value={formData.teamBColor}
+                  onChange={(color) =>
+                    setFormData((prev) => ({ ...prev, teamBColor: color }))
+                  }
+                />
               </div>
 
               <div>

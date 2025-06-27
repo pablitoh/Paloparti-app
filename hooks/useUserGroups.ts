@@ -37,13 +37,9 @@ export const useUserGroups = () => {
 
     const fetchGroups = async () => {
       try {
-        const timestamp = new Date().getTime();
-        const response = await fetch(`/api/groups?_t=${timestamp}`, {
+        const response = await fetch(`/api/groups`, {
           headers: {
             'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            Pragma: 'no-cache',
-            Expires: '0',
           },
         });
 

@@ -13,6 +13,8 @@ type MatchWithRelations = Match & {
   group: {
     id: string;
     name: string;
+    teamAName: string | null;
+    teamBName: string | null;
     members: {
       userId: string;
       role: string;
@@ -59,6 +61,8 @@ export default async function handler(
             select: {
               id: true,
               name: true,
+              teamAName: true,
+              teamBName: true,
               members: {
                 select: {
                   userId: true,
@@ -272,6 +276,8 @@ export default async function handler(
             select: {
               id: true,
               name: true,
+              teamAName: true,
+              teamBName: true,
               members: {
                 select: {
                   userId: true,

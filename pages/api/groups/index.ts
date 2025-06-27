@@ -183,6 +183,10 @@ export default async function handler(
         recurrenceTime,
         nextMatch,
         requiredPlayers,
+        teamAName,
+        teamBName,
+        teamAColor,
+        teamBColor,
       } = req.body;
 
       // Validar campos obligatorios
@@ -229,6 +233,10 @@ export default async function handler(
           nextMatch: nextMatchDate,
           inviteToken, // Guardar el token de invitación
           requiredPlayers,
+          teamAName: teamAName || 'Equipo A',
+          teamBName: teamBName || 'Equipo B',
+          teamAColor: teamAColor || '#3B82F6', // Azul por defecto
+          teamBColor: teamBColor || '#EF4444', // Rojo por defecto
           members: {
             create: {
               userId: userId,
@@ -244,8 +252,8 @@ export default async function handler(
         data: {
           date: nextMatchDate,
           location,
-          teamA: 'Equipo A',
-          teamB: 'Equipo B',
+          teamA: teamAName || 'Equipo A',
+          teamB: teamBName || 'Equipo B',
           scoreA: 0,
           scoreB: 0,
           status: 'PENDING',

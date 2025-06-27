@@ -60,6 +60,9 @@ interface GroupWithRelations {
   nextMatchDetails?: MatchInterface;
   nextMatchId?: string;
   members?: any[];
+  teamAColor?: string;
+  teamBColor?: string;
+  lastSortingCriteria?: string;
 }
 
 interface AuthUser {
@@ -196,37 +199,55 @@ export default function NextMatchTab({
   // Estado para el toggle de vista compacta
   const [isCompactView, setIsCompactView] = useState(false);
 
-  // Cerrar dropdown cuando se hace clic afuera
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element;
-      if (showActionsDropdown && !target?.closest('[data-actions-dropdown]')) {
-        setShowActionsDropdown(false);
-      }
-    };
-
-    if (showActionsDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () =>
-        document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [showActionsDropdown]);
-
   // Local state to track attendance status
   const [localUserAttendanceStatus, setLocalUserAttendanceStatus] = useState<
     ParticipantStatus | undefined
   >(userAttendanceStatus);
 
-  // Estados para almacenar promedios de edad después de un sorteo
-  // Las edades promedio ahora se calculan directamente con useMemo
-
   // Añadir un estado para la clave de renderizado del componente TeamsList
   const [teamsListKey, setTeamsListKey] = useState<number>(0);
+
+  // Cargar criterios de sorteo guardados al inicializar
+  useEffect(() => {
+    if (group.lastSortingCriteria) {
+      try {
+        const criteria =
+          typeof group.lastSortingCriteria === 'string'
+            ? JSON.parse(group.lastSortingCriteria)
+            : group.lastSortingCriteria;
+
+        console.log('🔍 Cargando criterios de sorteo guardados:', criteria);
+
+        if (criteria.balanceByAge !== undefined) {
+          setBalanceByAge(criteria.balanceByAge);
+        }
+        if (criteria.balanceByRole !== undefined) {
+          setBalanceByRole(criteria.balanceByRole);
+        }
+        if (criteria.balanceByRating !== undefined) {
+          setBalanceByRating(criteria.balanceByRating);
+        }
+        if (criteria.isRandomMode !== undefined) {
+          setIsRandomMode(criteria.isRandomMode);
+        }
+      } catch (error) {
+        console.error('Error al cargar criterios de sorteo:', error);
+      }
+    }
+  }, [group.lastSortingCriteria]);
 
   // Update local state when props change
   useEffect(() => {
     setLocalUserAttendanceStatus(userAttendanceStatus);
   }, [userAttendanceStatus]);
+
+  // Invalidar caché cuando cambie el avatar del usuario
+  useEffect(() => {
+    if (user?.image) {
+      // Invalidar la query del next-match para refrescar los datos cuando cambie el avatar
+      queryClient.invalidateQueries(['group', 'nextMatch', id]);
+    }
+  }, [user?.image, id, queryClient]);
 
   // Usar mutaciones de React Query
   const userAttendanceMutation = useUserAttendanceMutation();
@@ -272,6 +293,20 @@ export default function NextMatchTab({
   const pendingPlayers = matchDetails?.pendingPlayers || [];
   const declinedPlayers = matchDetails?.declinedPlayers || [];
 
+  // Debug log para confirmedPlayers
+  useEffect(() => {
+    if (confirmedPlayers.length > 0) {
+      console.log(
+        '🔍 DEBUG - ConfirmedPlayers data:',
+        confirmedPlayers.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          avatar: p.avatar,
+        }))
+      );
+    }
+  }, [confirmedPlayers]);
+
   // Usar useMemo para estabilizar teamA y teamB y evitar bucles infinitos
   const teamA = useMemo<Player[]>(() => {
     if (forcedTeamA.length > 0 && forceTeamsFormed) {
@@ -280,9 +315,28 @@ export default function NextMatchTab({
     // Los equipos ya vienen parseados del backend
     const teamAData = matchDetails?.teamA;
     if (!teamAData) return [];
-    if (Array.isArray(teamAData)) return teamAData;
+    if (Array.isArray(teamAData)) {
+      console.log(
+        '🔍 DEBUG - TeamA data:',
+        teamAData.map((p) => ({
+          id: p.id,
+          name: p.name,
+          avatar: p.avatar,
+        }))
+      );
+      return teamAData;
+    }
     try {
-      return JSON.parse(teamAData);
+      const parsed = JSON.parse(teamAData);
+      console.log(
+        '🔍 DEBUG - TeamA parsed:',
+        parsed.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          avatar: p.avatar,
+        }))
+      );
+      return parsed;
     } catch (e) {
       console.error('Error parsing teamA:', e);
       return [];
@@ -296,9 +350,28 @@ export default function NextMatchTab({
     // Los equipos ya vienen parseados del backend
     const teamBData = matchDetails?.teamB;
     if (!teamBData) return [];
-    if (Array.isArray(teamBData)) return teamBData;
+    if (Array.isArray(teamBData)) {
+      console.log(
+        '🔍 DEBUG - TeamB data:',
+        teamBData.map((p) => ({
+          id: p.id,
+          name: p.name,
+          avatar: p.avatar,
+        }))
+      );
+      return teamBData;
+    }
     try {
-      return JSON.parse(teamBData);
+      const parsed = JSON.parse(teamBData);
+      console.log(
+        '🔍 DEBUG - TeamB parsed:',
+        parsed.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          avatar: p.avatar,
+        }))
+      );
+      return parsed;
     } catch (e) {
       console.error('Error parsing teamB:', e);
       return [];
@@ -571,51 +644,58 @@ export default function NextMatchTab({
 
     setSortTeamsLoading(true);
     try {
-      const response = await fetch(
-        `/api/matches/${group.nextMatchId}/resort-teams`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const response = await fetch(`/api/matches/create-match`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          groupId: id,
+          matchId: group.nextMatchId,
+          isResort: true,
+          balanceByAge: balanceByAge,
+          balanceByRole: balanceByRole,
+          balanceByRating: balanceByRating,
+          allowTbdPlayers: true,
+          useRandomAlgorithm: isRandomMode,
+          mode: 'auto',
+        }),
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Error al resortear equipos');
       }
 
-      const updatedMatch = await response.json();
+      const data = await response.json();
+      console.log('🎯 Respuesta de create-match:', data);
 
-      // Actualizar la caché de React Query con los nuevos datos
+      // Actualizar el caché con los nuevos datos
       queryClient.setQueryData(['group', 'nextMatch', id], (oldData: any) => {
         if (!oldData) return oldData;
 
-        // Asegurarse de que los equipos sean objetos antes de actualizar
-        const teamA =
-          typeof updatedMatch.teamA === 'string'
-            ? JSON.parse(updatedMatch.teamA)
-            : updatedMatch.teamA;
-        const teamB =
-          typeof updatedMatch.teamB === 'string'
-            ? JSON.parse(updatedMatch.teamB)
-            : updatedMatch.teamB;
-
         return {
           ...oldData,
-          teamA: teamA,
-          teamB: teamB,
-          playersA: teamA,
-          playersB: teamB,
-          sortCount: updatedMatch.sortCount,
+          nextMatchDetails: {
+            ...oldData.nextMatchDetails,
+            teamA: data.teamA,
+            teamB: data.teamB,
+            tbdPlayers: data.tbdPlayers,
+            sortCount: data.match.sortCount,
+          },
         };
       });
 
-      showSuccessToast('Equipos resorteados exitosamente');
-    } catch (error) {
-      console.error('Error sorting teams:', error);
-      showErrorToast('Error al resortear equipos');
+      // Invalidar las queries necesarias
+      await queryClient.invalidateQueries({
+        queryKey: ['group', 'nextMatch', id],
+        exact: true,
+      });
+
+      showSuccessToast('Equipos reorganizados correctamente');
+    } catch (error: any) {
+      console.error('Error al resortear equipos:', error);
+      showErrorToast(error?.message || 'Error al resortear equipos');
     } finally {
       setSortTeamsLoading(false);
     }
@@ -823,20 +903,24 @@ _Generado con Paloparti_ 🚀`;
     100
   );
 
-  // Calcular jugadores sin asignar usando useMemo para evitar recálculos innecesarios
+  // Calcular jugadores no asignados
   const unassignedPlayersCalculated = useMemo(() => {
-    if (!confirmedPlayers || !teamA || !teamB) {
-      return [];
+    if (!matchDetails || !confirmedPlayers) return [];
+
+    // Si no hay equipos formados, todos los jugadores confirmados están sin asignar
+    if (!matchDetails.sortCount || matchDetails.sortCount === 0) {
+      return confirmedPlayers;
     }
 
-    // Obtener todos los IDs de jugadores asignados a equipos
-    const assignedPlayerIds = [...teamA, ...teamB].map((player) => player.id);
+    // Si hay equipos formados, encontrar jugadores que están confirmados pero no en ningún equipo
+    const teamAIds = teamA.map((player) => player.id);
+    const teamBIds = teamB.map((player) => player.id);
+    const assignedIds = [...teamAIds, ...teamBIds];
 
-    // Filtrar jugadores confirmados que no estén en ningún equipo
     return confirmedPlayers.filter(
-      (player) => !assignedPlayerIds.includes(player.id)
+      (player) => !assignedIds.includes(player.id)
     );
-  }, [confirmedPlayers, teamA, teamB]);
+  }, [matchDetails?.sortCount, confirmedPlayers, teamA, teamB]);
 
   // Calcular jugadores que cancelaron desde equipos (representados por jugadores TBD)
   const cancelledFromTeamsCount = useMemo(() => {
@@ -1021,39 +1105,89 @@ _Generado con Paloparti_ 🚀`;
 
   // Procesar los equipos desde strings JSON
   const processTeams = useMemo(() => {
-    if (!matchDetails) return { teamA: [], teamB: [] };
+    if (!matchDetails)
+      return {
+        processedTeamA: [],
+        processedTeamB: [],
+        tbdTeamA: [],
+        tbdTeamB: [],
+      };
 
     try {
-      const teamA =
-        typeof matchDetails.teamA === 'string'
-          ? JSON.parse(matchDetails.teamA)
-          : matchDetails.teamA || [];
-      const teamB =
-        typeof matchDetails.teamB === 'string'
-          ? JSON.parse(matchDetails.teamB)
-          : matchDetails.teamB || [];
+      let teamA: Player[] = [];
+      let teamB: Player[] = [];
+
+      // Intentar obtener equipos de teamA/teamB primero
+      if (Array.isArray(matchDetails.teamA) && matchDetails.teamA.length > 0) {
+        teamA = matchDetails.teamA;
+      }
+      if (Array.isArray(matchDetails.teamB) && matchDetails.teamB.length > 0) {
+        teamB = matchDetails.teamB;
+      }
+
+      // Si los equipos están vacíos, procesar confirmedPlayers
+      if (
+        teamA.length === 0 &&
+        teamB.length === 0 &&
+        Array.isArray(matchDetails.confirmedPlayers)
+      ) {
+        teamA = matchDetails.confirmedPlayers.filter(
+          (player) => player.isTeamA
+        );
+        teamB = matchDetails.confirmedPlayers.filter(
+          (player) => !player.isTeamA
+        );
+      }
+
+      // Procesar tbdPlayers
+      let tbdData = matchDetails.tbdPlayers;
+      if (typeof tbdData === 'string') {
+        tbdData = JSON.parse(tbdData);
+      }
+
+      // Obtener los jugadores TBD de cada equipo
+      const tbdTeamA = Array.isArray(tbdData) ? [] : tbdData?.teamA || [];
+      const tbdTeamB = Array.isArray(tbdData) ? [] : tbdData?.teamB || [];
 
       console.log('🎯 Equipos procesados:', {
         teamA,
         teamB,
+        tbdTeamA,
+        tbdTeamB,
         teamAName: group.teamAName,
         teamBName: group.teamBName,
+        sortCount: matchDetails.sortCount,
       });
 
-      return { teamA, teamB };
+      return {
+        processedTeamA: teamA,
+        processedTeamB: teamB,
+        tbdTeamA,
+        tbdTeamB,
+      };
     } catch (error) {
       console.error('Error parsing teams:', error);
-      return { teamA: [], teamB: [] };
+      return {
+        processedTeamA: [],
+        processedTeamB: [],
+        tbdTeamA: [],
+        tbdTeamB: [],
+      };
     }
-  }, [matchDetails?.teamA, matchDetails?.teamB]);
+  }, [matchDetails, group.teamAName, group.teamBName]);
 
   // Extraer los equipos procesados
-  const { teamA: processedTeamAFromSort, teamB: processedTeamBFromSort } =
-    processTeams;
+  const { processedTeamA, processedTeamB, tbdTeamA, tbdTeamB } = processTeams;
 
   // Actualizar la función onReplaceTbd para tipar el playerId
   const onReplaceTbd = (playerId: string) => {
     setShowReplaceTbdModal(playerId);
+  };
+
+  // Función para manejar el intercambio de jugadores
+  const handleSwapPlayer = (playerId: string, isTeamA: boolean) => {
+    setPreSelectedPlayer({ playerId, isTeamA });
+    setShowSwapPlayersModal(true);
   };
 
   // Función para verificar si los equipos están correctamente formados
@@ -1090,6 +1224,23 @@ _Generado con Paloparti_ 🚀`;
   useEffect(() => {
     setForceTeamsFormed(checkTeamsAreValid);
   }, [checkTeamsAreValid]);
+
+  // Remover el useEffect de logging y solo mantener un log crítico
+  useEffect(() => {
+    if (teamsFormed && (!teamA.length || !teamB.length)) {
+      console.error('❌ TeamsList: equipos formados pero sin jugadores:', {
+        teamA: teamA.length,
+        teamB: teamB.length,
+        sortCount: matchDetails?.sortCount,
+      });
+    }
+  }, [teamA, teamB, teamsFormed, matchDetails?.sortCount]);
+
+  // Log de debugging para verificar userRoles
+  console.log(
+    '🐛 NextMatchTab - userRoles antes de pasar a AttendanceConfirmation:',
+    userRoles
+  );
 
   return (
     <div className='space-y-4'>
@@ -1242,16 +1393,13 @@ _Generado con Paloparti_ 🚀`;
           </div>
 
           {/* Notificación de formación de equipos - Se muestra siempre que el usuario sea admin */}
-          {/* Eliminar este bloque ya que está duplicado y usa el cálculo incorrecto */}
-          {/* {currentUserIsAdmin && (
+          {currentUserIsAdmin && (
             <div className='mb-6'>
               <TeamFormationNotification
-                confirmedCount={
-                  matchDetails?.confirmedPlayers?.length || confirmedCount || 0
-                }
+                confirmedCount={confirmedCount}
                 requiredPlayers={group?.requiredPlayers || 10}
                 sortCount={matchDetails?.sortCount || 0}
-                unassignedCount={unassignedPlayersCalculated.length}
+                unassignedCount={unassignedPlayersCalculated?.length || 0}
                 cancelledFromTeamsCount={cancelledFromTeamsCount}
                 onRandomizeTeams={handleSortTeamsClick}
                 isLoading={sortTeamsLoading}
@@ -1268,7 +1416,7 @@ _Generado con Paloparti_ 🚀`;
                 setIsRandomMode={setIsRandomMode}
               />
             </div>
-          )} */}
+          )}
 
           {/* Sección de jugadores confirmados - Solo mostrar cuando no hay equipos formados (sortCount = 0) */}
           {(!matchDetails?.sortCount || matchDetails.sortCount === 0) &&
@@ -1472,16 +1620,21 @@ _Generado con Paloparti_ 🚀`;
 
               {/* TeamsList component */}
               <TeamsList
-                key={teamsListKey}
-                playersA={teamA}
-                playersB={teamB}
-                tbdPlayersTeamA={tbdPlayersTeamA}
-                tbdPlayersTeamB={tbdPlayersTeamB}
+                key={`teams-${matchDetails?.sortCount}-${processedTeamA.length}-${processedTeamB.length}`}
+                playersA={processedTeamA}
+                playersB={processedTeamB}
+                tbdPlayersTeamA={tbdTeamA}
+                tbdPlayersTeamB={tbdTeamB}
                 teamAName={group.teamAName || 'Equipo A'}
                 teamBName={group.teamBName || 'Equipo B'}
+                teamAColor={group.teamAColor || '#3B82F6'}
+                teamBColor={group.teamBColor || '#EF4444'}
                 currentUserIsAdmin={currentUserIsAdmin}
+                onSwapPlayer={handleSwapPlayer}
                 sortCount={matchDetails?.sortCount || 0}
                 matchId={group.nextMatchId}
+                isCompactView={isCompactView}
+                isRandomMode={isRandomMode}
               />
             </div>
           )}

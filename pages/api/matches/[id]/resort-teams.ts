@@ -16,7 +16,8 @@ interface PlayerData {
   name: string;
 }
 
-interface ExtendedMatchAttendance extends PrismaMatchAttendance {
+interface ExtendedMatchAttendance
+  extends Omit<PrismaMatchAttendance, 'playerRoles'> {
   playerRoles: PlayerRole[];
   user: User;
 }
@@ -232,6 +233,37 @@ export default async function handler(
           },
         },
       });
+
+      // Actualizar matchPlayers para mantener consistencia
+      await prisma.matchPlayer.deleteMany({
+        where: { matchId: String(id) },
+      });
+
+      // Crear nuevos registros de matchPlayers para el equipo A
+      for (const player of newTeamA) {
+        if (player.id && !player.id.startsWith('tbd-')) {
+          await prisma.matchPlayer.create({
+            data: {
+              matchId: String(id),
+              userId: player.id,
+              isTeamA: true,
+            },
+          });
+        }
+      }
+
+      // Crear nuevos registros de matchPlayers para el equipo B
+      for (const player of newTeamB) {
+        if (player.id && !player.id.startsWith('tbd-')) {
+          await prisma.matchPlayer.create({
+            data: {
+              matchId: String(id),
+              userId: player.id,
+              isTeamA: false,
+            },
+          });
+        }
+      }
 
       // Preparar la respuesta
       const responseData = {

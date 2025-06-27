@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Button from '../../components/Button';
 import Layout from '../../components/Layout';
+import ColorPicker from '../../components/ColorPicker';
 import { useSession } from 'next-auth/react';
 import { RecurrenceType } from '../../types/match';
 import DeleteGroupModal from '../../components/group/modals/DeleteGroupModal';
@@ -30,6 +31,8 @@ interface Group {
   teamAName: string;
   teamBName: string;
   isAdmin: boolean;
+  teamAColor?: string;
+  teamBColor?: string;
 }
 
 export default function EditGroup() {
@@ -55,6 +58,8 @@ export default function EditGroup() {
     requiredPlayers: 10,
     teamAName: 'Equipo A',
     teamBName: 'Equipo B',
+    teamAColor: '#3B82F6', // Azul por defecto
+    teamBColor: '#EF4444', // Rojo por defecto
   });
   const { id } = router.query;
 
@@ -117,6 +122,8 @@ export default function EditGroup() {
           requiredPlayers: (data.requiredPlayers || 10) / 2, // Convert total players to players per team
           teamAName: data.teamAName || 'Equipo A',
           teamBName: data.teamBName || 'Equipo B',
+          teamAColor: data.teamAColor || '#3B82F6', // Azul por defecto
+          teamBColor: data.teamBColor || '#EF4444', // Rojo por defecto
         });
 
         // Usar directamente el campo isAdmin de la API
@@ -703,6 +710,24 @@ export default function EditGroup() {
                   value={formData.teamBName}
                   onChange={handleChange}
                   className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                />
+              </div>
+
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+                <ColorPicker
+                  label='Color del Equipo A'
+                  value={formData.teamAColor}
+                  onChange={(color) =>
+                    setFormData((prev) => ({ ...prev, teamAColor: color }))
+                  }
+                />
+
+                <ColorPicker
+                  label='Color del Equipo B'
+                  value={formData.teamBColor}
+                  onChange={(color) =>
+                    setFormData((prev) => ({ ...prev, teamBColor: color }))
+                  }
                 />
               </div>
 

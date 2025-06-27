@@ -28,7 +28,10 @@ import {
 } from '../../../lib/matches/advancedBalancer';
 
 // Importar nuevo algoritmo unificado
-import { createUnifiedBalancedTeams } from '../../../lib/matches/unifiedBalancer';
+import {
+  createUnifiedBalancedTeams,
+  createStructuredBalancedTeams,
+} from '../../../lib/matches/unifiedBalancer';
 
 // Importar utilidades de partidos
 import {
@@ -37,6 +40,7 @@ import {
   verifyFinalTeams,
   removeDuplicates,
   ensureEvenRealPlayerDistribution,
+  ensureEvenRealPlayerDistributionRandom,
 } from '../../../lib/matches/matchUtils';
 
 export default async function handler(
@@ -121,6 +125,13 @@ export default async function handler(
     let previousTeams = null;
 
     if (isResort && matchId) {
+      console.log(
+        '🎯 DEBUG - Iniciando re-sorteo con isResort:',
+        isResort,
+        'matchId:',
+        matchId
+      );
+
       existingMatch = await prisma.match.findUnique({
         where: { id: matchId },
       });
@@ -172,6 +183,11 @@ export default async function handler(
     let matchForRoles = null;
 
     if (isResort && existingMatch) {
+      console.log(
+        '🎯 DEBUG - Obteniendo asistencias para re-sorteo del partido:',
+        existingMatch.id
+      );
+
       // Para re-sorteo, usar las asistencias del partido existente
       confirmedAttendances = await prisma.matchAttendance.findMany({
         where: {
@@ -189,7 +205,14 @@ export default async function handler(
         },
       });
       matchForRoles = existingMatch;
+
+      console.log(
+        '🎯 DEBUG - Jugadores confirmados para re-sorteo:',
+        confirmedAttendances.length
+      );
     } else {
+      console.log('🎯 DEBUG - Obteniendo asistencias para nuevo partido');
+
       // Para nuevo partido, usar el nextMatch del grupo
       const group = await prisma.group.findUnique({
         where: { id: groupId },
@@ -247,7 +270,8 @@ export default async function handler(
     }
 
     console.log(
-      `👥 Jugadores con asistencia confirmada: ${confirmedAttendances.length}`
+      '🎯 DEBUG - Total de jugadores confirmados:',
+      confirmedAttendances.length
     );
 
     // Los roles ahora están directamente en MatchAttendance.playerRoles
@@ -306,14 +330,32 @@ export default async function handler(
       };
     });
 
+    console.log(
+      '🎯 DEBUG - Jugadores convertidos a formato Member:',
+      members.length
+    );
+    console.log('🎯 DEBUG - Parámetros de balanceo:', {
+      balanceByAge,
+      balanceByRole,
+      balanceByRating,
+      mode,
+      useRandomAlgorithm,
+    });
+
     // Crear equipos según el algoritmo seleccionado
     let teamAMembers: Member[] = [];
     let teamBMembers: Member[] = [];
 
-    if (mode === 'manual' && teamA && teamB) {
-      // Modo manual: usar equipos proporcionados
-      console.log('🎯 Modo manual: usando equipos proporcionados');
+    // Declarar variables que se usarán en toda la función
+    let finalTeamA: any[] = [];
+    let finalTeamB: any[] = [];
+    let teamAAvgAge = 0;
+    let teamBAvgAge = 0;
+    let tbdPlayers: any = null;
+    let lowVariability = false;
 
+    if (mode === 'manual' && teamA && teamB) {
+      console.log('🎯 DEBUG - Usando modo manual');
       teamAMembers = teamA
         .map((playerId: string) => members.find((m) => m.id === playerId))
         .filter(Boolean);
@@ -322,95 +364,176 @@ export default async function handler(
         .map((playerId: string) => members.find((m) => m.id === playerId))
         .filter(Boolean);
     } else {
-      // Modo automático: usar el nuevo algoritmo unificado
-      console.log('🎯 Modo automático: usando algoritmo unificado de balance');
+      // === LÓGICA DE REINTENTOS PARA VARIABILIDAD ===
+      let maxTries = 10;
+      let tries = 0;
+      let previousTeamAIds = [];
+      let previousTeamBIds = [];
 
-      if (useRandomAlgorithm) {
-        console.log('🎲 Usando algoritmo completamente aleatorio');
-        [teamAMembers, teamBMembers] = createRandomTeams(members);
-      } else {
-        console.log('🎯 Usando nuevo algoritmo unificado');
-        console.log(
-          `⚙️ Opciones: edad=${balanceByAge}, rating=${balanceByRating}, posición=${balanceByRole}`
-        );
-
-        [teamAMembers, teamBMembers] = createUnifiedBalancedTeams(members, {
-          balanceByAge,
-          balanceByRating,
-          balanceByRole,
-        });
+      // Si es resort, obtener los equipos actuales para comparar
+      if (
+        isResort &&
+        existingMatch &&
+        existingMatch.teamA &&
+        existingMatch.teamB
+      ) {
+        try {
+          previousTeamAIds = JSON.parse(existingMatch.teamA)
+            .map((p: any) => p.id)
+            .sort();
+          previousTeamBIds = JSON.parse(existingMatch.teamB)
+            .map((p: any) => p.id)
+            .sort();
+        } catch (e) {
+          previousTeamAIds = [];
+          previousTeamBIds = [];
+        }
       }
+
+      let foundDifferent = false;
+      let lastTeamA = [];
+      let lastTeamB = [];
+      let lastFinalTeamA = [];
+      let lastFinalTeamB = [];
+      let lastTeamAAvgAge = 0;
+      let lastTeamBAvgAge = 0;
+      let lastTbdPlayers = null;
+      let lastPlayerRolesMap = null;
+      let lastAssignedRolesMap = null;
+
+      while (tries < maxTries && !foundDifferent) {
+        // Ejecutar el algoritmo según el modo seleccionado
+        let [teamAMembers, teamBMembers] = useRandomAlgorithm
+          ? createRandomTeams(members)
+          : createStructuredBalancedTeams(
+              members,
+              {
+                balanceByAge,
+                balanceByRating,
+                balanceByRole,
+                addVariability: true,
+              },
+              // Pasar equipos previos para variabilidad
+              previousTeamAIds.length > 0 && previousTeamBIds.length > 0
+                ? {
+                    teamA: previousTeamAIds,
+                    teamB: previousTeamBIds,
+                  }
+                : undefined
+            );
+
+        // Solo aplicar ensureEvenRealPlayerDistribution si es absolutamente necesario
+        // y de manera que preserve la variabilidad
+        const realPlayersA = teamAMembers.filter(
+          (p) => p && typeof p.id === 'string' && !p.id.startsWith('tbd-')
+        );
+        const realPlayersB = teamBMembers.filter(
+          (p) => p && typeof p.id === 'string' && !p.id.startsWith('tbd-')
+        );
+        const difference = Math.abs(realPlayersA.length - realPlayersB.length);
+
+        // Solo redistribuir si la diferencia es mayor a 1 y hay equipos previos para comparar
+        if (
+          difference > 1 &&
+          previousTeamAIds.length > 0 &&
+          previousTeamBIds.length > 0
+        ) {
+          console.log(
+            `⚠️ Diferencia de ${difference} jugadores detectada, aplicando redistribución aleatoria`
+          );
+
+          // Aplicar redistribución de manera aleatoria para preservar variabilidad
+          const [newTeamAMembers, newTeamBMembers] =
+            ensureEvenRealPlayerDistributionRandom(
+              teamAMembers as any,
+              teamBMembers as any
+            );
+          teamAMembers = newTeamAMembers as any;
+          teamBMembers = newTeamBMembers as any;
+        } else {
+          console.log(
+            `✅ Distribución equilibrada (diferencia: ${difference}), no se aplica redistribución`
+          );
+        }
+
+        let tempFinalTeamA = removeDuplicates(teamAMembers);
+        let tempFinalTeamB = removeDuplicates(teamBMembers);
+        // Ordenar por id para comparar
+        const teamAIds = tempFinalTeamA.map((p) => p.id).sort();
+        const teamBIds = tempFinalTeamB.map((p) => p.id).sort();
+        // Guardar para la respuesta
+        lastTeamA = teamAIds;
+        lastTeamB = teamBIds;
+        lastFinalTeamA = tempFinalTeamA;
+        lastFinalTeamB = tempFinalTeamB;
+        lastTeamAAvgAge = Math.floor(calculateAverageAge(tempFinalTeamA));
+        lastTeamBAvgAge = Math.floor(calculateAverageAge(tempFinalTeamB));
+        // TBD players y roles
+        const requiredPlayersPerTeam = 11;
+        const playerRolesMap: Record<string, any[]> = {};
+        const assignedRolesMap: Record<string, string> = {};
+        [...tempFinalTeamA, ...tempFinalTeamB].forEach((player) => {
+          if (player.playerRoles && Array.isArray(player.playerRoles)) {
+            playerRolesMap[player.id] = player.playerRoles.map((role: any) => {
+              if (typeof role === 'string') return { role, priority: 1 };
+              return role;
+            });
+          } else {
+            playerRolesMap[player.id] = [];
+          }
+          if (player.assignedRole)
+            assignedRolesMap[player.id] = player.assignedRole;
+        });
+        lastPlayerRolesMap = playerRolesMap;
+        lastAssignedRolesMap = assignedRolesMap;
+        const totalRealPlayers = tempFinalTeamA.length + tempFinalTeamB.length;
+        const shouldCreateTbdPlayers =
+          allowTbdPlayers && totalRealPlayers < requiredPlayersPerTeam * 2;
+        const tbdPlayersTeamA = shouldCreateTbdPlayers
+          ? addTbdPlayers(tempFinalTeamA, true, requiredPlayersPerTeam)
+          : [];
+        const tbdPlayersTeamB = shouldCreateTbdPlayers
+          ? addTbdPlayers(tempFinalTeamB, false, requiredPlayersPerTeam)
+          : [];
+        lastTbdPlayers = {
+          teamA: tbdPlayersTeamA,
+          teamB: tbdPlayersTeamB,
+          playerRoles: playerRolesMap,
+          assignedRoles: assignedRolesMap,
+        };
+        // Comparar con los equipos anteriores
+        if (
+          previousTeamAIds.length > 0 &&
+          previousTeamBIds.length > 0 &&
+          ((JSON.stringify(teamAIds) === JSON.stringify(previousTeamAIds) &&
+            JSON.stringify(teamBIds) === JSON.stringify(previousTeamBIds)) ||
+            (JSON.stringify(teamAIds) === JSON.stringify(previousTeamBIds) &&
+              JSON.stringify(teamBIds) === JSON.stringify(previousTeamAIds)))
+        ) {
+          tries++;
+          continue;
+        } else {
+          foundDifferent = true;
+          break;
+        }
+      }
+      if (
+        !foundDifferent &&
+        previousTeamAIds.length > 0 &&
+        previousTeamBIds.length > 0
+      ) {
+        lowVariability = true;
+      }
+      // Usar los últimos equipos generados
+      finalTeamA = lastFinalTeamA;
+      finalTeamB = lastFinalTeamB;
+      teamAAvgAge = lastTeamAAvgAge;
+      teamBAvgAge = lastTeamBAvgAge;
+      tbdPlayers = lastTbdPlayers;
     }
-
-    // Asegurar distribución pareja de jugadores reales
-    [teamAMembers, teamBMembers] = ensureEvenRealPlayerDistribution(
-      teamAMembers,
-      teamBMembers
-    );
-
-    // Remover duplicados
-    let finalTeamA = removeDuplicates(teamAMembers);
-    let finalTeamB = removeDuplicates(teamBMembers);
 
     // Verificar equipos finales
     verifyFinalTeams(finalTeamA, finalTeamB);
-
-    // Calcular edades promedio (redondeado hacia abajo)
-    const teamAAvgAge = Math.floor(calculateAverageAge(finalTeamA));
-    const teamBAvgAge = Math.floor(calculateAverageAge(finalTeamB));
-
-    // Preparar datos de TBD players y roles
-    const requiredPlayersPerTeam = 11;
-    const playerRolesMap: Record<string, any[]> = {};
-    const assignedRolesMap: Record<string, string> = {};
-
-    [...finalTeamA, ...finalTeamB].forEach((player) => {
-      // Usar los roles del jugador si existen
-      if (player.playerRoles && Array.isArray(player.playerRoles)) {
-        playerRolesMap[player.id] = player.playerRoles.map((role: any) => {
-          if (typeof role === 'string') {
-            return { role, priority: 1 }; // Si es string, convertir a formato PlayerRole
-          }
-          return role; // Mantener el objeto PlayerRole completo
-        });
-      } else {
-        playerRolesMap[player.id] = [];
-      }
-
-      if (player.assignedRole) {
-        assignedRolesMap[player.id] = player.assignedRole;
-      }
-    });
-
-    // Generar jugadores TBD SOLO si realmente es necesario
-    // Si ya tenemos jugadores suficientes en total, no crear TBD
-    const totalRealPlayers = finalTeamA.length + finalTeamB.length;
-    const shouldCreateTbdPlayers =
-      allowTbdPlayers && totalRealPlayers < requiredPlayersPerTeam * 2;
-
-    console.log(`🤖 Evaluando TBD players:`, {
-      allowTbdPlayers,
-      totalRealPlayers,
-      requiredTotal: requiredPlayersPerTeam * 2,
-      shouldCreateTbdPlayers,
-      teamASize: finalTeamA.length,
-      teamBSize: finalTeamB.length,
-    });
-
-    const tbdPlayersTeamA = shouldCreateTbdPlayers
-      ? addTbdPlayers(finalTeamA, true, requiredPlayersPerTeam)
-      : [];
-    const tbdPlayersTeamB = shouldCreateTbdPlayers
-      ? addTbdPlayers(finalTeamB, false, requiredPlayersPerTeam)
-      : [];
-
-    // Preparar datos completos de TBD
-    const tbdPlayers = {
-      teamA: tbdPlayersTeamA,
-      teamB: tbdPlayersTeamB,
-      playerRoles: playerRolesMap,
-      assignedRoles: assignedRolesMap,
-    };
 
     // Crear nombres de equipos
     const teamAName = `Equipo A`;
@@ -428,10 +551,22 @@ export default async function handler(
       age: player.age,
       starRating: player.starRating,
       playerRoles:
-        player.playerRoles?.map((role: string) => ({
-          role,
-          priority: 1,
-        })) || [], // Convertir a PlayerRole
+        player.playerRoles?.map((role: any) => {
+          if (typeof role === 'string') {
+            return { role, priority: 1 };
+          }
+          // Si el rol ya es un objeto { role, priority }, devolverlo plano
+          if (
+            role &&
+            typeof role === 'object' &&
+            'role' in role &&
+            'priority' in role &&
+            typeof role.role === 'string'
+          ) {
+            return { role: role.role, priority: role.priority };
+          }
+          return role;
+        }) || [],
       assignedRole: player.assignedRole,
       role: player.role,
       positionForced: player.positionForced || false,
@@ -445,10 +580,21 @@ export default async function handler(
       age: player.age,
       starRating: player.starRating,
       playerRoles:
-        player.playerRoles?.map((role: string) => ({
-          role,
-          priority: 1,
-        })) || [], // Convertir a PlayerRole
+        player.playerRoles?.map((role: any) => {
+          if (typeof role === 'string') {
+            return { role, priority: 1 };
+          }
+          if (
+            role &&
+            typeof role === 'object' &&
+            'role' in role &&
+            'priority' in role &&
+            typeof role.role === 'string'
+          ) {
+            return { role: role.role, priority: role.priority };
+          }
+          return role;
+        }) || [],
       assignedRole: player.assignedRole,
       role: player.role,
       positionForced: player.positionForced || false,
@@ -519,15 +665,19 @@ export default async function handler(
       match = await prisma.match.update({
         where: { id: existingMatch.id },
         data: {
-          teamA: teamAName,
-          teamB: teamBName,
+          teamA: JSON.stringify(responseTeamA), // Guardar el equipo completo
+          teamB: JSON.stringify(responseTeamB), // Guardar el equipo completo
           tbdPlayers: JSON.stringify(tbdPlayers),
-
           sortCount: { increment: 1 },
         },
       });
 
       console.log('✅ Partido actualizado para re-sorteo');
+      console.log('🎯 DEBUG - Equipos guardados en base de datos:', {
+        teamA: responseTeamA.map((p) => p.name),
+        teamB: responseTeamB.map((p) => p.name),
+        sortCount: match.sortCount,
+      });
     } else {
       // Crear nuevo partido (incluir playerRoles si vienen del partido original)
       match = await prisma.match.create({
@@ -557,7 +707,7 @@ export default async function handler(
       console.log('✅ Nuevo partido creado');
     }
 
-    // Registrar jugadores en el partido
+    // Registrar jugadores en el partido (tanto para nuevo partido como para resort)
     for (const player of finalTeamA) {
       if (!player.id || player.id.startsWith('tbd-')) continue;
 
@@ -616,7 +766,7 @@ export default async function handler(
           teamB: responseTeamB,
         },
         totalPlayers: finalTeamA.length + finalTeamB.length,
-        tbdPlayersCount: tbdPlayersTeamA.length + tbdPlayersTeamB.length,
+        tbdPlayersCount: tbdPlayers.teamA.length + tbdPlayers.teamB.length,
         balancingCriteria: {
           byAge: balanceByAge,
           byRole: balanceByRole,
@@ -666,6 +816,24 @@ export default async function handler(
       })),
     };
 
+    // Guardar los criterios de sorteo utilizados en el grupo
+    const sortingCriteria = {
+      balanceByAge,
+      balanceByRole,
+      balanceByRating,
+      isRandomMode: useRandomAlgorithm,
+      timestamp: new Date().toISOString(),
+    };
+
+    await prisma.group.update({
+      where: { id: groupId },
+      data: {
+        lastSortingCriteria: JSON.stringify(sortingCriteria),
+      },
+    });
+
+    console.log('✅ Criterios de sorteo guardados:', sortingCriteria);
+
     return res.status(200).json({
       message: isResort
         ? 'Equipos reorganizados correctamente'
@@ -676,6 +844,7 @@ export default async function handler(
       teamBAvgAge,
       match: cleanMatch,
       tbdPlayers: cleanTbdPlayers,
+      lowVariability,
     });
   } catch (error) {
     console.error('Error al crear partido:', error);

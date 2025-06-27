@@ -62,7 +62,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return null;
     },
     enabled: status !== 'loading',
-    staleTime: 5 * 60 * 1000, // 5 minutos
+    staleTime: 10 * 60 * 1000, // 10 minutos para evitar refetches frecuentes
+    gcTime: 15 * 60 * 1000, // 15 minutos de cache
+    refetchOnWindowFocus: false, // No refetch en window focus
+    refetchOnMount: false, // No refetch automático en mount
   });
 
   // Mutación para iniciar sesión - simplificada

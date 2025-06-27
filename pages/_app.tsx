@@ -24,6 +24,57 @@ const AUTH_ROUTES = ['/auth', '/login', '/register', '/api/auth'];
 const LOOP_DETECTION_WINDOW = 5000; // 5 segundos
 const MAX_NAVIGATION_COUNT = 5; // Máximo número de navegaciones en la ventana de tiempo
 
+// Hook personalizado para manejar reload on focus
+function useReloadOnFocus(queryClient: any) {
+  const lastFocusTime = useRef<number>(0);
+  const FOCUS_COOLDOWN = 2000; // 2 segundos de cooldown entre reloads
+
+  useEffect(() => {
+    const handleFocus = () => {
+      const now = Date.now();
+
+      // Evitar reloads muy frecuentes
+      if (now - lastFocusTime.current < FOCUS_COOLDOWN) {
+        console.log('🔄 Reload on focus omitido por cooldown');
+        return;
+      }
+
+      lastFocusTime.current = now;
+
+      // Solo recargar si estamos en una página que no sea de autenticación
+      const currentPath = window.location.pathname;
+      const isAuthRoute = AUTH_ROUTES.some((route) =>
+        currentPath.includes(route)
+      );
+
+      if (!isAuthRoute) {
+        console.log('🔄 Reload on focus ejecutado');
+        queryClient?.refetchQueries({
+          type: 'active',
+          exact: false,
+        });
+      } else {
+        console.log('🔄 Reload on focus omitido en ruta de auth');
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        handleFocus();
+      }
+    };
+
+    // Eventos para detectar cuando la ventana vuelve a tener foco
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [queryClient]);
+}
+
 function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
   const router = useRouter();
   const routerEventsEnabled = useRef(true);
@@ -37,16 +88,19 @@ function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 0, // Siempre considerar datos como obsoletos
-            gcTime: 0, // No guardar en caché (reemplaza a cacheTime)
+            staleTime: 5 * 60 * 1000, // 5 minutos antes de considerar datos obsoletos
+            gcTime: 10 * 60 * 1000, // 10 minutos de cache time
             retry: 1,
-            refetchOnMount: 'always',
-            refetchOnWindowFocus: true,
-            refetchOnReconnect: true,
+            refetchOnMount: false, // No refetch automático en mount
+            refetchOnWindowFocus: true, // ✅ ACTIVADO: refetch en window focus
+            refetchOnReconnect: true, // Solo refetch en reconexión
           },
         },
       })
   );
+
+  // Usar el hook de reload on focus
+  useReloadOnFocus(queryClient);
 
   // Función mejorada para detectar y prevenir loops de redirección
   const detectRouteChangeLoop = (url: string): boolean => {
@@ -141,9 +195,9 @@ function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
     <QueryClientProvider client={queryClient}>
       <SessionProvider
         session={session}
-        // Configuración más conservadora para prevenir loops
-        refetchInterval={process.env.NODE_ENV === 'development' ? 60 : 300} // 5 minutos en producción
-        refetchOnWindowFocus={true}
+        // Configuración optimizada para reducir llamadas a session
+        refetchInterval={process.env.NODE_ENV === 'development' ? 0 : 0} // Desactivar polling automático
+        refetchOnWindowFocus={true} // ✅ ACTIVADO: refetch en window focus
         refetchWhenOffline={false}
         // Configuración específica para Vercel preview
         basePath='/api/auth'
