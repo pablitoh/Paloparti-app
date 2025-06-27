@@ -309,13 +309,6 @@ export default async function handler(
         return res.status(400).json({ message: 'Faltan campos obligatorios' });
       }
 
-      // Validar que requiredPlayers sea un número par
-      if (requiredPlayers % 2 !== 0) {
-        return res
-          .status(400)
-          .json({ message: 'El número de jugadores requeridos debe ser par' });
-      }
-
       // Actualizar el grupo
       const updatedGroup = await prisma.group.update({
         where: { id },

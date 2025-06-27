@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react';
 import { RecurrenceType } from '../../types/match';
 import DeleteGroupModal from '../../components/group/modals/DeleteGroupModal';
 import { isGhostPlayer, deleteGhostPlayer } from '../../lib/ghostPlayerUtils';
+import { showSuccessToast, showErrorToast } from '../../services/toastService';
 
 interface Member {
   id: string;
@@ -39,8 +40,6 @@ export default function EditGroup() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [group, setGroup] = useState<Group | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -119,7 +118,7 @@ export default function EditGroup() {
           recurrenceType: data.recurrenceType || 'NONE',
           recurrenceDays: data.recurrenceDays || [],
           recurrenceTime: data.recurrenceTime || '18:00',
-          requiredPlayers: (data.requiredPlayers || 10) / 2, // Convert total players to players per team
+          requiredPlayers: data.requiredPlayers || 10, // Ya no dividimos por 2
           teamAName: data.teamAName || 'Equipo A',
           teamBName: data.teamBName || 'Equipo B',
           teamAColor: data.teamAColor || '#3B82F6', // Azul por defecto
@@ -137,9 +136,9 @@ export default function EditGroup() {
           // Redirigir si no es administrador
           router.push(`/group/${id}`);
         }
-      } catch (error) {
-        console.error('Error fetching group details:', error);
-        setError('Ha ocurrido un error al cargar los datos del grupo');
+      } catch (err) {
+        console.error('Error fetching group details:', err);
+        showErrorToast('Ha ocurrido un error al cargar los datos del grupo');
       } finally {
         setIsLoading(false);
       }
@@ -154,18 +153,25 @@ export default function EditGroup() {
     e.preventDefault();
 
     if (!session?.user || !isAdmin) {
-      setError('No tienes permisos para editar este grupo');
+      showErrorToast('No tienes permisos para editar este grupo');
       return;
     }
 
     try {
       setIsSubmitting(true);
-      setError(null);
-      setSuccess(null);
 
       // Validar que jugadores por equipo sea mayor a 0
-      if (formData.requiredPlayers < 1) {
-        setError('Debe haber al menos 1 jugador por equipo');
+      if (formData.requiredPlayers < 2) {
+        showErrorToast('Debe haber al menos 2 jugadores en total');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Validar que el número total de jugadores sea par
+      if (formData.requiredPlayers % 2 !== 0) {
+        showErrorToast(
+          'El número total de jugadores debe ser par para tener equipos equilibrados'
+        );
         setIsSubmitting(false);
         return;
       }
@@ -191,7 +197,7 @@ export default function EditGroup() {
         teamAName: validatedTeamAName,
         teamBName: validatedTeamBName,
         nextMatch: nextMatch ? nextMatch.toISOString() : null,
-        requiredPlayers: Number(formData.requiredPlayers) * 2, // Convert players per team to total players
+        requiredPlayers: Number(formData.requiredPlayers),
       };
 
       console.log(
@@ -220,16 +226,16 @@ export default function EditGroup() {
         throw new Error(data.message || 'Error al actualizar el grupo');
       }
 
-      setSuccess('Grupo actualizado correctamente');
+      showSuccessToast('Grupo actualizado correctamente');
 
       // Redirect to group page after successful update
       setTimeout(() => {
         router.push(`/group/${id}`);
       }, 1000);
-    } catch (error) {
-      console.error('Error al actualizar grupo:', error);
-      setError(
-        error instanceof Error ? error.message : 'Error al actualizar el grupo'
+    } catch (err) {
+      console.error('Error al actualizar grupo:', err);
+      showErrorToast(
+        err instanceof Error ? err.message : 'Error al actualizar el grupo'
       );
     } finally {
       setIsSubmitting(false);
@@ -325,8 +331,6 @@ export default function EditGroup() {
 
     try {
       setIsSubmitting(true);
-      setError(null);
-      setSuccess(null);
 
       console.log('Sending member action:', { memberId, action });
 
@@ -382,11 +386,11 @@ export default function EditGroup() {
 
       setMembers(updatedMembers);
 
-      setSuccess(data.message || 'Operación completada con éxito');
-    } catch (error) {
-      console.error('Error:', error);
-      setError(
-        error instanceof Error ? error.message : 'Error al realizar la acción'
+      showSuccessToast(data.message || 'Operación completada con éxito');
+    } catch (err) {
+      console.error('Error:', err);
+      showErrorToast(
+        err instanceof Error ? err.message : 'Error al realizar la acción'
       );
     } finally {
       setIsSubmitting(false);
@@ -411,8 +415,6 @@ export default function EditGroup() {
 
     try {
       setIsSubmitting(true);
-      setError(null);
-      setSuccess(null);
 
       const response = await fetch(`/api/groups/${id}/ghost-players`, {
         method: 'DELETE',
@@ -435,12 +437,12 @@ export default function EditGroup() {
       );
       setMembers(updatedMembers);
 
-      setSuccess('Jugador fantasma eliminado exitosamente');
-    } catch (error) {
-      console.error('Error deleting ghost player:', error);
-      setError(
-        error instanceof Error
-          ? error.message
+      showSuccessToast('Jugador fantasma eliminado exitosamente');
+    } catch (err) {
+      console.error('Error deleting ghost player:', err);
+      showErrorToast(
+        err instanceof Error
+          ? err.message
           : 'Error al eliminar jugador fantasma'
       );
     } finally {
@@ -460,8 +462,6 @@ export default function EditGroup() {
 
     try {
       setIsDeleting(true);
-      setError(null);
-      setSuccess(null);
 
       // Llamar a la API para eliminar el grupo
       const response = await fetch(`/api/groups/${id}`, {
@@ -476,16 +476,16 @@ export default function EditGroup() {
         throw new Error(data.message || 'Error al eliminar el grupo');
       }
 
-      setSuccess('Grupo eliminado correctamente');
+      showSuccessToast('Grupo eliminado correctamente');
 
       // Redireccionar a la página de grupos después de eliminar
       setTimeout(() => {
         router.push('/groups');
       }, 1500);
-    } catch (error) {
-      console.error('Error al eliminar grupo:', error);
-      setError(
-        error instanceof Error ? error.message : 'Error al eliminar el grupo'
+    } catch (err) {
+      console.error('Error al eliminar grupo:', err);
+      showErrorToast(
+        err instanceof Error ? err.message : 'Error al eliminar el grupo'
       );
     } finally {
       setIsDeleting(false);
@@ -521,14 +521,16 @@ export default function EditGroup() {
     );
   }
 
-  if (error && !group) {
+  if (!group) {
     return (
       <Layout>
         <div className='text-center py-12'>
           <h2 className='text-xl font-medium text-gray-900 mb-4'>
             Error al cargar el grupo
           </h2>
-          <p className='text-gray-500 mb-6'>{error}</p>
+          <p className='text-gray-500 mb-6'>
+            No se pudo cargar la información del grupo
+          </p>
           <Button onClick={() => router.back()} variant='primary'>
             Volver
           </Button>
@@ -583,18 +585,6 @@ export default function EditGroup() {
               Editar Grupo: {group?.name}
             </h1>
           </div>
-
-          {error && (
-            <div className='mb-4 p-3 bg-red-100 text-red-700 rounded-lg'>
-              {error}
-            </div>
-          )}
-
-          {success && (
-            <div className='mb-4 p-3 bg-green-100 text-green-700 rounded-lg'>
-              {success}
-            </div>
-          )}
 
           {/* Sección 1: Información básica del grupo */}
           <div className='bg-white rounded-xl shadow-md p-6 mb-6'>
@@ -662,7 +652,7 @@ export default function EditGroup() {
                   htmlFor='requiredPlayers'
                   className='block text-sm font-medium text-gray-700 mb-1'
                 >
-                  Jugadores por equipo
+                  Total de Jugadores Requeridos
                 </label>
                 <input
                   type='number'
@@ -670,12 +660,13 @@ export default function EditGroup() {
                   name='requiredPlayers'
                   value={formData.requiredPlayers}
                   onChange={handleChange}
-                  min={1}
+                  min='2'
+                  max='30'
                   required
                   className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                 />
                 <p className='mt-1 text-sm text-gray-500'>
-                  Número de jugadores por equipo
+                  Número total de jugadores necesarios para el partido
                 </p>
               </div>
 

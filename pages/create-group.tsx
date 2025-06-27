@@ -86,12 +86,20 @@ export default function CreateGroup() {
     setError(null);
 
     try {
+      // Calcular próxima fecha de partido
+      const nextMatch = new Date();
+      nextMatch.setDate(nextMatch.getDate() + 7); // Una semana en el futuro
+
       const response = await fetch('/api/groups', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          requiredPlayers: Number(formData.requiredPlayers),
+          nextMatch: nextMatch ? nextMatch.toISOString() : null,
+        }),
       });
 
       const data = await response.json();
@@ -308,7 +316,7 @@ export default function CreateGroup() {
                   htmlFor='requiredPlayers'
                   className='block text-sm font-medium text-gray-700 mb-2'
                 >
-                  Jugadores Requeridos por Equipo
+                  Total de Jugadores Requeridos
                 </label>
                 <input
                   type='number'
@@ -316,10 +324,13 @@ export default function CreateGroup() {
                   name='requiredPlayers'
                   value={formData.requiredPlayers}
                   onChange={handleChange}
-                  min='1'
-                  max='15'
+                  min='2'
+                  max='30'
                   className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-200 focus:border-primary-500 transition-all duration-200'
                 />
+                <p className='mt-1 text-sm text-gray-500'>
+                  Número total de jugadores necesarios para el partido
+                </p>
               </div>
 
               {/* Recurrence Section */}
