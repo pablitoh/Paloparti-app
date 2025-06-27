@@ -6,15 +6,15 @@
 
 */
 -- AlterTable
-ALTER TABLE "Group" ADD COLUMN     "teamAColor" TEXT DEFAULT '#3B82F6',
-ADD COLUMN     "teamBColor" TEXT DEFAULT '#EF4444';
+ALTER TABLE "Group" ADD COLUMN IF NOT EXISTS "teamAColor" TEXT DEFAULT '#3B82F6',
+ADD COLUMN IF NOT EXISTS "teamBColor" TEXT DEFAULT '#EF4444';
 
 -- AlterTable
-ALTER TABLE "GroupMember" ADD COLUMN     "starRating" INTEGER NOT NULL DEFAULT 3;
+ALTER TABLE "GroupMember" ADD COLUMN IF NOT EXISTS "starRating" INTEGER NOT NULL DEFAULT 3;
 
 -- AlterTable
-ALTER TABLE "Match" DROP COLUMN "playersA",
-DROP COLUMN "playersB";
+ALTER TABLE "Match" DROP COLUMN IF EXISTS "playersA",
+DROP COLUMN IF EXISTS "playersB";
 
 -- AlterTable
-ALTER TABLE "MatchAttendance" ADD COLUMN     "playerRoles" JSONB;
+ALTER TABLE "MatchAttendance" ADD COLUMN IF NOT EXISTS "playerRoles" JSONB;
